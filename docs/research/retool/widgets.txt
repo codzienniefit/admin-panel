@@ -1,0 +1,1670 @@
+==========================================================================================
+challengeFormGoalsSelect [MultiselectWidget2] in challengeTabs/72679 (body) row=1.4000000000000004 col=0
+    data: {{ workoutsConfig.data.challengeGoals }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Cele
+    labels: {{ item.title }}
+    placeholder: Wybierz
+    searchMode: fuzzy
+    values: {{ item.id }}
+==========================================================================================
+tabbedContainer [ContainerWidget2] in / (body) row=0.6000000000000001 col=0
+    _iconByIndex: ["bold/travel-hotel-dumbell", "bold/interface-text-formatting-list-bullets", "bold/mail-chat-two-bubbles-square", "bold/nature-ecology-flower-alternate", "bold/interface-security-shield-person—shield-secure-security-person"]
+    _iconPositionByIndex: ["left", "left", "left", "left", "left"]
+    _ids: ["8efbe", "58252", "1a1b2", "c00a3", "098d0"]
+    _labels: ["", "", "Wiadomości", "", ""]
+    _viewKeys: ["Treningi", "Wyzwania", "Wiadomosci", "Odznaki", "Użytkownicy"]
+    currentViewKey: {{ selectedTab }}
+    itemMode: static
+    EVENT: on change -> QUERY adminConfig.trigger()
+==========================================================================================
+tabMedia [TabsWidget2] in tabbedContainer/8efbe (header) row=1 col=0
+    _ids: ["9ee26", "c0dcf", "c761a"]
+    _values: ["Tab 1", "Tab 2", "Tab 3"]
+    disabled: {{ WorkoutModal.opened || ChallengeModal.opened }}
+    itemMode: static
+    navigateContainer: true
+    styleVariant: pill
+    targetContainerId: tabbedContainer
+    value: {{ self.values[0] }}
+==========================================================================================
+$main [Frame] in None/None (None) row=None col=None
+    type: main
+==========================================================================================
+workoutsTableForm [FormWidget2] in WorkoutModal/ (body) row=3.552713678800501e-15 col=0
+    disableSubmit: {{upsertWorkout.isFetching || !formFancyContentLabel.valid}}
+    loading: {{upsertWorkout.isFetching || workoutsQuery.isFetching }}
+    requireValidation: true
+    resetAfterSubmit: true
+    EVENT: |
+        on submit -> SCRIPT: let data = await getWorkoutUpsertJson.trigger()
+        
+        upsertWorkout.trigger({
+          
+          onSuccess: function (data) {
+          WorkoutModal.close()
+            }}
+        )
+==========================================================================================
+formTitle1 [TextWidget2] in workoutsTableForm/ (header) row=0.6 col=0
+    ariaLive: off
+    value: #### {{formTitleLabel.value && formIdLabel.value ? formTitleLabel.value + " (id: " + formIdLabel.value +")": "Nowy trening"}}
+==========================================================================================
+formSubmit [ButtonWidget2] in workoutsTableForm/ (footer) row=0 col=8
+    hidden: false
+    styleVariant: solid
+    submit: true
+    submitTargetId: workoutsTableForm
+    text: {{formIdLabel.value?.length > 0 ? "Zapisz zmiany" : "Stwórz nowy"}}
+==========================================================================================
+formIdLabel [TextInputWidget2] in workoutTabs/72679 (body) row=0 col=0
+    disabled: true
+    hidden: false
+    label: ID
+==========================================================================================
+formLevelSelect [SelectWidget2] in workoutTabs/72679 (body) row=6.106226635438361e-16 col=6
+    data: {{ workoutsConfig.data.trainingLevels }}
+    emptyMessage: No options
+    formDataKey: LevelId
+    itemMode: dynamic
+    label: Poziom
+    labels: {{item.title}}
+    required: true
+    searchMode: fuzzy
+    values: {{item.id}}
+==========================================================================================
+formEquipmentMultiselect [MultiselectWidget2] in workoutTabs/72679 (body) row=1.5999999999999996 col=6
+    data: {{  workoutsConfig.data.equipmentTypes}}
+    emptyMessage: No options
+    formDataKey: EquipmentIds
+    itemMode: dynamic
+    label: Sprzęt
+    labels: {{item.title}}
+    searchMode: fuzzy
+    values: {{item.id}}
+==========================================================================================
+formTypeMultiselect [MultiselectWidget2] in workoutTabs/72679 (body) row=1.8000000000000034 col=6
+    data: {{ workoutsConfig.data.trainingTypes }}
+    emptyMessage: No options
+    formDataKey: TrainingTypeIds
+    itemMode: dynamic
+    label: Typ
+    labels: {{item.title}}
+    placeholder: Select options
+    searchMode: fuzzy
+    values: {{item.id}}
+==========================================================================================
+formLinkLabel [TextInputWidget2] in workoutTabs/72679 (body) row=2.599999999999992 col=6
+    formDataKey: VideoUrl
+    hideLabel: true
+    label: Link
+    patternType: url
+    placeholder: https://
+    showClear: true
+==========================================================================================
+WorkoutModal [ModalWidget] in tabbedContainer/ (header) row=-3.552713678800501e-15 col=6
+    buttonText: Workout modal
+    hidden: true
+    modalHeight: 1000
+    modalHeightType: auto
+    modalOverflowType: scroll
+    modalWidth: 70%
+    EVENT: |
+        on open -> SCRIPT: startCreatingOrEditingWorkout.trigger({additionalScope: {
+          workoutId: "-1"
+        }})  [enabled={{false}}]
+    EVENT: |
+        on close -> SCRIPT: workoutsTableForm.clear()
+        workoutsTableForm.reset()
+        formFancyContentLabel.setValue([])
+==========================================================================================
+formTitleLabel [TextInputWidget2] in workoutTabs/72679 (body) row=0.20000000000000018 col=0
+    formDataKey: Title
+    label: Nazwa
+    minLength: 4
+    required: true
+==========================================================================================
+formDurationLabel [NumberInputWidget] in workoutTabs/72679 (body) row=0.1999999999999993 col=4
+    currency: USD
+    formDataKey: {{ self.id }}
+    format: decimal
+    label: Czas (min)
+    max: {{(workoutsConfig?.data?.duration?.toSeconds ?? 5400)/60}}
+    min: {{(workoutsConfig?.data?.duration?.fromSeconds ?? 600)/60}}
+    placeholder: Enter value
+    required: true
+    showStepper: true
+==========================================================================================
+formPremiumCheckbox [SwitchWidget2] in workoutTabs/72679 (body) row=1.000000000000001 col=10
+    formDataKey: {{ self.id }}
+    label: Płatny
+==========================================================================================
+formHiddenCheckbox [SwitchWidget2] in workoutTabs/72679 (body) row=0.20000000000000107 col=10
+    formDataKey: {{ self.id }}
+    label: Ukryj
+==========================================================================================
+formImageRelativePath [TextInputWidget2] in workoutTabs/72679 (body) row=9.200000000000001 col=0
+    hideLabel: true
+    label: Grafika
+    minLength: 4
+==========================================================================================
+formFancyContentLabel [JSONEditorWidget] in workoutTabs/72679 (body) row=1.5999999999999996 col=0
+    valid: true
+==========================================================================================
+formVideoPlayer [VideoWidget] in workoutTabs/72679 (body) row=2.799999999999995 col=6
+    hidden: {{ !formLinkLabel.value }}
+    playbackRate: 1
+    src: {{formLinkLabel.value}}
+    volume: 1
+==========================================================================================
+formImagePreview [ImageWidget2] in workoutTabs/72679 (body) row=9.400000000000002 col=0
+    hidden: {{ !formImageRelativePath.value }}
+    src: {{mediaEndpoint.value}}{{formImageRelativePath.value}}
+==========================================================================================
+formAddedAtLabel [DateTimeWidget] in workoutTabs/72679 (body) row=0.6000000000000003 col=0
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Data dodania
+    manageTimeZone: true
+    value: {{ new Date() }}
+    valueTimeZone: 00:00
+==========================================================================================
+text1 [TextWidget2] in workoutTabs/72679 (body) row=0.9999999999999993 col=0
+    ariaLive: off
+    value: **Opis**
+==========================================================================================
+link1 [LinkWidget] in workoutTabs/72679 (body) row=1.0000000000000018 col=3
+    text: Skopiuj przykład z tytułem i treścią
+    EVENT: on click -> util .copyToClipboard({"value": "{{JSON.stringify([{\n  \"type\": \"Title\",\n  \"content\": \"Treść\"\n},{\n  \"type\": \"Text\",\n  \"content\": \"Treść\"\n}], null, \" \")}}"})
+==========================================================================================
+imagesGrid [ListViewWidget2] in workoutTabs/9e973 (body) row=1.7999999999999972 col=0
+    data: {{ allMediaFilesQuery.data }}
+    formDataKey: {{ self.id }}
+    itemWidth: 200px
+    numColumns: 5
+==========================================================================================
+container2 [ContainerWidget2] in imagesGrid/ (body) row=0 col=0
+    _ids: ["cea9f"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+    EVENT: |
+        on click -> SCRIPT: formImageRelativePath.setValue(allMediaFilesQuery.data[i].path)
+        workoutTabs.setCurrentViewIndex(0)
+==========================================================================================
+containerTitle1 [TextWidget2] in container2/ (header) row=0 col=0
+    ariaLive: off
+    value: ###### {{ item.path }}
+==========================================================================================
+image1 [ImageWidget2] in container2/cea9f (body) row=0 col=0
+    src: {{mediaEndpoint.value + item.path}}
+    tooltipText: ![alt text]({{encodeURI( mediaEndpoint.value + item.path)}})
+==========================================================================================
+workoutTabs [ContainerWidget2] in workoutsTableForm/ (header) row=1.200000000000002 col=0
+    _iconPositionByIndex: ["", "", "left"]
+    _ids: ["72679", "9e973", "06a8d"]
+    _labels: ["", "", "Audio"]
+    _viewKeys: ["Szczegóły treningu", "Grafiki", "Audio"]
+    currentViewKey: {{ self.viewKeys[0] }}
+    itemMode: static
+==========================================================================================
+tabs1 [TabsWidget2] in workoutTabs/ (header) row=0 col=0
+    _ids: ["5e8a8", "dc871", "61475"]
+    _values: ["Tab 1", "Tab 2", "Tab 3"]
+    itemMode: static
+    navigateContainer: true
+    styleVariant: pill
+    targetContainerId: workoutTabs
+    value: {{ self.values[0] }}
+==========================================================================================
+link2 [LinkWidget] in workoutTabs/72679 (body) row=8.600000000000003 col=3
+    text: Wybierz miniaturkę
+    EVENT: on click -> SCRIPT: workoutTabs.setCurrentViewIndex(1)
+==========================================================================================
+text2 [TextWidget2] in workoutTabs/72679 (body) row=7.800000000000001 col=0
+    ariaLive: off
+    value: **Miniaturka**
+==========================================================================================
+fileInput [FileInputWidget] in workoutTabs/9e973 (body) row=0.6 col=6
+    accept: ['webp']
+    appendNewSelection: true
+    disabled: {{uploadImage.isFetching}}
+    formDataKey: {{ self.id }}
+    hideLabel: true
+    iconBefore: bold/image-picture-gallery
+    maxSize: 250kb
+    placeholder: Dodaj zdjęcie
+    selectionType: single
+==========================================================================================
+fileSendButton [ButtonWidget2] in workoutTabs/9e973 (body) row=0.8000000000000002 col=10
+    disabled: {{ fileInput.files.length < 1 }}
+    hidden: {{ fileInput.files.length < 1 }}
+    loading: {{uploadImage.isFetching}}
+    styleVariant: solid
+    submitTargetId: workoutsTableForm
+    text: Wyślij
+    EVENT: |
+        on click -> SCRIPT: uploadImage.trigger({onSuccess: () => {
+          fileInput.clearValue()
+          allMediaFilesQuery.trigger()
+        }})
+==========================================================================================
+link3 [LinkWidget] in workoutTabs/72679 (body) row=1.9999999999999996 col=8
+    text: YouTube Codziennie Fit
+    EVENT: on click -> util .openUrl({"url": "https://www.youtube.com/@codziennie_fit/videos"})
+==========================================================================================
+text3 [TextWidget2] in workoutTabs/72679 (body) row=1.9999999999999996 col=6
+    ariaLive: off
+    value: **YouTube**
+==========================================================================================
+formLiveDateLabel [DateTimeWidget] in workoutTabs/72679 (body) row=0.8000000000000005 col=0
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Data live
+    manageTimeZone: true
+    showClear: true
+    value: {{null}}
+    valueTimeZone: 00:00
+==========================================================================================
+formAvailableAtDate [DateTimeWidget] in workoutTabs/72679 (body) row=0.7999999999999996 col=3
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Data premiery
+    manageTimeZone: true
+    value: {{null}}
+    valueTimeZone: 00:00
+==========================================================================================
+formInternalTitleLabel [TextInputWidget2] in workoutTabs/72679 (body) row=0.3999999999999999 col=0
+    formDataKey: InternalTitle
+    label: Komentarz (niewidoczny w apce)
+==========================================================================================
+ChallengeModal [ModalWidget] in tabbedContainer/ (header) row=2 col=9
+    buttonText: Challenge modal
+    hidden: true
+    modalHeight: 1000
+    modalHeightType: auto
+    modalOverflowType: scroll
+    modalWidth: 100%
+    EVENT: |
+        on open -> SCRIPT: startCreatingOrEditingChallenge.trigger({additionalScope: {
+          challengeId: "-1"
+        }})  [enabled={{false}}]
+    EVENT: |
+        on close -> SCRIPT: challengesTableForm.clear()
+        challengesTableForm.reset()
+        challengeFormFancyContentLabel.setValue([])
+==========================================================================================
+challengesTableForm [FormWidget2] in ChallengeModal/ (body) row=0 col=0
+    disableSubmit: {{upsertChallengePOST.isFetching || !challengeFormFancyContentLabel.valid}}
+    loading: {{upsertChallengePOST.isFetching || challengesQuery.isFetching }}
+    requireValidation: true
+    resetAfterSubmit: true
+    EVENT: on submit -> QUERY upsertChallenge.trigger({"options": {"onSuccess": null, "onFailure": null, "additionalScope": null}})
+==========================================================================================
+challengeFormTitle [TextWidget2] in challengesTableForm/ (header) row=0.6 col=0
+    ariaLive: off
+    value: #### {{challengeFormTitleLabel.value && challengeFormIdLabel.value ? challengeFormTitleLabel.value + " (id: " + challengeFormIdLabel.value +")": "Nowe wyzwanie"}}
+==========================================================================================
+challengeFormSubmitButton [ButtonWidget2] in challengesTableForm/ (header) row=1.3999999999999986 col=8
+    hidden: false
+    styleVariant: solid
+    submitTargetId: challengesTableForm
+    text: {{challengeFormIdLabel.value?.length > 0 ? "Zapisz zmiany" : "Stwórz nowe"}}
+    EVENT: on click -> QUERY upsertChallenge.trigger({"options": {"additionalScope": {"force": "false"}}})
+==========================================================================================
+challengeTabs [ContainerWidget2] in challengesTableForm/ (header) row=1.1999999999999986 col=0
+    _ids: ["72679", "9e973"]
+    _viewKeys: ["Szczegóły wyzwania", "Grafiki"]
+    itemMode: static
+==========================================================================================
+challengeFormIdLabel [TextInputWidget2] in challengeTabs/72679 (body) row=0 col=0
+    disabled: true
+    hidden: false
+    label: ID
+==========================================================================================
+challengeFormTitleLabel [TextInputWidget2] in challengeTabs/72679 (body) row=0.5999999999999999 col=0
+    formDataKey: Title
+    label: Nazwa
+    minLength: 4
+    required: true
+==========================================================================================
+challengeFormPremiumCheckbox [SwitchWidget2] in challengeDetailsPaymentContainer/00030 (header) row=0.2 col=0
+    formDataKey: {{ self.id }}
+    label: Płatne
+==========================================================================================
+challengeFormHiddenCheckbox [SwitchWidget2] in challengeTabs/72679 (body) row=0 col=4
+    formDataKey: {{ self.id }}
+    label: Ukryj
+==========================================================================================
+challengeFormImageRelativePath [TextInputWidget2] in challengeTabs/72679 (body) row=10.8 col=0
+    hideLabel: true
+    label: Grafika
+    minLength: 4
+==========================================================================================
+challengeFormFancyContentLabel [JSONEditorWidget] in challengeTabs/72679 (body) row=4.399999999999999 col=0
+    valid: true
+==========================================================================================
+formImagePreview2 [ImageWidget2] in challengeTabs/72679 (body) row=10.999999999999996 col=0
+    hidden: {{ !challengeFormImageRelativePath.value }}
+    src: {{mediaEndpoint.value}}{{challengeFormImageRelativePath.value}}
+==========================================================================================
+challengeFormAddedAtLabel [DateTimeWidget] in challengeTabs/72679 (body) row=1.7999999999999998 col=0
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Data dodania
+    manageTimeZone: true
+    value: {{ new Date() }}
+    valueTimeZone: 00:00
+==========================================================================================
+text4 [TextWidget2] in challengeTabs/72679 (body) row=3.799999999999999 col=0
+    ariaLive: off
+    value: **Opis**
+==========================================================================================
+link4 [LinkWidget] in challengeTabs/72679 (body) row=3.799999999999997 col=2
+    text: Skopiuj przykład z tytułem i treścią
+    EVENT: on click -> util .copyToClipboard({"value": "{{JSON.stringify([{\n  \"type\": \"Title\",\n  \"content\": \"Treść\"\n},{\n  \"type\": \"Text\",\n  \"content\": \"Treść\"\n}], null, \" \")}}"})
+==========================================================================================
+imagesGrid2 [ListViewWidget2] in challengeMediaGroup/33bf1 (body) row=1.2 col=0
+    data: {{ allMediaFilesQuery.data }}
+    formDataKey: {{ self.id }}
+    itemWidth: 200px
+    numColumns: 5
+==========================================================================================
+container3 [ContainerWidget2] in imagesGrid2/ (body) row=0 col=0
+    _ids: ["cea9f"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+    EVENT: |
+        on click -> SCRIPT: challengeFormImageRelativePath.setValue(allMediaFilesQuery.data[i].path)
+        challengeTabs.setCurrentViewIndex(0)
+==========================================================================================
+containerTitle2 [TextWidget2] in container3/ (header) row=0 col=0
+    ariaLive: off
+    value: ###### {{ item.path }}
+==========================================================================================
+image2 [ImageWidget2] in container3/cea9f (body) row=0 col=0
+    src: {{mediaEndpoint.value + item.path}}
+    tooltipText: ![alt text]({{encodeURI( mediaEndpoint.value + item.path)}})
+==========================================================================================
+tabs2 [TabsWidget2] in challengeTabs/ (header) row=0 col=0
+    _ids: ["5e8a8", "dc871", "61475"]
+    _values: ["Tab 1", "Tab 2", "Tab 3"]
+    itemMode: static
+    navigateContainer: true
+    styleVariant: pill
+    targetContainerId: challengeTabs
+    value: {{ self.values[0] }}
+==========================================================================================
+link5 [LinkWidget] in challengeTabs/72679 (body) row=10.2 col=2
+    text: Wybierz miniaturkę
+    EVENT: on click -> SCRIPT: challengeTabs.setCurrentViewIndex(1)
+==========================================================================================
+text5 [TextWidget2] in challengeTabs/72679 (body) row=10.2 col=0
+    ariaLive: off
+    value: **Miniaturka**
+==========================================================================================
+fileInput2 [FileInputWidget] in challengeMediaGroup/33bf1 (body) row=0 col=6
+    accept: ['webp']
+    appendNewSelection: true
+    disabled: {{uploadImage.isFetching}}
+    formDataKey: {{ self.id }}
+    hideLabel: true
+    iconBefore: bold/image-picture-gallery
+    maxSize: 300kb
+    placeholder: Dodaj zdjęcie
+    selectionType: single
+==========================================================================================
+fileSendButton2 [ButtonWidget2] in challengeMediaGroup/33bf1 (body) row=0.2 col=0
+    disabled: {{ fileInput2.files.length < 1 }}
+    hidden: {{ fileInput2.files.length < 1 }}
+    loading: {{uploadImage.isFetching}}
+    styleVariant: solid
+    submitTargetId: challengesTableForm
+    text: Wyślij
+    EVENT: |
+        on click -> SCRIPT: uploadImage.trigger({onSuccess: () => {
+          fileInput2.clearValue()
+          allMediaFilesQuery.trigger()
+        }})
+==========================================================================================
+challengeFormInternalTitleLabel [TextInputWidget2] in challengeTabs/72679 (body) row=1.0000000000000004 col=0
+    formDataKey: InternalTitle
+    label: Komentarz (niewidoczny w apce)
+==========================================================================================
+challengeFormLengthDaysLabel [NumberInputWidget] in challengeTabs/72679 (body) row=3.6000000000000014 col=0
+    currency: USD
+    formDataKey: {{ self.id }}
+    format: decimal
+    label: Czas trwania (dni)
+    min: 1
+    placeholder: Enter value
+    showStepper: true
+==========================================================================================
+challengeFormSubtitleLabel [TextInputWidget2] in challengeTabs/72679 (body) row=0.8000000000000003 col=0
+    formDataKey: Subtitle
+    label: Podtytuł
+    minLength: 4
+    required: true
+==========================================================================================
+container4 [ContainerWidget2] in challengeTabs/72679 (body) row=-2.220446049250313e-16 col=5
+    _ids: ["b702b"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+challengePathDaysPerWeek [NumberInputWidget] in container4/b702b (body) row=0.8 col=0
+    currency: USD
+    formDataKey: {{ self.id }}
+    format: decimal
+    hidden: {{ !(challengePathTabs.value in  challengePathsBeingEdited.value) }}
+    label: Treningi na tydzień
+    min: 1
+    placeholder: Enter value
+    showStepper: true
+    value: {{ challengePathsBeingEdited.value[challengePathTabs.value]?.frequency }}
+    EVENT: |
+        on change -> SCRIPT: changeFrequencyForPath.trigger({
+        additionalScope: {
+          levelId: challengePathTabs.value,
+          frequency: challengePathDaysPerWeek.value
+        }  
+        })  [wait=debounce/100]
+==========================================================================================
+challengePathTabs [SelectWidget2] in container4/b702b (header) row=0.8 col=0
+    data: {{ workoutsConfig.data.challengeLevels.filter(x => challengePathsBeingEdited?.value[x.id]) }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    hidden: {{ (challengePathTabs.data?.length ?? 0) == 0 }}
+    hideLabel: true
+    itemMode: dynamic
+    labels: {{item.title}}
+    placeholder: Wybierz ścieżkę
+    searchMode: fuzzy
+    values: {{ item.id }}
+    EVENT: on change -> widget challengePathDaysList.resetInstanceValues()
+==========================================================================================
+challengePathDaysList [ListViewWidget2] in container4/b702b (body) row=3.5999999999999996 col=0
+    data: {{ challengePathsBeingEdited.value[challengePathTabs.value]?.days }}
+    formDataKey: {{ self.id }}
+    hidden: {{ !(challengePathTabs.value in  challengePathsBeingEdited.value) || challengePathsBeingEdited.value[challengePathTabs.value].days.length == 0 }}
+    itemWidth: 200px
+    numColumns: 2
+==========================================================================================
+container6 [ContainerWidget2] in challengePathDaysList/ (body) row=0 col=0
+    _ids: ["55faf"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+containerTitle5 [TextWidget2] in container6/ (header) row=0 col=0
+    ariaLive: off
+    value: ###### Dzień {{ item.dayIndex }} {{ item.workoutIds?.length > 0 ? "" : "(rest day)" }}
+==========================================================================================
+challengePathDayWorkoutId1 [SelectWidget2] in container6/55faf (body) row=0 col=0
+    _ids: ["db759", "ad2b5", "53e66"]
+    _values: ["Option 1", "Option 2", "Option 3"]
+    data: {{ workoutsQuery.data }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Trening 1
+    labels: {{ item.title }} ({{ item.id }})
+    placeholder: -
+    searchMode: fuzzy
+    showClear: true
+    value: {{ item.workoutIds?.length > 0 ? item.workoutIds[0] : undefined }}
+    values: {{ item.id }}
+    EVENT: |
+        on change -> SCRIPT: let dayIndex = item.dayIndex
+        let workoutId = challengePathDayWorkoutId1.value
+        
+        setWorkoutIdForPathDay.trigger({additionalScope:{
+          dayIndex: dayIndex,
+          workoutIndex:0,
+          workoutId: workoutId,
+          pathLevelId: challengePathTabs.value
+        }})
+==========================================================================================
+challengePathDayAddButton [ButtonWidget2] in container4/b702b (body) row=1.6000000000000032 col=7
+    hidden: {{ !(challengePathTabs.value in  challengePathsBeingEdited.value) }}
+    styleVariant: outline
+    text: Dodaj dzień
+    EVENT: on click -> QUERY addDayToChallengePath.trigger({"options": {"additionalScope": {"levelId": "{{ challengePathTabs.value }}"}}})
+==========================================================================================
+challengePathActivate [ButtonWidget2] in container4/b702b (body) row=0 col=3
+    hidden: {{ true || challengePathTabs.value in  challengePathsBeingEdited.value }}
+    styleVariant: outline
+    text: Aktywuj ścieżkę
+    EVENT: on click -> QUERY addPathToCurrentPaths.trigger({"options": {"additionalScope": {"levelId": "{{ challengePathTabs.value }}"}}})
+==========================================================================================
+challengeDayLink [LinkWidget] in container6/ (header) row=0.19999999999999996 col=9
+    hidden: {{ !(item.workoutId in workoutById.value) }}
+    text: YouTube
+    EVENT: on click -> util .openUrl({"url": "{{ workoutById.value[item.workoutId].videoUrl }}"})
+==========================================================================================
+challengeDayButtonGroup [ButtonGroupWidget2] in container6/55faf (body) row=0.6000000000000002 col=10
+    _buttonIcon: {"5d088": "bold/interface-download-circle-alternate", "360df": "bold/interface-delete-bin-5-alternate", "908cd": "bold/interface-upload-circle-alternate"}
+    _buttonIconPosition: {"5d088": "left", "360df": "left", "908cd": "left"}
+    _buttonIds: ["908cd", "5d088", "360df"]
+    _buttonStyleVariant: {"5d088": "solid", "360df": "danger", "908cd": "solid"}
+    _buttonText: {"5d088": "W dół", "360df": "Usuń", "908cd": "Do góry"}
+    id: challengeDayButtonGroup
+    EVENT: |
+        on click -> SCRIPT: moveDayForCurrentPath.trigger({
+          additionalScope: {
+            levelId: challengePathTabs.value,
+            dayIndex: item.dayIndex,
+            direction: -1
+          }
+        })  [targetId=908cd]
+    EVENT: |
+        on click -> SCRIPT: moveDayForCurrentPath.trigger({
+          additionalScope: {
+            levelId: challengePathTabs.value,
+            dayIndex: item.dayIndex,
+            direction: 1
+          }
+        })  [targetId=5d088]
+    EVENT: |
+        on click -> SCRIPT: removeDayFromCurrentPath.trigger({
+          additionalScope: {
+            levelId: challengePathTabs.value,
+          dayIndex: item.dayIndex}
+        })  [targetId=360df]
+==========================================================================================
+challengePathDayRemovePath [ButtonWidget2] in container4/b702b (body) row=0.7999999999999999 col=7
+    hidden: {{ !(challengePathTabs.value in  challengePathsBeingEdited.value) }}
+    iconBefore: bold/interface-delete-bin-2
+    styleVariant: outline
+    submitTargetId: challengesTableForm
+    text: Usuń ścieżkę
+    EVENT: on click -> QUERY removePathFromCurrentPaths.trigger({"options": {"additionalScope": {"levelId": "{{ challengePathTabs.value }}"}}})
+==========================================================================================
+challengePathMinimumDays [NumberInputWidget] in container4/b702b (body) row=0.7999999999999998 col=4
+    currency: USD
+    formDataKey: {{ self.id }}
+    format: decimal
+    hidden: {{ !(challengePathTabs.value in  challengePathsBeingEdited.value) }}
+    label: Min. dni
+    min: 0
+    placeholder: Enter value
+    showStepper: true
+    value: {{ challengePathsBeingEdited.value[challengePathTabs.value]?.minimumDaysToComplete }}
+    EVENT: |
+        on change -> SCRIPT: changeMinimumDaysForPath.trigger({
+        additionalScope: {
+          levelId: challengePathTabs.value,
+          days: challengePathMinimumDays.value
+        }  
+        })  [wait=debounce/100]
+==========================================================================================
+challengePathDayWorkoutId2 [SelectWidget2] in container6/55faf (body) row=0.20000000000000018 col=0
+    _ids: ["db759", "ad2b5", "53e66"]
+    _values: ["Option 1", "Option 2", "Option 3"]
+    data: {{ workoutsQuery.data }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Trening 2
+    labels: {{ item.title }} ({{ item.id }})
+    placeholder: -
+    searchMode: fuzzy
+    showClear: true
+    value: {{ item.workoutIds?.length > 1 ? item.workoutIds[1] : undefined }}
+    values: {{ item.id }}
+    EVENT: |
+        on change -> SCRIPT: let dayIndex = item.dayIndex
+        let workoutId = challengePathDayWorkoutId2.value
+        
+        setWorkoutIdForPathDay.trigger({additionalScope:{
+          dayIndex: dayIndex,
+          workoutId: workoutId,
+          workoutIndex: 1,
+          pathLevelId: challengePathTabs.value
+        }})
+==========================================================================================
+challengeFormAvailableAtLabel [DateTimeWidget] in challengeTabs/72679 (body) row=2 col=0
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    hidden: true
+    iconBefore: bold/interface-calendar
+    label: Widoczne od
+    manageTimeZone: true
+    showClear: true
+    value: {{ new Date() }}
+    valueTimeZone: 00:00
+==========================================================================================
+challengeFormLiveAtLabel [DateTimeWidget] in challengeTabs/72679 (body) row=2.5999999999999996 col=0
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Data premiery
+    manageTimeZone: true
+    showClear: true
+    value: {{ new Date() }}
+    valueTimeZone: 00:00
+==========================================================================================
+text6 [TextWidget2] in workoutTabs/9e973 (body) row=0 col=8
+    ariaLive: off
+    value: <a target="_blank" rel="noopener noreferrer" href="https://compress-or-die.com/webp">Narzędzie do kompresji</a>
+==========================================================================================
+RefreshMedia [ButtonWidget2] in workoutTabs/9e973 (body) row=0.8 col=0
+    iconBefore: bold/interface-arrows-synchronize
+    styleVariant: solid
+    text: Odśwież
+    EVENT: on click -> QUERY allMediaFilesQuery.trigger()
+==========================================================================================
+MessageModal [ModalFrameWidget] in None/None (None) row=None col=None
+    hidden: {{ !isShowingMessageDetails.value }}
+    hideOnEscape: true
+    isHiddenOnMobile: true
+    showOverlay: true
+    size: large
+==========================================================================================
+messageModalTitle [TextWidget2] in /MessageModal (header) row=0 col=0
+    ariaLive: off
+    value: ### {{ messageStatusRawField.value == "new" ? "Nowa wiadomosc" : messageStatusRawField.value == "draft" ? (isInEditModeForCurrentMessage.value ? "Edycja wiadomosci" : "Podgląd roboczej wiadomości") : messageStatusRawField.value == "archived" ? "Zarchiwizowana wiadomosc" : messageStatusRawField.value == "sent" ? "Wyslana wiadomosc" : "-" }}
+==========================================================================================
+messageCloseButton [ButtonWidget2] in /MessageModal (header) row=0 col=9
+    iconBefore: bold/interface-delete-1
+    styleVariant: outline
+    EVENT: on click -> state isShowingMessageDetails.setValue({"value": "false"})
+==========================================================================================
+messageIdField [TextInputWidget2] in messageForm/ (footer) row=-4.440892098500626e-16 col=2
+    disabled: true
+    formDataKey: {{ self.id }}
+    hidden: true
+    label: ID
+==========================================================================================
+messageForm [FormWidget2] in tabbedContainer2/61dff (body) row=8.881784197001252e-16 col=0
+    requireValidation: true
+    resetAfterSubmit: true
+==========================================================================================
+messageTitleField [TextInputWidget2] in group3/33bf1 (body) row=0 col=0
+    disabled: {{ messageStatusRawField.value == "archived" || messageStatusRawField.value == "published" || !isInEditModeForCurrentMessage.value}}
+    formDataKey: {{ self.id }}
+    label: Opis (niewidoczny w apce)
+    minLength: 3
+    required: true
+==========================================================================================
+messageTargetGroupSelect [SelectWidget2] in group2/33bf1 (body) row=0 col=0
+    data: {{ adminConfig.data.draftMessageTargetGroups }}
+    disabled: {{ messageStatusRawField.value == "archived" || messageStatusRawField.value == "published" || !isInEditModeForCurrentMessage.value}}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Odbiorcy
+    labels: {{ item.label }}
+    placeholder: Select an option
+    required: true
+    searchMode: fuzzy
+    values: {{ item.state }}
+    EVENT: on change -> widget messageForm.validate()
+==========================================================================================
+messageSenderFromField [TextInputWidget2] in group3/33bf1 (body) row=0 col=4
+    disabled: {{ messageStatusRawField.value == "archived" || messageStatusRawField.value == "published" || !isInEditModeForCurrentMessage.value }}
+    formDataKey: {{ self.id }}
+    label: Nadawca
+    minLength: 3
+    required: true
+==========================================================================================
+messageTargetGroupValueSelect [SelectWidget2] in group2/33bf1 (body) row=0 col=4
+    data: {{ challengesQuery.data }}
+    disabled: {{  messageStatusRawField.value == "archived" || messageStatusRawField.value == "published"  || (adminConfig.data.draftMessageTargetGroups.find(x => x.state == messageTargetGroupSelect.value)?.requiresTargetGroupValue != "challenge" ) || !isInEditModeForCurrentMessage.value}}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    hidden: true
+    hiddenByIndex: {{ item.hidden }}
+    itemMode: dynamic
+    label: Wyzwanie
+    labels: {{ item.title }}
+    placeholder: -
+    required: {{ adminConfig.data.draftMessageTargetGroups.find(x => x.state == messageTargetGroupSelect.value)?.requiresTargetGroupValue == "challenge" ?? false }}
+    searchMode: fuzzy
+    showClear: true
+    values: {{ item.id }}
+==========================================================================================
+link6 [LinkWidget] in container8/034be (header) row=0 col=6
+    hidden: {{ !isInEditModeForCurrentMessage.value }}
+    text: Skopiuj przykład
+    EVENT: on click -> util .copyToClipboard({"value": "{{JSON.stringify([{\n  \"type\": \"Title\",\n  \"content\": \"Treść\"\n},{\n  \"type\": \"Text\",\n  \"content\": \"Treść\"\n}, {\n  \"type\": \"Image\",\n  \"content\": \"\",\n  \"metadata\": {\n    \"imageRelativePath\": \"challenges/CF_20240315_034.webp\",\n    \"heightToWidthRatio\": 0.642578125\n  }\n\n                }], null, \" \")}}"})
+==========================================================================================
+messageFormFancyContentLabel [JSONEditorWidget] in container8/034be (body) row=3.552713678800501e-15 col=0
+    hidden: {{ !isInEditModeForCurrentMessage.value }}
+    valid: true
+    value: {}
+==========================================================================================
+messageStatusRawField [TextWidget2] in messageForm/ (footer) row=0 col=0
+    ariaLive: off
+    hidden: true
+==========================================================================================
+messageDateCreatedField [DateWidget] in group3/33bf1 (body) row=0 col=7
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    disabled: true
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Data utworzenia
+    required: true
+    value: {{ new Date() }}
+==========================================================================================
+messageFormButtonsGroup [ButtonGroupWidget2] in messageForm/ (footer) row=-8.881784197001252e-16 col=7
+    _buttonBackgroundColor: {"4daa1": "", "45bce": "rgba(174, 194, 171, 1)", "f0805": "", "3a37c": ""}
+    _buttonDisabled: {"4daa1": "{{ messageForm.invalid || messageFormFancyContentLabel.valid == false}}", "45bce": "", "f0805": "", "3a37c": ""}
+    _buttonHidden: {"4daa1": "{{ (messageStatusRawField.value != \"draft\" && messageStatusRawField.value != \"new\") || isInEditModeForCurrentMessage.value == false}}", "45bce": "{{ messageStatusRawField.value != \"draft\" || isInEditModeForCurrentMessage.value}}", "f0805": "{{ messageStatusRawField.value != \"draft\" || isInEditModeForCurrentMessage.value}}", "3a37c": "{{ isInEditModeForCurrentMessage.value || messageStatusRawField.value != \"draft\" }}"}
+    _buttonIds: ["45bce", "4daa1", "f0805", "3a37c"]
+    _buttonStyleVariant: {"4daa1": "solid", "45bce": "solid", "f0805": "outline", "3a37c": "outline"}
+    _buttonText: {"4daa1": "Zapisz", "45bce": "Wyslij", "f0805": "Archiwizuj", "3a37c": "Edytuj"}
+    EVENT: on click -> QUERY archiveMessagePOST.trigger()  [targetId=f0805]
+    EVENT: on click -> QUERY publishMessagePOST.trigger()  [targetId=45bce]
+    EVENT: on click -> state isInEditModeForCurrentMessage.setValue({"value": "true"})  [targetId=3a37c]
+    EVENT: on click -> QUERY upsertMessage.trigger()  [targetId=4daa1]
+==========================================================================================
+messageFancyJsonPreview [TextWidget2] in container7/034be (body) row=-4.440892098500626e-16 col=0
+    ariaLive: off
+    value: |
+        {{ convertAdminFancyContentToMarkdown(messageFormFancyContentLabel.value) }}
+        
+==========================================================================================
+text8 [TextWidget2] in messageForm/ (body) row=11.799999999999994 col=0
+    ariaLive: off
+    value: |
+        Wazne: nie pisac nic o kupowania subskrypcji przez sklep, Apple jest na tym punkcie wyczulone i w najgorszym przypadku mogłoby zbanować aplikację.
+        
+        Wspierane znaczniki: < b >, < a href >
+        
+==========================================================================================
+container7 [ContainerWidget2] in group1/33bf1 (body) row=-8.881784197001252e-16 col=6
+    _ids: ["034be"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+containerTitle6 [TextWidget2] in container7/034be (header) row=0 col=0
+    ariaLive: off
+    value: #### Podgląd
+==========================================================================================
+container8 [ContainerWidget2] in group1/33bf1 (body) row=1.7763568394002505e-15 col=0
+    _ids: ["034be"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+containerTitle7 [TextWidget2] in container8/ (header) row=0 col=0
+    ariaLive: off
+    value: #### Treść
+==========================================================================================
+text9 [TextWidget2] in container8/034be (body) row=11.2 col=0
+    ariaLive: off
+    hidden: {{ !messageFormFancyContentLabel.hidden }}
+    value: {{ JSON.stringify(messageFormFancyContentLabel.value, null, 2) }}
+==========================================================================================
+formTitle2 [TextWidget2] in messageForm/ (header) row=0 col=0
+    ariaLive: off
+    value: #### Form title
+==========================================================================================
+group1 [ContainerWidget2] in messageForm/ (body) row=8 col=0
+    _ids: ["33bf1"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+group2 [ContainerWidget2] in messageForm/ (body) row=4 col=0
+    _ids: ["33bf1"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+group3 [ContainerWidget2] in messageForm/ (body) row=0 col=0
+    _ids: ["33bf1"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+tabbedContainer2 [ContainerWidget2] in /MessageModal (body) row=0 col=0
+    _disabledByIndex: ["", "{{!isInEditModeForCurrentMessage.value}}"]
+    _ids: ["61dff", "02cbe"]
+    _tooltipByIndex: ["", "{{ isInEditModeForCurrentMessage.value ? \"\" : \"Żeby odblokować aktywuj tryb edycji\" }}"]
+    _viewKeys: ["Wiadomość", "Grafiki"]
+    currentViewKey: {{ self.viewKeys[0] }}
+    itemMode: static
+==========================================================================================
+messageTabs [TabsWidget2] in tabbedContainer2/ (header) row=0 col=0
+    _ids: ["ad978", "cad3b", "a281b"]
+    _values: ["Tab 1", "Tab 2", "Tab 3"]
+    itemMode: static
+    navigateContainer: true
+    styleVariant: pill
+    targetContainerId: tabbedContainer2
+    value: {{ self.values[0] }}
+==========================================================================================
+challengeMediaGroup [ContainerWidget2] in challengeTabs/9e973 (body) row=5.551115123125783e-17 col=0
+    _ids: ["33bf1"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+messageMediaGroup [ContainerWidget2] in tabbedContainer2/02cbe (body) row=0 col=0
+    _ids: ["33bf1"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+imagesGrid3 [ListViewWidget2] in messageMediaGroup/33bf1 (body) row=1.2 col=0
+    data: {{ allMediaFilesQuery.data }}
+    formDataKey: {{ self.id }}
+    itemWidth: 200px
+    numColumns: 5
+==========================================================================================
+container9 [ContainerWidget2] in imagesGrid3/ (body) row=0 col=0
+    _ids: ["cea9f"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+containerTitle8 [TextWidget2] in container9/ (header) row=0 col=0
+    ariaLive: off
+    value: {{image3.srcWidth }}
+==========================================================================================
+image3 [ImageWidget2] in container9/cea9f (body) row=0 col=0
+    src: {{mediaEndpoint.value + item.path}}
+    tooltipText: ![alt text]({{encodeURI( mediaEndpoint.value + item.path)}})
+==========================================================================================
+fileInput3 [FileInputWidget] in messageMediaGroup/33bf1 (body) row=0 col=6
+    accept: ['webp']
+    appendNewSelection: true
+    disabled: {{uploadImage.isFetching}}
+    formDataKey: {{ self.id }}
+    hideLabel: true
+    iconBefore: bold/image-picture-gallery
+    maxSize: 300kb
+    placeholder: Dodaj zdjęcie
+    selectionType: single
+==========================================================================================
+fileSendButton3 [ButtonWidget2] in messageMediaGroup/33bf1 (body) row=0.2 col=0
+    disabled: {{ fileInput3.files.length < 1 }}
+    hidden: {{ fileInput3.files.length < 1 }}
+    loading: {{uploadImage.isFetching}}
+    styleVariant: solid
+    submitTargetId: challengesTableForm
+    text: Wyślij
+    EVENT: |
+        on click -> SCRIPT: uploadImage.trigger({onSuccess: () => {
+          fileInput3.clearValue()
+          allMediaFilesQuery.trigger()
+        }})
+==========================================================================================
+copyMessageImageJson [ButtonWidget2] in container9/cea9f (footer) row=0 col=0
+    loading: {{ imageNameBeingPreparedForMessages.value == item.path }}
+    styleVariant: outline
+    text: {{ messageImagesByName.value[item.path] ? "Skopiuj" : "Przygotuj"  }}
+    EVENT: |
+        on click -> SCRIPT: if (messageImagesByName.value[item.path]){
+          utils.copyToClipboard(messageImagesByName.value[item.path])
+        
+        return
+        
+        }
+        
+        (async () => {
+        imageNameBeingPreparedForMessages.setValue(item.path)
+            try {
+                // Step 0: Block UI - Show loading indicator
+                utils.showNotification({ title: "Processing", description: "Fetching and processing image..." });
+        
+                console.log("Step 1: Fetching image with path:", item.path);
+                
+                // 1. Fetch Image from Retool Query
+                const response = await fetchImage.trigger({ additionalScope: { path: item.path } });
+                console.log("Step 2: Image fetched successfully.");
+        
+                // Debug: Log response keys
+                console.log("Debug: Response structure keys:", Object.keys(response));
+        
+                // 2. Validate Response
+                if (!response || !response.base64Data) {
+                    throw new Error("No base64Data received from fetchImage.");
+                }
+                console.log("Step 3: Base64 data found (not logged for performance).");
+        
+                // 3. Convert Base64 to Image
+                const img = new Image();
+                img.src = `data:image/png;base64,${response.base64Data}`;
+                console.log("Step 4: Image source set.");
+        
+                // 4. Get Image Dimensions
+                const ratio = await new Promise((resolve, reject) => {
+                    img.onload = () => {
+                        console.log("Step 5: Image loaded successfully.");
+                        resolve(img.naturalHeight / img.naturalWidth);
+                    };
+                    img.onerror = (err) => {
+                        console.error("Step 5 Error: Image failed to load.", err);
+                        reject(new Error("Could not load image from Base64."));
+                    };
+                });
+        
+                console.log("Step 6: Height-to-width ratio calculated:", ratio);
+        
+                // 5. Generate JSON Output
+                const jsonData = JSON.stringify({
+                    "type": "Image",
+                    "content": "",
+                    "metadata": {
+                        "imageRelativePath": item.path,
+                        "heightToWidthRatio": ratio
+                    }
+                }, null, 2);
+                console.log("Step 7: JSON generated successfully.");
+        
+                // 6. Store JSON Data in messageImagesByName using setValue
+                messageImagesByName.setValue({
+                    ...messageImagesByName.value,
+                    [item.path]: jsonData
+                });
+                console.log("Step 8: JSON stored in messageImagesByName.");
+        
+                // 7. Show success notification
+                utils.showNotification({ title: "Stored", description: "Image metadata stored successfully." });
+        
+            } catch (error) {
+                console.error("Error occurred:", error);
+                utils.showNotification({ title: "Error", description: error.message || "Could not process the image." });
+            } finally {
+        imageNameBeingPreparedForMessages.setValue("")
+            }
+        })();
+        
+==========================================================================================
+challengeDayProToggle [SwitchWidget2] in container4/b702b (body) row=2.4000000000000004 col=9
+    formDataKey: {{ self.id }}
+    hidden: {{ !(challengePathTabs.value in  challengePathsBeingEdited.value) }}
+    label: PRO
+    value: {{ challengePathsBeingEdited.value[challengePathTabs.value]?.pro ?? false }}
+    EVENT: on true -> SCRIPT: challengePathsBeingEdited.setIn([challengePathTabs.value, "pro"], true)
+    EVENT: on false -> SCRIPT: challengePathsBeingEdited.setIn([challengePathTabs.value, "pro"], false)
+==========================================================================================
+challengeFormEndsAtLabel [DateTimeWidget] in challengeTabs/72679 (body) row=3.4000000000000004 col=0
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Data ukrycia
+    manageTimeZone: true
+    showClear: true
+    value: {{ new Date() }}
+    valueTimeZone: 00:00
+==========================================================================================
+fileInputAudio [FileInputWidget] in workoutTabs/06a8d (body) row=1.7763568394002505e-15 col=6
+    accept: ['m4a', 'm4v', 'mp3', 'wav']
+    appendNewSelection: true
+    disabled: {{uploadAudio.isFetching}}
+    formDataKey: {{ self.id }}
+    hideLabel: true
+    iconBefore: bold/entertainment-headphones
+    maxSize: 200 MB
+    placeholder: Dodaj audio
+    selectionType: single
+==========================================================================================
+RefreshAudioMedia [ButtonWidget2] in workoutTabs/06a8d (body) row=0 col=0
+    iconBefore: bold/interface-arrows-synchronize
+    styleVariant: solid
+    text: Odśwież
+    EVENT: on click -> QUERY allAudioFilesQuery.trigger()
+==========================================================================================
+audioGrid [ListViewWidget2] in workoutTabs/06a8d (body) row=1.2000000000000002 col=0
+    data: {{ allAudioFilesQuery.data }}
+    formDataKey: {{ self.id }}
+    itemWidth: 200px
+    numColumns: 3
+==========================================================================================
+container10 [ContainerWidget2] in audioGrid/ (body) row=0 col=0
+    _ids: ["cea9f"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+containerTitle9 [TextWidget2] in container10/ (header) row=0 col=0
+    ariaLive: off
+    value: ###### {{ item.path }}
+==========================================================================================
+audioSendButton [ButtonWidget2] in workoutTabs/06a8d (body) row=0.19999999999999996 col=6
+    disabled: {{ fileInputAudio.files.length < 1 }}
+    hidden: {{ fileInputAudio.files.length < 1 }}
+    loading: {{uploadAudio.isFetching}}
+    styleVariant: solid
+    submitTargetId: workoutsTableForm
+    text: Wyślij
+    EVENT: |
+        on click -> SCRIPT: uploadAudio.trigger({onSuccess: () => {
+          fileInputAudio.clearValue()
+          allAudioFilesQuery.trigger()
+        }})
+==========================================================================================
+audioFilePlayButton [ButtonWidget2] in container10/cea9f (body) row=1 col=0
+    styleVariant: outline
+    text: Odtwórz
+    EVENT: on click -> util .openUrl({"url": "{{mediaEndpoint.value + item.path}}"})
+==========================================================================================
+audioFileChooseButton [ButtonWidget2] in container10/cea9f (body) row=0.2 col=0
+    styleVariant: outline
+    submitTargetId: workoutsTableForm
+    text: Wybierz
+    EVENT: |
+        on click -> SCRIPT: formAudioFileRelativePath.setValue(item.path)
+        workoutTabs.setCurrentViewIndex(0)
+==========================================================================================
+text10 [TextWidget2] in workoutTabs/72679 (body) row=7.000000000000001 col=0
+    ariaLive: off
+    value: **Plik audio**
+==========================================================================================
+link7 [LinkWidget] in workoutTabs/72679 (body) row=6.999999999999998 col=3
+    text: Wybierz plik audio
+    EVENT: on click -> SCRIPT: workoutTabs.setCurrentViewIndex(2)
+==========================================================================================
+formAudioFileRelativePath [TextInputWidget2] in workoutTabs/72679 (body) row=7.6000000000000005 col=0
+    hideLabel: true
+    label: Audio
+==========================================================================================
+button1 [ButtonWidget2] in workoutTabs/72679 (body) row=7.6000000000000005 col=5
+    disabled: {{ (formAudioFileRelativePath.value?.length ?? 0) == 0 }}
+    hidden: {{ (formAudioFileRelativePath.value?.length ?? 0) == 0 }}
+    iconBefore: bold/entertainment-volume-level-high
+    styleVariant: outline
+    EVENT: on click -> util .openUrl({"url": "{{mediaEndpoint.value}}{{formAudioFileRelativePath.value}}"})
+==========================================================================================
+challengePathDayWorkoutId3 [SelectWidget2] in container6/55faf (body) row=0.40000000000000036 col=0
+    _ids: ["db759", "ad2b5", "53e66"]
+    _values: ["Option 1", "Option 2", "Option 3"]
+    data: {{ workoutsQuery.data }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Trening 3
+    labels: {{ item.title }} ({{ item.id }})
+    placeholder: -
+    searchMode: fuzzy
+    showClear: true
+    value: {{ item.workoutIds?.length > 2 ? item.workoutIds[2] : undefined }}
+    values: {{ item.id }}
+    EVENT: |
+        on change -> SCRIPT: let dayIndex = item.dayIndex
+        let workoutId = challengePathDayWorkoutId3.value
+        
+        setWorkoutIdForPathDay.trigger({additionalScope:{
+          dayIndex: dayIndex,
+          workoutId: workoutId,
+          workoutIndex: 2,
+          pathLevelId: challengePathTabs.value
+        }})
+==========================================================================================
+text11 [TextWidget2] in challengeTabs/72679 (body) row=2.8000000000000007 col=0
+    ariaLive: off
+    value: ⬆️ Ważne - żeby zminimalizować ryzyko wystąpenia błędu "z dołączeniem w dniu 2", prosimy ustawiać godzinę 13:00 w dniu premiery. Wyzwanie będzie dostępne tak czy siak od północy, ponieważ obecnie aplikacja nie wspiera blokady godzinowej.
+==========================================================================================
+challengeFormDifficultySelect [MultiselectWidget2] in challengeTabs/72679 (body) row=1.6000000000000005 col=0
+    data: {{ workoutsConfig.data.difficultyLevels }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Poziomy trudności
+    labels: {{ item.title }}
+    placeholder: Wybierz
+    searchMode: fuzzy
+    values: {{ item.id }}
+==========================================================================================
+challengeFormCategorySelect [SelectWidget2] in challengeTabs/72679 (body) row=2.4000000000000004 col=0
+    data: {{ workoutsConfig.data.challengeCategories }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Kategoria
+    labels: {{ item.title }}
+    placeholder: Wybierz
+    searchMode: fuzzy
+    showClear: true
+    values: {{ item.id }}
+==========================================================================================
+BadgeModal [ModalFrameWidget] in None/None (None) row=None col=None
+    hidden: {{ !isShowingBadgeDetails.value }}
+    hideOnEscape: true
+    isHiddenOnMobile: true
+    showOverlay: true
+    size: medium
+==========================================================================================
+badgeModalTitle [TextWidget2] in /BadgeModal (header) row=0 col=0
+    ariaLive: off
+    value: ### {{ badgeFormId.value.length > 0 ? "Edycja odznaki" : "Nowa odznaka" }}
+==========================================================================================
+modalCloseButton1 [ButtonWidget2] in /BadgeModal (header) row=0 col=9
+    iconBefore: bold/interface-delete-1
+    styleVariant: outline
+    EVENT: on click -> widget BadgeModal.setHidden({"hidden": true})
+==========================================================================================
+badgeForm [FormWidget2] in tabbedContainer3/00030 (body) row=0 col=0
+    requireValidation: true
+    resetAfterSubmit: true
+    EVENT: on submit -> QUERY BadgesTableClickToolbarHandler.trigger()
+==========================================================================================
+formTitle3 [TextWidget2] in badgeForm/ (header) row=0 col=0
+    ariaLive: off
+    value: #### Form title
+==========================================================================================
+badgeFormId [TextInputWidget2] in badgeForm/ (body) row=0 col=0
+    disabled: |
+        true
+        
+    formDataKey: {{ self.id }}
+    label: ID
+==========================================================================================
+badgeFormName [TextInputWidget2] in badgeForm/ (body) row=0.20000000000000018 col=0
+    disabled: false
+    formDataKey: {{ self.id }}
+    label: Nazwa
+    minLength: 3
+==========================================================================================
+badgeFormTypeSelect [SelectWidget2] in badgeForm/ (body) row=-2.220446049250313e-16 col=4
+    colorByIndex: {{ item.label }}
+    data: {{ adminConfig.data?.badgeTypes }}
+    disabled: |
+        {{ badgeFormId.value }}
+        
+    disabledByIndex: {{ item.value == "perfections" || item.value =="milestone" }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Typ
+    labels: {{ item.label }}
+    placeholder: |
+        
+        
+    searchMode: fuzzy
+    values: {{ item.value }}
+==========================================================================================
+formBadgeHidden [SwitchWidget2] in badgeForm/ (body) row=-5.551115123125783e-16 col=10
+    formDataKey: {{ self.id }}
+    label: Ukryj
+==========================================================================================
+formBadgeImagePath [TextInputWidget2] in badgeForm/ (body) row=0.20000000000000018 col=6
+    customValidation: {{ formBadgeImagePath.value?.includes("badges/") ? null : "Musio zawierać badges/"  }}
+    formDataKey: {{ self.id }}
+    label: Grafika
+==========================================================================================
+badgeImageForm [ImageWidget2] in badgeForm/ (body) row=1.4 col=10
+    src:  {{mediaEndpoint.value + encodeURIComponent(formBadgeImagePath.value)}}
+==========================================================================================
+formBadgeActiveFromDate [DateTimeWidget] in badgeForm/ (body) row=3.399999999999999 col=0
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Widoczna od
+    manageTimeZone: true
+    showClear: true
+    valueTimeZone: 00:00
+==========================================================================================
+formBadgeActiveToDate [DateTimeWidget] in badgeForm/ (body) row=3.400000000000001 col=6
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Widoczna do
+    manageTimeZone: true
+    showClear: true
+    valueTimeZone: 00:00
+==========================================================================================
+tabbedContainer3 [ContainerWidget2] in /BadgeModal (body) row=0 col=0
+    _ids: ["00030", "00031"]
+    _viewKeys: ["Odznaka", "Grafiki"]
+    currentViewKey: {{ self.viewKeys[0] }}
+    itemMode: static
+==========================================================================================
+BadgeTabs [TabsWidget2] in tabbedContainer3/ (header) row=0 col=0
+    _ids: ["00030", "00031", "00032"]
+    _values: ["Tab 1", "Tab 2", "Tab 3"]
+    itemMode: static
+    navigateContainer: true
+    styleVariant: pill
+    targetContainerId: tabbedContainer3
+    value: {{ self.values[0] }}
+==========================================================================================
+text13 [TextWidget2] in tabbedContainer3/00031 (body) row=0 col=8
+    ariaLive: off
+    value: <a target="_blank" rel="noopener noreferrer" href="https://compress-or-die.com/webp">Narzędzie do kompresji</a>
+==========================================================================================
+fileInput4 [FileInputWidget] in tabbedContainer3/00031 (body) row=0.6 col=6
+    accept: ['webp']
+    appendNewSelection: true
+    disabled: {{uploadImage.isFetching}}
+    formDataKey: {{ self.id }}
+    hideLabel: true
+    iconBefore: bold/image-picture-gallery
+    maxSize: 50kb
+    placeholder: Dodaj zdjęcie
+    selectionType: single
+==========================================================================================
+RefreshMedia2 [ButtonWidget2] in tabbedContainer3/00031 (body) row=0 col=0
+    iconBefore: bold/interface-arrows-synchronize
+    styleVariant: solid
+    text: Odśwież
+    EVENT: on click -> QUERY allMediaFilesQuery.trigger()
+==========================================================================================
+imagesGrid4 [ListViewWidget2] in tabbedContainer3/00031 (body) row=1.8000000000000003 col=0
+    data: {{ allMediaFilesQuery.data?.filter(x => x.path.includes("badges")) }}
+    formDataKey: {{ self.id }}
+    itemWidth: 200px
+    numColumns: 5
+==========================================================================================
+container11 [ContainerWidget2] in imagesGrid4/ (body) row=0 col=0
+    _ids: ["cea9f"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+    EVENT: |
+        on click -> SCRIPT: formBadgeImagePath.setValue(item.path)
+        tabbedContainer3.setCurrentViewIndex(0)
+==========================================================================================
+containerTitle10 [TextWidget2] in container11/ (header) row=0 col=0
+    ariaLive: off
+    value: ###### {{ item.path }}
+==========================================================================================
+image5 [ImageWidget2] in container11/cea9f (body) row=0 col=0
+    src: {{mediaEndpoint.value + item.path}}
+    tooltipText: ![alt text]({{encodeURI( mediaEndpoint.value + item.path)}})
+    EVENT: |
+        on click -> SCRIPT: formBadgeImagePath.setValue(item.path)
+        tabbedContainer3.setCurrentViewIndex(0)
+==========================================================================================
+fileSendButton4 [ButtonWidget2] in tabbedContainer3/00031 (body) row=0.8 col=10
+    disabled: {{ fileInput4.files.length < 1 }}
+    hidden: {{ fileInput4.files.length < 1 }}
+    loading: {{uploadImage.isFetching}}
+    styleVariant: solid
+    submitTargetId: workoutsTableForm
+    text: Wyślij
+    EVENT: |
+        on click -> SCRIPT: uploadImage.trigger({onSuccess: () => {
+          fileInput4.clearValue()
+          allMediaFilesQuery.trigger()
+        }})
+==========================================================================================
+badgeFormSubmitButton [ButtonWidget2] in /BadgeModal (footer) row=0 col=7
+    disabled: {{ badgeForm.invalid }}
+    hidden: false
+    loading: {{ upsertBadge.isFetching }}
+    styleVariant: solid
+    submitTargetId: challengesTableForm
+    text: {{badgeFormId.value?.length > 0 ? "Zapisz zmiany" : "Stwórz odznakę"}}
+    EVENT: |
+        on click -> SCRIPT: let data = await getGetUpsertJson.trigger()
+        
+        upsertBadge.trigger({
+          
+          onSuccess: function (data) {
+          BadgeModal.close()
+            }}
+        )
+==========================================================================================
+formBadgeNormalSelect [SelectWidget2] in workoutTabs/72679 (body) row=6.800000000000001 col=0
+    data: {{ badgesAssignable.value }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    hiddenByIndex: {{ item.isHidden }}
+    imageByIndex: {{mediaEndpoint.value}}{{item.imageRelativePath}}
+    itemMode: dynamic
+    label: Odznaka za wykonanie
+    labels: {{ item.name }}
+    placeholder: Wybierz odznakę
+    searchMode: fuzzy
+    showClear: true
+    values: {{ item.id }}
+==========================================================================================
+challengeFormBadgeNormalSelect [SelectWidget2] in challengeTabs/72679 (body) row=9.799999999999997 col=0
+    data: {{ badgesAssignable.value }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    imageByIndex: {{mediaEndpoint.value}}{{item.imageRelativePath}}
+    itemMode: dynamic
+    label: Odznaka za wykonanie
+    labels: {{ item.name }}
+    placeholder: Wybierz odznakę
+    searchMode: fuzzy
+    showClear: true
+    values: {{ item.id }}
+==========================================================================================
+challengeFormBadgePerfectSelect [SelectWidget2] in challengeTabs/72679 (body) row=10 col=0
+    data: {{ badgesAssignable.value }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    imageByIndex: {{mediaEndpoint.value}}{{item.imageRelativePath}}
+    itemMode: dynamic
+    label: Odznaka za wykonanie w 100%
+    labels: {{ item.name }}
+    placeholder: Wybierz odznakę
+    searchMode: fuzzy
+    showClear: true
+    values: {{ item.id }}
+==========================================================================================
+userIdField [TextInputWidget2] in tabbedContainer/098d0 (body) row=0 col=0
+    customValidation: {{ usersBadges.data?.error }}
+    formDataKey: {{ self.id }}
+    label: ID użytkownika
+    placeholder: Wpisz ID użytkjownika
+    value: <redacted-uid>
+==========================================================================================
+usersBadgesListSubsections [ListViewWidget2] in tabbedContainer4/00030 (body) row=0 col=0
+    data: {{ (usersBadges.data?.sections?.flatMap(x => x) ?? []).flatMap(x => x.subsections)}}
+    formDataKey: {{ self.id }}
+    itemWidth: 200px
+    numColumns: 3
+==========================================================================================
+container13 [ContainerWidget2] in usersBadgesListSubsections/ (body) row=0 col=0
+    _ids: ["00030"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+containerTitle12 [TextWidget2] in container13/ (header) row=0 col=0
+    ariaLive: off
+    value: #### {{ item.title }}
+==========================================================================================
+gridView1 [ListViewWidget2] in container13/00030 (body) row=0 col=0
+    data: {{ item.badges }}
+    formDataKey: {{ self.id }}
+    itemWidth: 200px
+    numColumns: 5
+==========================================================================================
+container14 [ContainerWidget2] in gridView1/ (body) row=1.0547118733938987e-15 col=0
+    _ids: ["00030"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+containerTitle13 [TextWidget2] in container14/ (header) row=0 col=0
+    ariaLive: off
+    value: #### {{ item.name }}
+==========================================================================================
+userBadgeImage [ImageWidget2] in container14/00030 (body) row=0.8 col=3
+    src: {{mediaEndpoint.value}}{{item.imageRelativePath}}
+    tooltipText: {{ item.badgeText }}
+==========================================================================================
+text14 [TextWidget2] in container14/00030 (body) row=0.2 col=0
+    ariaLive: off
+    value: ###### {{ item.name }}
+==========================================================================================
+tabbedContainer4 [ContainerWidget2] in tabbedContainer/098d0 (body) row=0.20000000000000018 col=0
+    _iconPositionByIndex: ["", "left", "left"]
+    _ids: ["00030", "b7f41", "ce499"]
+    _labels: ["Odznaki", "Wykonania", ""]
+    _viewKeys: ["View 1", "View 2", "Dane ogólne"]
+    currentViewKey: {{ self.viewKeys[0] }}
+    itemMode: static
+    loading: {{ usersBadges.isFetching || userProgress.isFetching }}
+==========================================================================================
+userTabs [TabsWidget2] in tabbedContainer4/ (header) row=0 col=0
+    _ids: ["00030", "00031", "00032"]
+    _values: ["Tab 1", "Tab 2", "Tab 3"]
+    itemMode: static
+    navigateContainer: true
+    styleVariant: pill
+    targetContainerId: tabbedContainer4
+    value: {{ self.values[0] }}
+==========================================================================================
+jsonExplorer1 [JSONExplorerWidget] in tabbedContainer4/b7f41 (body) row=0 col=0
+    expandNodes: true
+    hideRootNode: true
+    value: {{ userProgress.data ?? {} }}
+==========================================================================================
+formBadgAssignedTo [TextInputWidget2] in badgeForm/ (body) row=3.6000000000000005 col=0
+    disabled: true
+    formDataKey: {{ self.id }}
+    inputTooltip: `Enter` to save, `Esc` to cancel
+    label: Przypisana do
+    placeholder: -
+    EVENT: on submit -> QUERY startCreatingOrEditingBadge.trigger({"options": {"additionalScope": {"badgeId": ""}}})
+==========================================================================================
+challengeVisibleUpfrontDaysLabel [NumberInputWidget] in challengeTabs/72679 (body) row=3.600000000000003 col=2
+    currency: USD
+    formDataKey: {{ self.id }}
+    format: decimal
+    label: Liczba widocznych dni do przodu
+    showStepper: true
+    value: 100
+==========================================================================================
+challengePathDescription [TextAreaWidget] in container4/b702b (body) row=2.4 col=0
+    autoResize: true
+    formDataKey: {{ self.id }}
+    hidden: {{ !(challengePathTabs.value in  challengePathsBeingEdited.value) }}
+    label: Opis
+    value: {{ challengePathsBeingEdited.value[challengePathTabs.value]?.description }}
+    EVENT: |
+        on change -> SCRIPT: changeDescriptionForPath.trigger({
+        additionalScope: {
+          levelId: challengePathTabs.value,
+          description: challengePathDescription.value
+        }  
+        })  [wait=debounce/300]
+==========================================================================================
+badgeFormComment [TextInputWidget2] in badgeForm/ (body) row=3.2000000000000006 col=0
+    disabled: false
+    formDataKey: {{ self.id }}
+    label: Opis (opcjonalny)
+    showClear: true
+==========================================================================================
+challengesPromotedDropdown [SelectWidget2] in tabbedContainer/58252 (header) row=1.8 col=0
+    data: {{ challengesQuery.data?.filter(x => x.liveAtUtc).sort(x => -x.updatedAtUtc) }}
+    disabled: {{  WorkoutModal.opened || ChallengeModal.opened }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    hidden: {{ tabMedia.selectedIndex != 1 }}
+    hiddenByIndex: {{ item.hidden }}
+    itemMode: dynamic
+    label: Promowane wyzwanie
+    labels: {{ item.title }}
+    loading: {{ adminConfig.isFetching }}
+    placeholder: Wybierz lub zostaw puste
+    searchMode: fuzzy
+    showClear: true
+    values: {{ item.id }}
+==========================================================================================
+promotedChallengeSaveButton [ButtonWidget2] in tabbedContainer/58252 (header) row=2.4 col=4
+    disabled: {{  WorkoutModal.opened || ChallengeModal.opened }}
+    hidden: {{ tabMedia.selectedIndex != 1 }}
+    loading: {{ adminConfig.isFetching || updatePromotedChallengePOST.isFetching }}
+    styleVariant: outline
+    text: Zapisz
+    EVENT: on click -> QUERY updatePromotedChallengePOST.trigger()
+==========================================================================================
+challengeDetailsPaymentContainer [ContainerWidget2] in challengeTabs/72679 (body) row=1.2000000000000002 col=0
+    _ids: ["00030"]
+    _viewKeys: ["View 1"]
+    itemMode: static
+==========================================================================================
+unlockedByEntitlementIds [TextInputWidget2] in challengeDetailsPaymentContainer/00030 (body) row=0.6 col=0
+    formDataKey: Title
+    label: Lista id entitlementow odblokowujacych, np. "id1,id2"
+==========================================================================================
+challengeFormPaidOfferingId [TextInputWidget2] in challengeDetailsPaymentContainer/00030 (body) row=0.8000000000000002 col=0
+    formDataKey: Title
+    label: Offering id w najwyzszej cenie
+==========================================================================================
+challengeFormPaidOfferingDiscountedId [TextInputWidget2] in challengeDetailsPaymentContainer/00030 (body) row=1.2000000000000004 col=0
+    formDataKey: Title
+    label: Offering id przeceniony
+==========================================================================================
+text15 [TextWidget2] in challengeDetailsPaymentContainer/00030 (body) row=0 col=0
+    ariaLive: off
+    value: Wypełnij pola poniżej jeżeli dostęp do wyzwania wymaga wykupienia osobnego produktu
+==========================================================================================
+challengePathDifficultySelect [MultiselectWidget2] in container4/b702b (body) row=3.4 col=0
+    data: {{ workoutsConfig.data.difficultyLevels }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    hidden: {{ !(challengePathTabs.value in  challengePathsBeingEdited.value) }}
+    itemMode: dynamic
+    label: Poziomy trudności
+    labels: {{ item.title }}
+    placeholder: Wybierz
+    searchMode: fuzzy
+    value: {{ challengePathsBeingEdited.value[challengePathTabs.value]?.difficultyLevelsIds }}
+    values: {{ item.id }}
+    EVENT: |
+        on change -> SCRIPT: changeLevelsForPath.trigger({
+        additionalScope: {
+          levelId: challengePathTabs.value,
+          levels: challengePathDifficultySelect.value
+        }  
+        })
+==========================================================================================
+text16 [TextWidget2] in container4/b702b (header) row=0 col=0
+    ariaLive: off
+    value: **Ścieżki ({{  Object.keys(challengePathsBeingEdited?.value).length }})**
+==========================================================================================
+ModalAddPath [ModalFrameWidget] in None/None (None) row=None col=None
+    hidden: true
+    hideOnEscape: true
+    isHiddenOnMobile: true
+    overlayInteraction: true
+    showOverlay: true
+    size: medium
+==========================================================================================
+modalTitle1 [TextWidget2] in /ModalAddPath (header) row=0 col=0
+    ariaLive: off
+    value: ### Nowa ścieżka
+==========================================================================================
+modalCloseButton2 [ButtonWidget2] in /ModalAddPath (header) row=0 col=9
+    iconBefore: bold/interface-delete-1
+    styleVariant: outline
+    EVENT: on click -> widget ModalAddPath.setHidden({"hidden": true})
+==========================================================================================
+addPathNewSelect [SelectWidget2] in /ModalAddPath (body) row=0 col=0
+    data: {{ workoutsConfig.data.challengeLevels.filter(x => !challengePathsBeingEdited?.value[x.id]) }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Nowa ścieżka
+    labels: {{ item.title }}
+    placeholder: Wybierz ścieżkę
+    searchMode: fuzzy
+    values: {{ item.id }}
+==========================================================================================
+AddPathButton [ButtonWidget2] in container4/b702b (header) row=0 col=8
+    styleVariant: outline
+    text: Dodaj ścieżkę
+    EVENT: on click -> widget ModalAddPath.show()
+==========================================================================================
+addPathNewSelectDuplicateFrom [SelectWidget2] in /ModalAddPath (body) row=0.20000000000000018 col=0
+    data: {{ workoutsConfig.data.challengeLevels.filter(x => challengePathsBeingEdited?.value[x.id]) }}
+    emptyMessage: No options
+    formDataKey: {{ self.id }}
+    itemMode: dynamic
+    label: Duplikuj z (opcjonalne)...
+    labels: {{ item.title }}
+    placeholder: Wybierz ścieżkę
+    searchMode: fuzzy
+    showClear: true
+    values: {{ item.id }}
+==========================================================================================
+addPathButtonSubmit [ButtonWidget2] in /ModalAddPath (footer) row=0 col=8
+    disabled: {{ !addPathNewSelect.value }}
+    styleVariant: solid
+    text: {{ addPathNewSelectDuplicateFrom.value ? "Duplikuj ścieżkę" : "Dodaj ścieżkę"}}
+    EVENT: |
+        on click -> SCRIPT: let key = addPathNewSelect.value
+        if (!addPathNewSelectDuplicateFrom.value){
+          addPathToCurrentPaths.trigger({additionalScope: { levelId: key}})
+        }
+        else {
+          let newValue = challengePathsBeingEdited.value[addPathNewSelectDuplicateFrom.value]
+        challengePathsBeingEdited.setValue({
+          ...challengePathsBeingEdited.value,
+          [key]: newValue
+        })
+        }
+        
+        challengePathTabs.setValue(key)
+        ModalAddPath.hide()
+        addPathNewSelect.setValue(null)
+        addPathNewSelectDuplicateFrom.setValue(null)
+==========================================================================================
+challengeFormUpdatedAtLabel [DateTimeWidget] in challengeTabs/72679 (body) row=2.2 col=0
+    dateFormat: dd.MM.yyyy
+    datePlaceholder: {{ self.dateFormat.toUpperCase() }}
+    disabled: true
+    displayTimeZone: local
+    formDataKey: {{ self.id }}
+    iconBefore: bold/interface-calendar
+    label: Data aktualizacji
+    manageTimeZone: true
+    value: {{ new Date() }}
+    valueTimeZone: 00:00
+==========================================================================================
+ModalChallengeOverride [ModalFrameWidget] in None/None (None) row=None col=None
+    hidden: true
+    hideOnEscape: true
+    isHiddenOnMobile: true
+    overlayInteraction: true
+    showOverlay: true
+    size: medium
+    EVENT: on show -> QUERY upsertChallenge.trigger()
+==========================================================================================
+modalTitle2 [TextWidget2] in /ModalChallengeOverride (header) row=0 col=0
+    ariaLive: off
+    value: ### Uwaga - ktoś inny zapisał to wyzwanie w międzyczasie
+==========================================================================================
+modalCloseButton3 [ButtonWidget2] in /ModalChallengeOverride (header) row=0 col=9
+    iconBefore: bold/interface-delete-1
+    styleVariant: outline
+    EVENT: on click -> widget ModalChallengeOverride.setHidden({"hidden": true})
+==========================================================================================
+text17 [TextWidget2] in /ModalChallengeOverride (body) row=0 col=0
+    ariaLive: off
+    value: Czy na pewno chcesz nadpisać zmiany?
+==========================================================================================
+button2 [ButtonWidget2] in /ModalChallengeOverride (footer) row=0 col=6
+    styleVariant: solid
+    text: Tak, chcę nadpisać zmiany
+    EVENT: on click -> QUERY upsertChallenge.trigger({"options": {"additionalScope": {"force": "true"}}})
+==========================================================================================
+userChangeEmailButon [ButtonWidget2] in tabbedContainer4/ce499 (body) row=0.4 col=4
+    disabled: {{ !usersData?.data?.account.emailVerified }}
+    hidden: {{ usersData?.data?.account.email == userEmailAddress.value }}
+    loading: {{ usersData?.data?.account.uid != userIdField.value }}
+    styleVariant: solid
+    text: Zmień adres email
+    EVENT: on click -> QUERY usersDataChangeEmail.trigger()
+==========================================================================================
+userEmailAddress [EditableTextWidget2] in tabbedContainer4/ce499 (body) row=0 col=0
+    editIcon: bold/interface-edit-write-1
+    formDataKey: {{ self.id }}
+    inputTooltip: `Enter` to save, `Esc` to cancel
+    label: Adres email
+    loading: {{ usersData?.data?.account.uid != userIdField.value }}
+    placeholder: ...
+==========================================================================================
+badgeFormClaimToken [TextInputWidget2] in badgeForm/ (body) row=3.8000000000000016 col=0
+    disabled: {{ badgeFormTypeSelect.value != "manual" }}
+    formDataKey: {{ self.id }}
+    label: Kod do zdobycia odznaki (zmiana popsuje stare linki/kody QR)
+    minLength: 6
+==========================================================================================
+formBadgeEventTokenActive [SwitchWidget2] in badgeForm/ (body) row=4.000000000000002 col=7
+    disabled: {{ badgeFormTypeSelect.value != "manual" }}
+    formDataKey: {{ self.id }}
+    label: Zdobywanie aktywne
+==========================================================================================
+formBadgeCopyClaim [ButtonWidget2] in badgeForm/ (body) row=4.000000000000002 col=0
+    disabled: {{ badgeFormTypeSelect.value != "manual" }}
+    styleVariant: outline
+    text: Skopiuj link do zdobycia odznaki
+    EVENT: on click -> util .copyToClipboard({"value": "codzienniefit://badge?code={{ badgeFormClaimToken.value }}"})
+==========================================================================================
+discountedForEntitlementIds [TextInputWidget2] in challengeDetailsPaymentContainer/00030 (body) row=1 col=0
+    formDataKey: Title
+    label: Lista id entitlementow zeby widziec przeceniony offering

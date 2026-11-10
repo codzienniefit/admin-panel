@@ -1,0 +1,758 @@
+==========================================================================================
+challengesTable [TableWidget2] in tabbedContainer/58252
+    _cellSelection: none
+    _clearChangesetOnSave: true
+    _defaultFilterOperator: and
+    _defaultSelectedRow: {"mode": "none", "indexType": "display", "index": 0}
+    _dynamicColumnProperties: {"formatByIndex": "auto"}
+    _primaryKeyColumnId: c4914
+    _rowHeight: large
+    _rowSelection: none
+    _selectMultipleRowsOnActionClick: no
+    _selectSingleRowsOnActionClick: replace
+    _serverPaginationType: limitOffsetBased
+    _showToolbar: true
+    _toolbarPosition: top
+    data: {{ challengesQuery.data }}
+    emptyMessage: Ładowanie...
+    hidden: |
+        false
+        
+    searchMode: fuzzy
+    COLUMNS (in order):
+      - col 70189
+          Alignment: left
+          CellTooltip: {{item}}
+          CellTooltipMode: overflow
+          Format: image
+          FormatOptions: {"automaticColors": true, "widthType": "fit"}
+          GroupAggregationMode: none
+          Key: imageRelativePath
+          Label: Grafika
+          Placeholder: Select option
+          Position: center
+          ReferenceId: zdjeci
+          Size: 107.96875
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{mediaEndpoint.value}}{{currentSourceRow.imageRelativePath}}
+      - col d4484
+          Alignment: left
+          Editable: false
+          Format: string
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: title
+          Label: Nazwa
+          Placeholder: Enter value
+          Position: center
+          SearchMode: default
+          Size: 277.390625
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ item }}
+      - col c77fa
+          Alignment: left
+          Format: string
+          GroupAggregationMode: none
+          Key: subtitle
+          Label: Subtitle
+          Placeholder: Enter value
+          Position: center
+          Size: 177
+          SortMode: default
+          SummaryAggregationMode: none
+      - col c4914
+          Alignment: left
+          Format: string
+          GroupAggregationMode: none
+          Hidden: true
+          Key: id
+          Label: ID
+          Placeholder: Enter value
+          Position: center
+          Size: 62.390625
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 4e9f2
+          Alignment: left
+          CellTooltipMode: overflow
+          Format: tags
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Hidden: true
+          Key: descriptionFancyContent
+          Label: Description fancy content
+          Placeholder: Select options
+          Position: center
+          Size: 162.1875
+          SortMode: default
+          SummaryAggregationMode: none
+      - col cf4f0
+          Alignment: left
+          EditableOptions: {"allowCustomValue": true}
+          Format: tag
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Label: Typ
+          OptionList: {"mode": "manual", "manualData": [{"value": "archived", "label": "Archiwalne", "color": "{{ theme.automatic[0] }}"}, {"value": "plan", "label": "Plan", "color": "{{ theme.automatic[1] }}"}, {"value": "challenge", "label": "Wyzwanie", "color": "{{ theme.automatic[2] }}"}, {"value": "main", "label": "Plan główny", "color": "{{ theme.automatic[3] }}"}, {"value": "supplementary", "label": "Plan uzupełniający", "color": "{{ theme.automatic[4] }}"}]}
+          Placeholder: Select option
+          Position: center
+          ReferenceId: eventType
+          SearchMode: default
+          Size: 210
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ currentSourceRow.liveAtUtc ? "challenge" : currentSourceRow.categoryId ?? "plan"}}
+      - col 530f0
+          Alignment: left
+          Editable: false
+          Format: datetime
+          FormatOptions: {"manageTimeZone": true, "valueTimeZone": "00:00", "displayTimeZone": "local"}
+          GroupAggregationMode: none
+          Key: addedAtUtc
+          Label: Data dodania
+          Placeholder: Enter value
+          Position: center
+          Size: 146.28125
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 2d531
+          Alignment: left
+          Format: datetime
+          GroupAggregationMode: none
+          Key: updatedAtUtc
+          Label: Data aktualizacji
+          Placeholder: Enter value
+          Position: center
+          Size: 149.5625
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 8da9c
+          Alignment: left
+          Format: tag
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Hidden: true
+          Key: imageRelativePath
+          Label: Image relative path
+          Placeholder: Select option
+          Position: center
+          Size: 404.5625
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ _.startCase(item) }}
+      - col 98c19
+          Alignment: right
+          EditableOptions: {"showStepper": true}
+          Format: decimal
+          FormatOptions: {"showSeparators": true, "notation": "standard"}
+          GroupAggregationMode: sum
+          Key: lengthDays
+          Label: Dni
+          Placeholder: Enter value
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 4820a
+          Alignment: left
+          Format: boolean
+          GroupAggregationMode: none
+          Hidden: false
+          Key: hidden
+          Label: |
+              Ukryte
+              
+          Placeholder: Enter value
+          Position: center
+          Size: 81.796875
+          SortMode: default
+          SummaryAggregationMode: none
+      - col adb7a
+          Alignment: left
+          Format: boolean
+          GroupAggregationMode: none
+          Hidden: false
+          Key: pro
+          Label: Pro
+          Placeholder: Enter value
+          Position: center
+          Size: 35.015625
+          SortMode: default
+          SummaryAggregationMode: none
+    ROW ACTIONS:
+      - action d8ed4
+          _actionDisabled: {{ChallengeModal.opened}}
+          _actionIcon: bold/interface-edit-pencil
+          _actionLabel: |
+              Edytuj
+              
+    TOOLBAR BUTTONS:
+      - toolbar 1a
+          _toolbarButtonHidden: {{ChallengeModal.opened}}
+          _toolbarButtonIcon: bold/interface-text-formatting-filter-2
+          _toolbarButtonLabel: Szukaj
+          _toolbarButtonType: filter
+      - toolbar 4d
+          _toolbarButtonHidden: {{ChallengeModal.opened}}
+          _toolbarButtonIcon: bold/interface-arrows-round-left
+          _toolbarButtonLabel: Odśwież
+          _toolbarButtonType: custom
+      - toolbar 3c
+          _toolbarButtonHidden: {{ChallengeModal.opened}}
+          _toolbarButtonIcon: bold/interface-add-circle-alternate
+          _toolbarButtonLabel: Stwórz nowe wyzwanie
+          _toolbarButtonType: custom
+    EVENTS:
+      raw: {"type": "script", "waitMs": "0", "waitType": "debounce", "event": "clickToolbar", "method": "run", "pluginId": "", "targetId": "3c", "params": {"src": "startCreatingOrEditingChallenge.trigger({additionalScope: {challengeId: \"-1\"}})"}, "id": "401a9f81"}
+      raw: {"event": "doubleClickRow", "type": "script", "method": "run", "pluginId": "", "targetId": null, "params": {"src": "startCreatingOrEditingChallenge.trigger({\n  additionalScope: {\n    challengeId: currentRow.id\n  }})"}, "waitType": "debounce", "waitMs": "0", "id": "3d40c560"}
+      raw: {"event": "clickAction", "type": "script", "method": "run", "pluginId": "", "targetId": "d8ed4", "params": {"src": "startCreatingOrEditingChallenge.trigger({\n  additionalScope: {\n    challengeId: currentRow.id\n  }})"}, "waitType": "debounce", "waitMs": "0", "id": "559f2d5d"}
+      raw: {"type": "widget", "waitMs": "0", "waitType": "debounce", "event": "clickToolbar", "method": "refresh", "pluginId": "challengesTable", "targetId": "4d", "id": "ca6aa334"}
+==========================================================================================
+workoutsTable [TableWidget2] in tabbedContainer/8efbe
+    _cellSelection: none
+    _clearChangesetOnSave: true
+    _defaultFilterOperator: and
+    _defaultSelectedRow: {"mode": "none", "indexType": "display", "index": 0}
+    _dynamicColumnProperties: {"formatByIndex": "auto"}
+    _primaryKeyColumnId: c4914
+    _rowHeight: medium
+    _rowSelection: none
+    _selectMultipleRowsOnActionClick: no
+    _selectSingleRowsOnActionClick: replace
+    _serverPaginationType: limitOffsetBased
+    _showToolbar: true
+    _toolbarPosition: top
+    data: {{ workoutsQuery.data }}
+    emptyMessage: Ładowanie...
+    hidden: |
+        false
+        
+    searchMode: fuzzy
+    COLUMNS (in order):
+      - col 70189
+          Alignment: left
+          CellTooltip: {{item}}
+          CellTooltipMode: overflow
+          Format: image
+          FormatOptions: {"automaticColors": true, "widthType": "fit"}
+          GroupAggregationMode: none
+          Key: imageRelativePath
+          Label: Grafika
+          Placeholder: Select option
+          Position: center
+          ReferenceId: zdjeci
+          Size: 124.953125
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{mediaEndpoint.value}}{{currentSourceRow.imageRelativePath}}
+      - col d4484
+          Alignment: left
+          Editable: false
+          Format: string
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: title
+          Label: Nazwa
+          Placeholder: Enter value
+          Position: center
+          Size: 165.203125
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ item }}
+      - col 109c7
+          Alignment: left
+          Format: string
+          GroupAggregationMode: none
+          Key: internalTitle
+          Label: Komentarz
+          Placeholder: Enter value
+          Position: center
+          ReferenceId: komentarz
+          Size: 350
+          SortMode: default
+          SummaryAggregationMode: none
+      - col c4914
+          Alignment: left
+          Editable: false
+          Format: string
+          GroupAggregationMode: none
+          Hidden: true
+          Key: id
+          Label: ID
+          Placeholder: Enter value
+          Position: center
+          Size: 96.953125
+          SortMode: default
+          SummaryAggregationMode: none
+      - col dd1aa
+          Alignment: left
+          Format: string
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: levelId
+          Label: Poziom
+          OptionList: {"mode": "mapped", "mappedData": "{{ workoutsConfig.data.trainingLevels }}", "iconByIndex": "{{  }}", "valueByIndex": "{{item.id}}", "labelByIndex": "{{item.title}}"}
+          Placeholder: Enter value
+          Position: center
+          Size: 173
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{workoutsConfig.data.trainingLevels.find(x => x.id === item)?.title ?? "-"}}
+      - col cf240
+          Alignment: left
+          CellTooltip: {{ item }}
+          CellTooltipMode: overflow
+          Format: tags
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: equipmentIds
+          Label: |
+              Sprzęt
+              
+          OptionList: {"mode": "mapped", "mappedData": "{{ workoutsConfig.data.equipmentTypes }}", "valueByIndex": "{{item.id}}", "labelByIndex": "{{item.title}}"}
+          Placeholder: Select options
+          Position: center
+          Size: 96.828125
+          SortMode: default
+          SummaryAggregationMode: none
+      - col a222a
+          Alignment: left
+          CellTooltipMode: overflow
+          Editable: false
+          Format: tags
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: trainingTypeIds
+          Label: Typ
+          OptionList: {"mode": "mapped", "mappedData": "{{workoutsConfig.data.trainingTypes  }}", "valueByIndex": "{{item.id}}", "labelByIndex": "{{item.title}}"}
+          Placeholder: Select options
+          Position: center
+          Size: 140.828125
+          SortMode: default
+          SummaryAggregationMode: none
+      - col aa1bf
+          Alignment: left
+          Format: link
+          FormatOptions: {"showUnderline": "hover"}
+          GroupAggregationMode: none
+          Key: videoUrl
+          Label: Link
+          Position: center
+          Size: 111.21875
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: Youtube
+      - col adb7a
+          Alignment: left
+          Format: boolean
+          GroupAggregationMode: none
+          Hidden: false
+          Key: pro
+          Label: Pro
+          Placeholder: Enter value
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 4820a
+          Alignment: left
+          Format: boolean
+          GroupAggregationMode: none
+          Key: hidden
+          Label: |
+              Ukryty
+              
+          Placeholder: Enter value
+          Position: center
+          Size: 57.59375
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 4e9f2
+          Alignment: left
+          CellTooltipMode: overflow
+          Format: tags
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Hidden: true
+          Key: descriptionFancyContent
+          Label: Description fancy content
+          Placeholder: Select options
+          Position: center
+          Size: 166.328125
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 530f0
+          Alignment: left
+          Editable: false
+          Format: datetime
+          FormatOptions: {"manageTimeZone": true, "valueTimeZone": "00:00", "displayTimeZone": "local"}
+          GroupAggregationMode: none
+          Key: addedAtUtc
+          Label: Data dodania
+          Placeholder: Enter value
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 2d531
+          Alignment: left
+          Format: datetime
+          GroupAggregationMode: none
+          Key: updatedAtUtc
+          Label: Data aktualizacji
+          Placeholder: Enter value
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 858e1
+          Alignment: left
+          EditableOptions: {"showStepper": true}
+          Format: string
+          FormatOptions: {"showSeparators": true, "notation": "standard"}
+          GroupAggregationMode: sum
+          Key: durationMinutes
+          Label: Czas
+          Placeholder: Enter value
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ item + " min" }}
+      - col 8da9c
+          Alignment: left
+          Format: tag
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Hidden: true
+          Key: imageRelativePath
+          Label: Image relative path
+          Placeholder: Select option
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ _.startCase(item) }}
+      - col d5e09
+          Alignment: left
+          Format: tag
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: liveAtUtc
+          Label: LIVE
+          Placeholder: Select option
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{item ? "LIVE" : null}}
+      - col 45c72
+          Alignment: left
+          Format: tag
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: availableAtUtc
+          Label: PREMIERA
+          Placeholder: Select option
+          Position: center
+          ReferenceId: availableAtColumn
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{item?"PREMIERA":null}}
+    ROW ACTIONS:
+      - action d8ed4
+          _actionDisabled: {{WorkoutModal.opened}}
+          _actionIcon: bold/interface-edit-pencil
+          _actionLabel: |
+              Edytuj
+              
+    TOOLBAR BUTTONS:
+      - toolbar 1a
+          _toolbarButtonHidden: {{WorkoutModal.opened}}
+          _toolbarButtonIcon: bold/interface-text-formatting-filter-2
+          _toolbarButtonLabel: Szukaj
+          _toolbarButtonType: filter
+      - toolbar 4d
+          _toolbarButtonHidden: {{WorkoutModal.opened}}
+          _toolbarButtonIcon: bold/interface-arrows-round-left
+          _toolbarButtonLabel: Odśwież
+          _toolbarButtonType: custom
+      - toolbar 3c
+          _toolbarButtonHidden: {{WorkoutModal.opened}}
+          _toolbarButtonIcon: bold/interface-add-circle-alternate
+          _toolbarButtonLabel: Stwórz nowy trening
+          _toolbarButtonType: custom
+    EVENTS:
+      raw: {"event": "doubleClickRow", "type": "script", "method": "run", "pluginId": "", "targetId": null, "params": {"src": "startCreatingOrEditingWorkout.trigger({\n  additionalScope: {\n    workoutId: currentRow.id\n  }})"}, "waitType": "debounce", "waitMs": "0", "id": "625875c7"}
+      raw: {"event": "clickAction", "type": "script", "method": "run", "pluginId": "", "targetId": "d8ed4", "params": {"src": "startCreatingOrEditingWorkout.trigger({\n  additionalScope: {\n    workoutId: currentRow.id\n  }})"}, "waitType": "debounce", "waitMs": "0", "id": "f840e853"}
+      raw: {"type": "script", "waitMs": "0", "waitType": "debounce", "event": "clickToolbar", "method": "run", "pluginId": "", "targetId": "3c", "params": {"src": "startCreatingOrEditingWorkout.trigger({additionalScope: {workoutId: \"-1\"}})"}, "id": "fb3cee49"}
+      raw: {"event": "clickCell", "type": "util", "method": "openUrl", "pluginId": "", "targetId": "aa1bf", "params": {"url": "{{ currentSourceRow.VideoUrl }}"}, "waitType": "debounce", "waitMs": "0", "id": "e709adcf"}
+      raw: {"type": "widget", "waitMs": "0", "waitType": "debounce", "event": "clickToolbar", "method": "refresh", "pluginId": "workoutsTable", "targetId": "4d", "id": "3380f2f5"}
+==========================================================================================
+MessagesTable [TableWidget2] in tabbedContainer/1a1b2
+    _cellSelection: none
+    _clearChangesetOnSave: true
+    _defaultFilterOperator: and
+    _defaultSelectedRow: {"mode": "index", "indexType": "display", "index": 0}
+    _enableSaveActions: true
+    _primaryKeyColumnId: 595ea
+    _rowSelection: none
+    _selectMultipleRowsOnActionClick: no
+    _selectSingleRowsOnActionClick: replace
+    _serverPaginationType: limitOffsetBased
+    _showBorder: true
+    _showToolbar: true
+    _toolbarPosition: top
+    data: {{ messagesQuery.data.messages }}
+    emptyMessage: Brak wiadomości
+    searchMode: fuzzy
+    COLUMNS (in order):
+      - col 595ea
+          Alignment: left
+          Format: string
+          GroupAggregationMode: none
+          Key: id
+          Label: ID
+          Placeholder: Enter value
+          Position: center
+          Size: 256
+          SortMode: default
+          SummaryAggregationMode: none
+      - col cd0f5
+          Alignment: left
+          Format: string
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: title
+          Label: Opis
+          Placeholder: Enter value
+          Position: center
+          Size: 180
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ _.startCase(item) }}
+      - col e110e
+          Alignment: left
+          Format: string
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: from
+          Label: Nadawca
+          Placeholder: Enter value
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ _.startCase(item) }}
+      - col b6771
+          Alignment: left
+          Format: tag
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: status
+          Label: Status
+          OptionList: {"manualData": [{"value": "sent", "label": "Wysłana", "color": "rgba(142, 230, 101, 0.49)"}, {"value": "draft", "label": "Robocza", "color": "rgba(255, 222, 138, 0.52)"}, {"value": "archived", "label": "Zarchiwizowana", "color": "rgba(194, 194, 194, 0.41)"}]}
+          Placeholder: Select option
+          Position: center
+          Size: 136
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 55004
+          Alignment: left
+          Format: tag
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: targetGroup
+          Label: Odbiorcy
+          Placeholder: Select option
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ adminConfig?.data?.draftMessageTargetGroups?.find(x => x.state == item)?.label }}
+      - col 11b80
+          Alignment: left
+          Format: datetime
+          GroupAggregationMode: none
+          Key: createdAtUtc
+          Label: Data utworzenia
+          Placeholder: Enter value
+          Position: center
+          Size: 168
+          SortMode: default
+          SummaryAggregationMode: none
+      - col d4e59
+          Alignment: left
+          Format: string
+          GroupAggregationMode: none
+          Hidden: true
+          Key: archivedAtUtc
+          Label: Archived at utc
+          Placeholder: Enter value
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+      - col cd3ba
+          Alignment: left
+          Format: datetime
+          GroupAggregationMode: none
+          Key: sentAtUtc
+          Label: Data wyslania
+          Placeholder: Enter value
+          Position: center
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+    ROW ACTIONS:
+      - action 8e198
+          _actionDisabled: {{ isShowingMessageDetails.value }}
+          _actionIcon: "/icon:bold/interface-edit-pencil"
+          _actionLabel: Edytuj
+    TOOLBAR BUTTONS:
+      - toolbar 4d
+          _toolbarButtonIcon: bold/interface-arrows-round-left
+          _toolbarButtonLabel: Odswiez
+          _toolbarButtonType: custom
+      - toolbar 861aa
+          _toolbarButtonIcon: bold/interface-add-1
+          _toolbarButtonLabel: Nowa wiadomosc
+          _toolbarButtonType: custom
+    EVENTS:
+      raw: {"event": "clickToolbar", "type": "script", "method": "run", "pluginId": "", "targetId": "861aa", "params": {"src": "startCreatingOrEditingMessage.trigger({additionalScope: {messageId: \"-1\"}})"}, "waitType": "debounce", "waitMs": "0", "id": "9fbdc7d4"}
+      raw: {"event": "clickAction", "type": "script", "method": "run", "pluginId": "", "targetId": "8e198", "params": {"src": "startCreatingOrEditingMessage.trigger({\n  additionalScope: {\n    messageId: currentRow.id\n  }})"}, "waitType": "debounce", "waitMs": "0", "id": "9c8313a4"}
+      raw: {"event": "doubleClickRow", "type": "script", "method": "run", "pluginId": "", "targetId": null, "params": {"src": "startCreatingOrEditingMessage.trigger({\n  additionalScope: {\n    messageId: currentRow.id\n  }})"}, "waitType": "debounce", "waitMs": "0", "id": "7ce35b63"}
+      raw: {"type": "widget", "waitMs": "0", "waitType": "debounce", "event": "clickToolbar", "method": "refresh", "pluginId": "MessagesTable", "targetId": "4d", "id": "66510d99"}
+==========================================================================================
+BadgesTable [TableWidget2] in tabbedContainer/c00a3
+    _cellSelection: none
+    _clearChangesetOnSave: true
+    _defaultFilterOperator: and
+    _defaultSelectedRow: {"mode": "index", "indexType": "display", "index": 0}
+    _enableSaveActions: true
+    _primaryKeyColumnId: b1468
+    _rowHeight: medium
+    _rowSelection: single
+    _selectMultipleRowsOnActionClick: no
+    _selectSingleRowsOnActionClick: replace
+    _serverPaginationType: limitOffsetBased
+    _showBorder: true
+    _showToolbar: true
+    _toolbarPosition: top
+    data: {{ badgesQuery.data }}
+    emptyMessage: No rows found
+    searchMode: fuzzy
+    COLUMNS (in order):
+      - col b1468
+          Alignment: left
+          EditableOptions: {"spellCheck": false}
+          Format: string
+          GroupAggregationMode: none
+          Hidden: true
+          Key: id
+          Label: ID
+          Placeholder: Enter value
+          Position: center
+          SearchMode: default
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 7b0e8
+          Alignment: left
+          EditableOptions: {"spellCheck": false}
+          Format: string
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: name
+          Label: Nazwa
+          Placeholder: Enter value
+          Position: center
+          SearchMode: default
+          Size: 173
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ _.startCase(item) }}
+      - col 9779e
+          Alignment: left
+          Format: image
+          FormatOptions: {"automaticColors": true, "widthType": "fit"}
+          GroupAggregationMode: none
+          Key: imageRelativePath
+          Label: Grafika
+          Placeholder: Enter value
+          Position: center
+          SearchMode: default
+          Size: 151
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{mediaEndpoint.value}}{{currentSourceRow.imageRelativePath}}
+      - col f4ba1
+          Alignment: left
+          Format: tag
+          FormatOptions: {"automaticColors": true}
+          GroupAggregationMode: none
+          Key: type
+          Label: Typ
+          OptionList: {"mode": "mapped", "mappedData": "{{ adminConfig.data?.badgeTypes ?? [] }}", "valueByIndex": "{{ item.value }}", "labelByIndex": "{{ item.label }}"}
+          Placeholder: Select option
+          Position: center
+          SearchMode: default
+          Size: 179
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: {{ item }}
+      - col 05160
+          Alignment: left
+          EditableOptions: {"spellCheck": false}
+          Format: string
+          GroupAggregationMode: none
+          Key: comment
+          Label: Opis
+          Placeholder: Enter value
+          Position: center
+          ReferenceId: comment
+          SearchMode: default
+          Size: 187
+          SortMode: default
+          SummaryAggregationMode: none
+      - col 51798
+          Alignment: left
+          EditableOptions: {"spellCheck": false}
+          Format: string
+          GroupAggregationMode: none
+          Key: id
+          Label: Info techniczne
+          Placeholder: Enter value
+          Position: center
+          ReferenceId: Opis
+          SearchMode: default
+          Size: 100
+          SortMode: default
+          SummaryAggregationMode: none
+          ValueOverride: |
+              {{ 
+                currentSourceRow.type == "milestone" 
+                  ? currentSourceRow.milestoneCount + "x" + " (" + currentSourceRow.repeatCategory + ")" 
+                  : currentSourceRow.type == "normal" 
+                    ? (() => {
+                        const w = currentSourceRow.assignedToWorkouts?.length || 0;
+                        const c = currentSourceRow.assignedToChallenges?.length || 0;
+                        const wStr = w ? w + " " + (w === 1 ? "treningu" : "treningów") : "";
+                        const cStr = c ? c + " " + (c === 1 ? "wyzwania" : "wyzwań") : "";
+                        if (!w && !c) return "Nieprzypisana";
+                        return "Przypisana do " + [wStr, cStr].filter(Boolean).join(" i ");
+                      })()
+                    : "" 
+              }}
+    ROW ACTIONS:
+    TOOLBAR BUTTONS:
+      - toolbar 1f9d3
+          _toolbarButtonIcon: bold/shopping-gift
+          _toolbarButtonLabel: Stwórz odznakę
+          _toolbarButtonType: custom
+    EVENTS:
+      raw: {"method": "run", "params": {"src": "startCreatingOrEditingBadge.trigger({\n  additionalScope: {\n    badgeId: currentRow.id\n  }})"}, "targetId": null, "pluginId": "", "waitType": "debounce", "event": "doubleClickRow", "type": "script", "id": "51b324c0", "waitMs": "0"}
+      raw: {"method": "run", "params": {"src": "startCreatingOrEditingBadge.trigger({additionalScope: {badgeId: \"-1\"}})"}, "targetId": "1f9d3", "pluginId": "", "waitType": "debounce", "event": "clickToolbar", "type": "script", "id": "19becffc", "waitMs": "0"}

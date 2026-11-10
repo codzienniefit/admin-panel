@@ -1,0 +1,12 @@
+# Security headers for every page and file the panel serves (Cloudflare static assets).
+# The policy below fits the Test environment, which loads nothing from other sites.
+# Connecting the real backend (docs/ROADMAP.md, stage 2) needs additions here:
+# see docs/SECURITY.md, "Content Security Policy".
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Cross-Origin-Opener-Policy: same-origin
+  X-Robots-Tag: noindex, nofollow

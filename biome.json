@@ -1,0 +1,41 @@
+{
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+	"files": {
+		"includes": [
+			"**",
+			"!docs",
+			"!src/routeTree.gen.ts",
+			"!worker-configuration.d.ts",
+			"!package-lock.json"
+		]
+	},
+	"formatter": { "indentStyle": "tab" },
+	"linter": {
+		"rules": {
+			"preset": "recommended",
+			"correctness": {
+				"noUnusedImports": "error",
+				"noUnusedVariables": "error"
+			},
+			"style": {
+				"noRestrictedGlobals": {
+					"level": "error",
+					"options": {
+						"deniedGlobals": {
+							"name": "Browser global (window.name). Declare a local variable.",
+							"status": "Browser global (window.status). Declare a local variable.",
+							"event": "Browser global (window.event). Use the handler's argument.",
+							"length": "Browser global (window.length). Declare a local variable.",
+							"origin": "Browser global. Use window.location.origin.",
+							"parent": "Browser global (window.parent). Declare a local variable.",
+							"top": "Browser global (window.top). Declare a local variable.",
+							"closed": "Browser global (window.closed). Declare a local variable."
+						}
+					}
+				}
+			}
+		}
+	},
+	"css": { "parser": { "tailwindDirectives": true } }
+}

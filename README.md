@@ -1,109 +1,44 @@
-# Welcome to React Router + Cloudflare Workers!
+# Codziennie Fit admin panel
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/react-router-starter-template)
+The web panel that replaces the Retool panel and Patryk's planner app.
 
-![React Router Starter Template Preview](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/bfdc2f85-e5c9-4c92-128b-3a6711249800/public)
+## Documents
 
-<!-- dash-content-start -->
+| Read                                                   | For                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------ |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)                | How the panel is built today                                             |
+| [CODE-GUIDELINES.md](docs/CODE-GUIDELINES.md)          | Rules for writing code here, with reasons                                |
+| [DEFINITION-OF-DONE.md](docs/DEFINITION-OF-DONE.md)    | When work may start and when it is finished: tests, lint, checks by hand |
+| [SECURITY.md](docs/SECURITY.md)                        | What was reviewed, what protects the panel, what stage 2 must add        |
+| [RISKS.md](docs/RISKS.md)                              | What could go wrong and what is done about it                            |
+| [PLAN.md](docs/PLAN.md), [ROADMAP.md](docs/ROADMAP.md) | What is intended, and in which order                                     |
+| `docs/PHASE-N-RESULT.md`                               | What each phase built and what it did not verify                         |
 
-A modern, production-ready template for building full-stack React applications using [React Router](https://reactrouter.com/) and the [Cloudflare Vite plugin](https://developers.cloudflare.com/workers/vite-plugin/).
-
-## Features
-
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
-- 🔎 Built-in Observability to monitor your Worker
-<!-- dash-content-end -->
-
-## Getting Started
-
-Outside of this repo, you can start a new project with this template using [C3](https://developers.cloudflare.com/pages/get-started/c3/) (the `create-cloudflare` CLI):
-
-```bash
-npm create cloudflare@latest -- --template=cloudflare/templates/react-router-starter-template
-```
-
-A live public deployment of this template is available at [https://react-router-starter-template.templates.workers.dev](https://react-router-starter-template.templates.workers.dev)
-
-### Installation
-
-Install the dependencies:
+## Commands
 
 ```bash
 npm install
+npm run dev      # http://localhost:5173
+npm run check    # typecheck, lint, tests, production build
+npm run format   # apply lint and formatting fixes
 ```
 
-### Development
+Deployment happens on push, through Cloudflare.
 
-Start the development server with HMR:
+## Where things are
 
-```bash
-npm run dev
-```
+| Path                    | What                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `src/routes/`           | One file per URL                                                                                              |
+| `src/features/`         | Screens, one folder per area                                                                                  |
+| `src/ui/`               | Shared components and `enums.ts`, which decides the label and colour of every status, training type and level |
+| `src/data/api/`         | The `ApiClient` interface and the in-process mock                                                             |
+| `src/data/collections/` | The single copy of each entity, and `saver.ts`, the one path every save takes                                 |
+| `src/data/schemas/`     | Zod schemas; the source of entity types                                                                       |
+| `src/domain/`           | Pure logic with tests: rules per entity, filters, schedule edits, the three-way merge                         |
+| `public/_headers`       | Security headers for the deployed site                                                                        |
+| `src/styles/app.css`    | Design tokens and colour tones                                                                                |
+| `worker/`               | The Cloudflare Worker behind `/api/*`                                                                         |
 
-Your application will be available at `http://localhost:5173`.
-
-## Typegen
-
-Generate types for your Cloudflare bindings in `wrangler.json`:
-
-```sh
-npm run typegen
-```
-
-## Building for Production
-
-Create a production build:
-
-```bash
-npm run build
-```
-
-## Previewing the Production Build
-
-Preview the production build locally:
-
-```bash
-npm run preview
-```
-
-## Deployment
-
-If you don't have a Cloudflare account, [create one here](https://dash.cloudflare.com/sign-up)! Go to your [Workers dashboard](https://dash.cloudflare.com/?to=%2F%3Aaccount%2Fworkers-and-pages) to see your [free custom Cloudflare Workers subdomain](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/) on `*.workers.dev`.
-
-Once that's done, you can build your app:
-
-```sh
-npm run build
-```
-
-And deploy it:
-
-```sh
-npm run deploy
-```
-
-To deploy a preview URL:
-
-```sh
-npx wrangler versions upload
-```
-
-You can then promote a version to production after verification or roll it out progressively.
-
-```sh
-npx wrangler versions deploy
-```
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
+Open `/design` in the running app to see every shared component in every state. Check visual
+changes there first.

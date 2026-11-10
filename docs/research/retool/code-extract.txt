@@ -1,0 +1,1802 @@
+
+####################################################################################################
+### GLOBAL preloadedAppJavaScript
+####################################################################################################
+// ============================================================================
+//  Walidacja treści pod kątem tego, co realnie potrafi wyświetlić aplikacja.
+//  Wzorzec poniżej to DOKŁADNIE ten sam, którego używa apka (razem z literówką),
+//  dzięki temu raportujemy to, co faktycznie zobaczy użytkownik.
+// ============================================================================
+const APP_SPLIT_REGEX_SOURCE =
+  '(?:[\\u2700-\\u27bf]|(?:\\ud83c[\\udde6-\\uddff]){2}|[\\ud800-\\udbff][\\udc00-\\udfff]|[\\u0023-\\u0039]\\ufe0f?\\u20e3|\\u3299|\\u3297|\\u303d|\\u3030|\\u24c2|\\ud83c[\\udd70-\\udd71]|\\ud83c[\\udd7e-\\udd7f]|\\ud83c\\udd8e|\\ud83c[\\udd91-\\udd9a]|\\ud83c[\\udde6-\\uddff]|[\\ud83c[\\ude01-\\ude02]|\\ud83c\\ude1a|\\ud83c\\ude2f|[\\ud83c[\\ude32-\\ude3a]|[\\ud83c[\\ude50-\\ude51]|\\u203c|\\u2049|[\\u25aa-\\u25ab]|\\u25b6|\\u25c0|[\\u25fb-\\u25fe]|\\u00a9|\\u00ae|\\u2122|\\u2139|\\ud83c\\udc04|[\\u2600-\\u26FF]|\\u2b05|\\u2b06|\\u2b07|\\u2b1b|\\u2b1c|\\u2b50|\\u2b55|\\u231a|\\u231b|\\u2328|\\u23cf|[\\u23e9-\\u23f3]|[\\u23f8-\\u23fa]|\\ud83c\\udccf|\\u2934|\\u2935|[\\u2190-\\u21ff])';
+
+const SUPPORTED_TYPES = ['Title', 'Text', 'Image'];
+
+function findSplittingChars(text) {
+    const re = new RegExp(APP_SPLIT_REGEX_SOURCE, 'g');
+    const found = [];
+    let m;
+    while ((m = re.exec(text))) found.push(m[0]);
+    return found.filter((v, i) => found.indexOf(v) === i);
+}
+
+function describeChar(ch) {
+    return ch === '[' ? 'nawias otwierający "["' : `emoji lub symbol "${ch}"`;
+}
+
+function snippet(s, max) {
+    const clean = String(s).replace(/\n/g, ' ').trim();
+    return clean.length > (max || 90) ? clean.slice(0, max || 90) + '...' : clean;
+}
+
+function checkTextBlock(text, label, errors, warnings) {
+    if (!text || text.trim().length === 0) {
+        warnings.push(`${label}: blok jest pusty i nic nie wyświetli.`);
+        return;
+    }
+
+    // 1. Znak rozcinający wewnątrz <b> lub <a>: tagi pokażą się dosłownie.
+    [
+        {name: 'pogrubienie <b>', re: /<b>(.+?)<\/b>/g},
+        {name: 'link <a>', re: /<a(.+?)<\/a>/g},
+    ].forEach(({name, re}) => {
+        let m;
+        while ((m = re.exec(text))) {
+            const bad = findSplittingChars(m[0]);
+            if (bad.length > 0) {
+                errors.push(`${label}: ${name} NIE ZADZIAŁA. W aplikacji zamiast formatowania pokażą się dosłownie tagi. Powód: w środku jest ${bad.map(describeChar).join(', ')}, a aplikacja przerywa formatowanie na tym znaku. Fragment: \`${snippet(m[0])}\``);
+            }
+        }
+    });
+
+    // 2. Nawias "[" gdziekolwiek w tekście: aplikacja go nie obsługuje.
+    const brackets = (text.match(/\[/g) || []).length;
+    if (brackets > 0) {
+        warnings.push(`${label}: ${brackets}x nawias otwierający "[". Aplikacja NIE OBSŁUGUJE tego znaku w blokach Text, wyświetli go inną czcionką niż reszta zdania (wygląda jak pogrubiony). Zamykający "]" jest bezpieczny. Zalecenie: użyj nawiasów okrągłych ( ).`);
+    }
+
+    // 3. Tagi inne niż <b>, </b>, <a ...>, </a>: apka wypisze je dosłownie.
+    const tagRe = /<[^>]*>/g;
+    let t;
+    while ((t = tagRe.exec(text))) {
+        const tag = t[0];
+        const ok = /^<b>$/.test(tag) || /^<\/b>$/.test(tag) || /^<a\s[^>]*>$/.test(tag) || /^<\/a>$/.test(tag);
+        if (!ok) {
+            errors.push(`${label}: tag \`${tag}\` NIE JEST OBSŁUGIWANY i wyświetli się dosłownie. Aplikacja rozumie wyłącznie \`<b>\`, \`</b>\`, \`<a href="...">\`, \`</a>\` (małymi literami, bez spacji w środku tagu).`);
+        }
+    }
+
+    // 4. Niesparowane tagi.
+    const openB = (text.match(/<b>/g) || []).length;
+    const closeB = (text.match(/<\/b>/g) || []).length;
+    if (openB !== closeB) {
+        errors.push(`${label}: niesparowane pogrubienie. Znaleziono \`<b>\` x${openB}, a \`</b>\` x${closeB}. Każde otwarcie musi mieć zamknięcie.`);
+    }
+    const openA = (text.match(/<a[\s>]/g) || []).length;
+    const closeA = (text.match(/<\/a>/g) || []).length;
+    if (openA !== closeA) {
+        errors.push(`${label}: niesparowany link. Znaleziono \`<a>\` x${openA}, a \`</a>\` x${closeA}.`);
+    }
+
+    // 5. Tag rozjeżdżający się na dwie linie: aplikacja tego nie sklei.
+    const brokenLines = text.split('\n').filter(line => {
+        const o = (line.match(/<b>/g) || []).length;
+        const c = (line.match(/<\/b>/g) || []).length;
+        const oa = (line.match(/<a[\s>]/g) || []).length;
+        const ca = (line.match(/<\/a>/g) || []).length;
+        return o !== c || oa !== ca;
+    });
+    if (brokenLines.length > 0 && openB === closeB && openA === closeA) {
+        errors.push(`${label}: formatowanie nie może przechodzić przez nową linię. Otwórz i zamknij tag w obrębie jednego akapitu. Linia: \`${snippet(brokenLines[0], 80)}\``);
+    }
+
+    // 6. Zagnieżdżone tagi: aplikacja obsługuje tylko jeden poziom.
+    let n;
+    const nestedA = /<a(.+?)<\/a>/g;
+    while ((n = nestedA.exec(text))) {
+        if (n[0].includes('<b>')) {
+            errors.push(`${label}: pogrubienie w środku linku NIE DZIAŁA. Aplikacja przetworzy najpierw \`<b>\`, a tagi linku zostaną wypisane dosłownie i link będzie nieklikalny. Fragment: \`${snippet(n[0])}\``);
+        }
+    }
+    const nestedB = /<b>(.+?)<\/b>/g;
+    while ((n = nestedB.exec(text))) {
+        if (/<a[\s>]/.test(n[1])) {
+            errors.push(`${label}: link w środku pogrubienia NIE DZIAŁA. Aplikacja wypisze tagi linku dosłownie wewnątrz pogrubionego tekstu. Fragment: \`${snippet(n[0])}\``);
+        }
+    }
+
+    // 7. Pusty tag: aplikacja wymaga co najmniej jednego znaku w środku.
+    if (/<b>\s*<\/b>/.test(text)) {
+        errors.push(`${label}: puste pogrubienie \`<b></b>\`. Aplikacja pokaże same tagi. Usuń je.`);
+    }
+
+    // 8. Link: adres musi być PIERWSZĄ wartością w podwójnych cudzysłowach.
+    const linkRe = /<a(.+?)<\/a>/g;
+    let l;
+    while ((l = linkRe.exec(text))) {
+        const whole = l[0];
+        const firstQuoted = whole.match(/"(.+?)"/);
+        if (!firstQuoted) {
+            const hasApostrophes = /'/.test(whole.split('>')[0]);
+            errors.push(`${label}: ${hasApostrophes ? 'adres podany w apostrofach nie zadziała, aplikacja szuka podwójnych cudzysłowów' : 'link nie ma adresu w podwójnych cudzysłowach, więc kliknięcie nic nie zrobi'}. Wymagany zapis: \`<a href="https://...">tekst</a>\`. Fragment: \`${snippet(whole)}\``);
+        } else {
+            const before = whole.slice(0, firstQuoted.index);
+            if (!/href=$/.test(before)) {
+                errors.push(`${label}: \`href\` musi być PIERWSZYM atrybutem linku. Aplikacja bierze pierwszą wartość w cudzysłowach i tutaj otworzyłaby "${firstQuoted[1]}" zamiast adresu. Fragment: \`${snippet(whole)}\``);
+            } else if (!/^https?:\/\//i.test(firstQuoted[1])) {
+                warnings.push(`${label}: adres linku "${firstQuoted[1]}" nie zaczyna się od http:// ani https://, kliknięcie może pokazać błąd.`);
+            }
+        }
+    }
+
+    // 9. Encje HTML: aplikacja ich nie dekoduje.
+    const entities = text.match(/&[a-z]+;|&#\d+;/gi);
+    if (entities) {
+        errors.push(`${label}: encje HTML ${entities.filter((v, i) => entities.indexOf(v) === i).join(', ')} wyświetlą się dosłownie. Wpisz znak wprost, np. "&" zamiast "&amp;".`);
+    }
+}
+
+function checkTitleBlock(text, label, errors, warnings) {
+    if (!text || text.trim().length === 0) {
+        warnings.push(`${label}: tytuł jest pusty.`);
+        return;
+    }
+    if (/<[^>]*>/.test(text)) {
+        errors.push(`${label}: tytuły w ogóle nie obsługują tagów HTML, wyświetlą się dosłownie. Przenieś formatowany fragment do bloku Text.`);
+    }
+    if (text.includes('\n')) {
+        warnings.push(`${label}: tytuł zawiera złamanie linii, w aplikacji tytuł to jeden akapit.`);
+    }
+}
+
+function checkImageBlock(item, label, errors, warnings) {
+    const meta = item.metadata;
+    if (!meta) {
+        errors.push(`${label}: brak metadanych, zdjęcie się nie wyświetli.`);
+        return;
+    }
+    const path = meta.imageRelativePath;
+    if (!path || String(path).trim() === '') {
+        errors.push(`${label}: brak ścieżki do pliku, zdjęcie się nie wyświetli.`);
+    } else {
+        if (/\s/.test(path)) {
+            warnings.push(`${label}: ścieżka pliku zawiera spacje: \`${path}\`. Adres nie jest kodowany, na części urządzeń zdjęcie może się nie załadować. Zalecenie: nazwy plików bez spacji.`);
+        }
+        if (/[^\x20-\x7E]/.test(path)) {
+            warnings.push(`${label}: ścieżka pliku zawiera polskie znaki lub znaki specjalne: \`${path}\`. To samo ryzyko co przy spacjach.`);
+        }
+    }
+    const ratio = meta.heightToWidthRatio;
+    if (ratio === null || ratio === undefined || ratio <= 0) {
+        errors.push(`${label}: brak lub zerowe \`heightToWidthRatio\`, aplikacja wyliczy wysokość 0 i zdjęcie będzie niewidoczne.`);
+    } else if (ratio >= 5) {
+        errors.push(`${label}: \`heightToWidthRatio\` = ${ratio} jest poza dozwolonym zakresem (0, 5), zapis zostanie odrzucony przez backend.`);
+    }
+}
+
+function convertAdminFancyContentToMarkdown(content) {
+    if (content == null || content == undefined || content.length === 0 || Object.keys(content).length === 0) {
+        return 'Brak treści';
+    }
+
+    const errors = [];
+    const warnings = [];
+
+    const body = content.map((item, index) => {
+        const label = `Blok ${index + 1} (${item.type})`;
+
+        if (!SUPPORTED_TYPES.includes(item.type)) {
+            errors.push(`Blok ${index + 1}: nieznany typ "${item.type}". Aplikacja pominie ten blok i nie wyświetli nic. Dozwolone typy: ${SUPPORTED_TYPES.join(', ')}.`);
+        } else if (item.type === 'Text') {
+            checkTextBlock(item.content || '', label, errors, warnings);
+        } else if (item.type === 'Title') {
+            checkTitleBlock(item.content || '', label, errors, warnings);
+        } else if (item.type === 'Image') {
+            checkImageBlock(item, label, errors, warnings);
+        }
+
+        switch (item.type) {
+            case 'Title':
+                return `#### ${item.content}`;
+            case 'Text':
+                return item.content;
+            case 'Image':
+                return item.metadata?.imageRelativePath ? `<img src="https://blobs.codzienniefitapp.com/public/${item.metadata.imageRelativePath}"/>` : '';
+            default:
+                return item.content || '';
+        }
+    }).filter(text => text.length > 0).join('\n\n');
+
+    const banner = [];
+    if (errors.length > 0) {
+        banner.push(`> 🛑 **BŁĄD FORMATOWANIA (${errors.length})**`);
+        errors.forEach(e => banner.push(`> - ${e}`));
+    }
+    if (warnings.length > 0) {
+        if (banner.length > 0) banner.push('>');
+        banner.push(`> ⚠️ **UWAGA (${warnings.length})**`);
+        warnings.forEach(w => banner.push(`> - ${w}`));
+    }
+    if (banner.length === 0) return body;
+
+    banner.push('>');
+    banner.push('> **Co obsługuje aplikacja:**');
+    banner.push('> - Bloki: `Title`, `Text`, `Image`. Inne typy są pomijane.');
+    banner.push('> - W bloku `Text` tylko `<b>tekst</b>` oraz `<a href="https://...">tekst</a>`, bez zagnieżdżania, w obrębie jednej linii.');
+    banner.push('> - Znak `[` nie jest obsługiwany nigdzie w bloku `Text`, nawet poza pogrubieniem. Zamień `[AUDIO]` na `(AUDIO)`.');
+    banner.push('> - Emoji trzymaj poza `<b>...</b>`, np. `<b>Nowy plan</b> 🎧` zamiast `<b>Nowy plan 🎧</b>`.');
+    banner.push('> - W blokach `Title` nawiasy i emoji są bezpieczne, tytuły nie są parsowane.');
+
+    return banner.join('\n') + '\n\n---\n\n' + body;
+}
+
+####################################################################################################
+### REST QUERY adminConfig
+####################################################################################################
+METHOD: GET
+URL: api/internalConfig
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=False): return data
+
+####################################################################################################
+### REST QUERY allMediaFilesQuery
+####################################################################################################
+METHOD: GET
+URL: api/manageMedia/files
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data.files.filter(x => x.type == 'image')
+
+####################################################################################################
+### REST QUERY workoutsConfig
+####################################################################################################
+METHOD: GET
+URL: api/workoutsConfig
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### REST QUERY uploadImage
+####################################################################################################
+METHOD: POST
+URL: api/manageMedia/files?relativePath={{WorkoutModal.opened ? 'workouts' : ChallengeModal.opened ? 'challenges' : !MessageModal.hidden ? 'messages' : !BadgeModal.hidden ? 'badges' : 'other'}}%2F{{WorkoutModal.opened ?fileInput?.value['0']?.name ?? "" : ChallengeModal.opened ? fileInput2?.value['0']?.name ?? "" : !MessageModal.hidden ? fileInput3?.value['0']?.name ?? "" : !BadgeModal.hidden ? fileInput4?.value['0']?.name ?? "" : "null"}}
+BODY TYPE: binary
+BODY: {{WorkoutModal.opened ? fileInput.value[0]?.base64Data ?? "" : ChallengeModal.opened ? fileInput2.value[0]?.base64Data ?? "" : !MessageModal.hidden ? fileInput3.value[0]?.base64Data ?? "" : !BadgeModal.hidden ? fileInput4.value[0]?.base64Data ?? "" : null}}
+HEADER NAMES: []
+TRANSFORMER (enabled=False): // Query results are available as the `data` variable
+return data.files.filter(x => x.type == 'image')
+
+####################################################################################################
+### REST QUERY workoutsQuery
+####################################################################################################
+METHOD: GET
+URL: api/manageWorkouts
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data.sort(x => x.addedAtUtc).reverse()
+
+####################################################################################################
+### REST QUERY upsertWorkout
+####################################################################################################
+METHOD: POST
+URL: api/manageWorkouts
+BODY TYPE: raw
+BODY: {{getWorkoutUpsertJson.data}}
+HEADER NAMES: ['Content-Type']
+TRANSFORMER (enabled=False): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### JS QUERY startCreatingOrEditingWorkout  (additionalScope params: ['workoutId'])
+####################################################################################################
+function setFormField(workout) {
+  workoutTabs.setCurrentViewIndex(0)
+  formIdLabel.setValue(workout.id)
+  formTitleLabel.setValue(workout.title)
+  formInternalTitleLabel.setValue(workout.internalTitle)
+  formDurationLabel.setValue(workout.durationMinutes)
+  formLinkLabel.setValue(workout.videoUrl)
+  formHiddenCheckbox.setValue(workout.hidden)
+  formPremiumCheckbox.setValue(workout.pro)
+  formLevelSelect.setValue(workout.levelId)
+  formBadgeNormalSelect.setValue(workout.badgeId)
+  formTypeMultiselect.setValue(workout.trainingTypeIds)
+  formEquipmentMultiselect.setValue(workout.equipmentIds)
+  formAddedAtLabel.setValue(workout.addedAtUtc)
+  formLiveDateLabel.setValue(workout.liveAtUtc)
+  formAvailableAtDate.setValue(workout.availableAtUtc)
+  formFancyContentLabel.setValue( workout.descriptionFancyContent)
+  formImageRelativePath.setValue(workout.imageRelativePath)
+  formAudioFileRelativePath.setValue(workout.audioRelativePath)
+}
+
+let isCreatingANewWorkout = workoutId == null || workoutId == undefined || workoutId == "-1"
+
+if (isCreatingANewWorkout) {
+  isCreatingNewWorkout.setValue(true);
+  isEditingExistingWorkout.setValue(false);
+  formIdLabel.setValue(null)
+} else {
+  isCreatingNewWorkout.setValue(false);
+  isEditingExistingWorkout.setValue(true);
+  let workoutById = workoutsQuery.data.find(i => i.id == workoutId)
+  setFormField(workoutById)
+}
+isShowingWorkoutDetails.setValue(true)
+WorkoutModal.open()
+
+####################################################################################################
+### JS QUERY getWorkoutUpsertJson  (additionalScope params: [])
+####################################################################################################
+return {
+  "id" : formIdLabel.value,
+  "title" : formTitleLabel.value,
+  "internalTitle" : formInternalTitleLabel.value,
+  "equipmentIds": formEquipmentMultiselect.value,
+  "trainingTypeIds": formTypeMultiselect.value,
+  "levelId": formLevelSelect.value,
+  "durationMinutes": formDurationLabel.value,
+  "hidden": formHiddenCheckbox.value,
+  "badgeId": formBadgeNormalSelect.value,
+  "pro": formPremiumCheckbox.value,
+  "descriptionFancyContent": formFancyContentLabel.value,
+  "videoUrl": formLinkLabel.value,
+  "addedAtUtc": formAddedAtLabel.value == "" ? new Date().toISOString() : formAddedAtLabel.value,
+  "liveAtUtc": formLiveDateLabel.value == "" ? null : formLiveDateLabel.value,
+  "availableAtUtc": formAvailableAtDate.value == "" ? null : formAvailableAtDate.value,
+  "imageRelativePath": formImageRelativePath.value.trim() !== '' ? formImageRelativePath.value : null,
+"audioRelativePath": formAudioFileRelativePath.value.trim() !== '' ? formAudioFileRelativePath.value : null
+
+}
+
+####################################################################################################
+### REST QUERY challengesQuery
+####################################################################################################
+METHOD: GET
+URL: api/manageChallenges
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data.sort(x => x.addedAtUtc).reverse()
+
+####################################################################################################
+### REST QUERY upsertChallengePOST
+####################################################################################################
+METHOD: POST
+URL: api/manageChallenges
+BODY TYPE: raw
+BODY: {{getChallengeUpsertJson.data}}
+HEADER NAMES: ['Content-Type']
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### JS QUERY upsertChallenge  (additionalScope params: ['force'])
+####################################################################################################
+let currentVersionFromBackend = null
+
+console.log("[upsert] force =", force, "(type:", typeof force, ")")
+console.log("[upsert] challengeIdBeingEdited.value =", challengeIdBeingEdited.value)
+
+if (challengeIdBeingEdited.value) {
+  currentVersionFromBackend = await challengeQueryById.trigger({
+    additionalScope: { id: challengeFormIdLabel.value}
+  })
+}
+
+console.log("[upsert] currentVersionFromBackend =", currentVersionFromBackend)
+console.log(
+  "[upsert] backend updatedAtUtc =",
+  currentVersionFromBackend ? currentVersionFromBackend.updatedAtUtc : "(no backend version)"
+)
+console.log("[upsert] form updatedAtUtc   =", challengeFormUpdatedAtLabel.value)
+console.log(
+  "[upsert] dates differ? =",
+  currentVersionFromBackend
+    ? currentVersionFromBackend.updatedAtUtc !== challengeFormUpdatedAtLabel.value
+    : "(n/a)"
+)
+
+if (
+  force === false &&
+  currentVersionFromBackend != null &&
+  currentVersionFromBackend.updatedAtUtc !== challengeFormUpdatedAtLabel.value
+) {
+  console.log("[upsert] -> showing override modal, returning early")
+  ModalChallengeOverride.show()
+  return
+}
+
+console.log("[upsert] -> skipping modal, proceeding to upsert")
+
+await getChallengeUpsertJson.trigger({
+  onSuccess: function (data) {
+    upsertChallengePOST.trigger()
+    ModalChallengeOverride.hide()
+  }
+})
+
+####################################################################################################
+### JS QUERY startCreatingOrEditingChallenge  (additionalScope params: ['challengeId'])
+####################################################################################################
+function setFormField(challenge) {
+  challengeTabs.setCurrentViewIndex(0)
+  challengeFormIdLabel.setValue(challenge.id)
+  challengeFormTitleLabel.setValue(challenge.title)
+  challengeFormSubtitleLabel.setValue(challenge.subtitle)
+  challengeFormBadgeNormalSelect.setValue(challenge.badgeId)
+  challengeFormBadgePerfectSelect.setValue(challenge.perfectCompletionBadgeId)
+  challengeFormCategorySelect.setValue(challenge.categoryId)
+  challengeFormGoalsSelect.setValue(challenge.goalsIds ?? [])
+  challengeFormDifficultySelect.setValue(challenge.difficultyLevelsIds ?? [])
+  challengeFormInternalTitleLabel.setValue(challenge.internalTitle)
+  challengeFormLengthDaysLabel.setValue(challenge.lengthDays)
+  challengeVisibleUpfrontDaysLabel.setValue(challenge.visibleDaysUpFront ?? null)
+  challengeFormHiddenCheckbox.setValue(challenge.hidden)
+  challengeFormPremiumCheckbox.setValue(challenge.pro)
+  
+unlockedByEntitlementIds.setValue((challenge.unlockedByEntitlementIds ?? []).join(', '))
+  
+discountedForEntitlementIds.setValue((challenge.discountedForEntitlementIds ?? []).join(', ')) 
+
+challengeFormPaidOfferingId.setValue(challenge.offeringId)
+  challengeFormPaidOfferingDiscountedId.setValue(challenge.offeringDiscountedId)
+  challengeFormAddedAtLabel.setValue(challenge.addedAtUtc)
+  challengeFormUpdatedAtLabel.setValue(challenge.updatedAtUtc)
+  challengeFormLiveAtLabel.setValue(challenge.liveAtUtc)
+  challengeFormEndsAtLabel.setValue(challenge.endsAtUtc)
+  challengeFormAvailableAtLabel.setValue(challenge.availableAtUtc)
+  challengeFormFancyContentLabel.setValue( challenge.descriptionFancyContent)
+  challengeFormImageRelativePath.setValue(challenge.imageRelativePath)
+}
+
+let isCreatingANewChallenge = challengeId == null || challengeId == undefined || challengeId == "-1"
+
+if (isCreatingANewChallenge) {
+  isCreatingNewChallenge.setValue(true);
+  isEditingExistingChallenge.setValue(false);
+  challengeFormIdLabel.setValue(null)
+challengePathsBeingEdited.setValue({})
+} else {
+  isCreatingNewChallenge.setValue(false);
+  isEditingExistingChallenge.setValue(true);
+  let challengeById = challengesQuery.data.find(i => i.id == challengeId)
+  setFormField(challengeById)
+mapChallengePathsToLocalPaths.trigger({additionalScope: {
+  challenge: challengeById
+}})
+  
+}
+
+
+isShowingChallengeDetails.setValue(true)
+ChallengeModal.open()
+
+####################################################################################################
+### JS QUERY getChallengeUpsertJson  (additionalScope params: [])
+####################################################################################################
+const csvToIds = (s) => (s ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+
+return {
+  "id" : challengeFormIdLabel.value,
+  "title" : challengeFormTitleLabel.value,
+  "subtitle": challengeFormSubtitleLabel.value,
+  "internalTitle" : challengeFormInternalTitleLabel.value,
+  "hidden": challengeFormHiddenCheckbox.value,
+  "pro": challengeFormPremiumCheckbox.value,
+ unlockedByEntitlementIds: csvToIds(unlockedByEntitlementIds.value),
+discountedForEntitlementIds: csvToIds(discountedForEntitlementIds.value),
+  "offeringId": challengeFormPremiumCheckbox.value ? challengeFormPaidOfferingId.value : null,
+  "offeringDiscountedId": challengeFormPremiumCheckbox.value ? challengeFormPaidOfferingDiscountedId.value : null,
+  "badgeId": challengeFormBadgeNormalSelect.value,
+  "perfectCompletionBadgeId": challengeFormBadgePerfectSelect.value,
+  "categoryId": challengeFormCategorySelect.value,
+  "goalsIds": challengeFormGoalsSelect.value ?? [],
+  "difficultyLevelsIds": challengeFormDifficultySelect.value ?? [],
+  "descriptionFancyContent": challengeFormFancyContentLabel.value,
+  "addedAtUtc": challengeFormAddedAtLabel.value == "" ? new Date().toISOString() : challengeFormAddedAtLabel.value,
+  "liveAtUtc": challengeFormLiveAtLabel.value ? challengeFormLiveAtLabel.value : undefined,
+  "endsAtUtc": challengeFormEndsAtLabel.value ? challengeFormEndsAtLabel.value : undefined,
+  "availableAtUtc": challengeFormAvailableAtLabel.value ? challengeFormAvailableAtLabel.value : undefined,
+  "imageRelativePath": challengeFormImageRelativePath.value,
+  "lengthDays" : challengeFormLengthDaysLabel.value,
+  "visibleDaysUpFront": challengeVisibleUpfrontDaysLabel.value,
+ "paths": Object.entries(challengePathsBeingEdited.value).map(([levelId, data]) => ({
+    levelId,
+    ...data,
+    days: data.days.map(day => ({
+      ...day,
+      workoutIds: day.workoutIds.filter(id => id && id.trim() !== '')
+    }))
+  }))
+}
+
+####################################################################################################
+### JS QUERY mapChallengePathsToLocalPaths  (additionalScope params: ['challenge'])
+####################################################################################################
+function transformWorkoutData(challenge) {
+  return challenge.paths.reduce((acc, item) => {
+    const { levelId, ...rest } = item;
+    acc[levelId] = rest;
+    return acc;
+  }, {});
+}
+
+let value = transformWorkoutData(challenge)
+challengePathsBeingEdited.setValue(value)
+
+####################################################################################################
+### JS QUERY setWorkoutIdForPathDay  (additionalScope params: ['pathLevelId', 'dayIndex', 'workoutId', 'workoutIndex'])
+####################################################################################################
+function updateWorkoutId(pathsData, levelId, dayIndex, workoutIndex, newWorkoutId) {
+  if (!pathsData[levelId]) {
+    console.error(`Level ${levelId} not found in the challenge.`);
+    return pathsData;
+  }
+
+  const dayToUpdate = pathsData[levelId].days.find(day => day.dayIndex === dayIndex);
+
+  if (!dayToUpdate) {
+    console.error(`Day with index ${dayIndex} not found in level ${levelId}.`);
+    return pathsData;
+  }
+
+  // Update the workoutId
+  dayToUpdate.workoutIds[workoutIndex] = newWorkoutId;
+
+  return pathsData;
+}
+
+let newValue = updateWorkoutId(challengePathsBeingEdited.value, pathLevelId, dayIndex,workoutIndex, workoutId)
+console.log(`Dla sciezki ${pathLevelId} w dniu ${dayIndex} ustawiono trening ${workoutIndex} na ${workoutId}`);
+challengePathsBeingEdited.setValue(newValue)
+
+####################################################################################################
+### JS QUERY addDayToChallengePath  (additionalScope params: ['levelId'])
+####################################################################################################
+function addNewDay(pathsData, targetLevelId) {
+  // Check if the target level exists
+  if (!pathsData[targetLevelId]) {
+    console.error(`Level ${targetLevelId} not found in the challenge data.`);
+    return pathsData;
+  }
+
+  const level = pathsData[targetLevelId];
+  
+  // Find the maximum dayIndex
+  const maxDayIndex = level.days.reduce((max, day) => 
+    Math.max(max, day.dayIndex), 0);
+  
+  // Create a new day object
+  const newDay = {
+    dayIndex: maxDayIndex + 1,
+    workoutIds: []
+  };
+  
+  // Add the new day to the days array
+  level.days.push(newDay);
+
+  return pathsData;
+}
+
+let newData = addNewDay(challengePathsBeingEdited.value, levelId)
+challengePathsBeingEdited.setValue(newData)
+
+####################################################################################################
+### JS QUERY addPathToCurrentPaths  (additionalScope params: ['levelId'])
+####################################################################################################
+function addPath(pathsData, targetLevelId) {
+  pathsData[targetLevelId] = {
+    "frequency" : 1,
+    "minimumDaysToComplete": 1,
+    "equipmentIds": [],
+    "description": null,
+    "difficultyLevelsIds": [],
+    "days": [{
+    dayIndex: 1,
+    workoutIds: [],
+  }]
+  }
+  return pathsData;
+}
+
+let newData = addPath(challengePathsBeingEdited.value, levelId)
+challengePathsBeingEdited.setValue(newData)
+
+####################################################################################################
+### JS QUERY removePathFromCurrentPaths  (additionalScope params: ['levelId'])
+####################################################################################################
+function addPath(pathsData, targetLevelId) {
+  delete pathsData[targetLevelId]
+  return pathsData;
+}
+
+let newData = addPath(challengePathsBeingEdited.value, levelId)
+challengePathsBeingEdited.setValue(newData)
+
+if (!newData[challengePathTabs.value]){
+  if (Object.keys(newData).length > 0){
+    challengePathTabs.setValue(Object.keys(newData)[0])
+  }
+  else {
+    challengePathTabs.setValue(null)
+  }
+  
+}
+
+####################################################################################################
+### JS QUERY removeDayFromCurrentPath  (additionalScope params: ['levelId', 'dayIndex'])
+####################################################################################################
+function removeDay(pathsData, targetLevelId, dayIndex) {
+  if (!pathsData[targetLevelId]) {
+    console.error(`Level ${targetLevelId} not found in the challenge data.`);
+    return pathsData;
+  }
+
+  const level = pathsData[targetLevelId];
+
+  level.days = level.days
+    .filter(x => {
+    return x.dayIndex != dayIndex
+  })
+    .sort((a, b) => a.dayIndex - b.dayIndex)
+    .map((day, index) => ({
+    ...day,
+    dayIndex: index + 1
+  }));
+
+  return pathsData;
+}
+
+let newData = removeDay(challengePathsBeingEdited.value, levelId, dayIndex)
+challengePathsBeingEdited.setValue(newData)
+
+####################################################################################################
+### JS QUERY changeFrequencyForPath  (additionalScope params: ['levelId', 'frequency'])
+####################################################################################################
+function changeFrequency(pathsData, targetLevelId, frequency) {
+  if (!pathsData[targetLevelId]) {
+    console.error(`Level ${targetLevelId} not found in the challenge data.`);
+    return pathsData;
+  }
+
+  const level = pathsData[targetLevelId];
+  level.frequency = frequency
+
+  
+  console.log(`Changed frequence for level ${levelId} to ${frequency}`)
+  
+  return pathsData;
+}
+
+let newData = changeFrequency(challengePathsBeingEdited.value, levelId, frequency)
+challengePathsBeingEdited.setValue(newData)
+
+####################################################################################################
+### JS QUERY changeDescriptionForPath  (additionalScope params: ['levelId', 'description'])
+####################################################################################################
+function changeDescription(pathsData, targetLevelId, description) {
+  if (!pathsData[targetLevelId]) {
+    console.error(`Level ${targetLevelId} not found in the challenge data.`);
+    return pathsData;
+  }
+
+  const level = pathsData[targetLevelId];
+  level.description = description
+
+  console.log(`Changed description for level ${levelId} to ${description}`)
+  
+  return pathsData;
+}
+
+let newData = changeDescription(challengePathsBeingEdited.value, levelId, description)
+challengePathsBeingEdited.setValue(newData)
+
+####################################################################################################
+### JS QUERY changeLevelsForPath  (additionalScope params: ['levelId', 'levels'])
+####################################################################################################
+function changeLevels(pathsData, targetLevelId, levels) {
+  if (!pathsData[targetLevelId]) {
+    console.error(`Level ${targetLevelId} not found in the challenge data.`);
+    return pathsData;
+  }
+
+  const level = pathsData[targetLevelId];
+  level.difficultyLevelsIds = levels
+
+  console.log(`Changed levels for path ${levelId} to ${levels}`)
+  
+  return pathsData;
+}
+
+let newData = changeLevels(challengePathsBeingEdited.value, levelId, levels)
+challengePathsBeingEdited.setValue(newData)
+
+####################################################################################################
+### JS QUERY moveDayForCurrentPath  (additionalScope params: ['levelId', 'dayIndex', 'direction'])
+####################################################################################################
+function moveDay(pathsData, targetLevelId, dayIndex, direction) {
+  console.log(`[moveDay] Starting: dayIndex ${dayIndex}, direction ${direction}, targetLevelId ${targetLevelId}`);
+  console.log('[moveDay] Initial pathsData:', JSON.stringify(pathsData, null, 2));
+  
+  // Create a deep copy of pathsData
+  const newPathsData = JSON.parse(JSON.stringify(pathsData));
+  console.log('[moveDay] Deep copy created');
+  
+  if (!newPathsData[targetLevelId]) {
+    console.error(`[moveDay] Error: Level ${targetLevelId} not found in the challenge data.`);
+    return newPathsData;
+  }
+  
+  const level = newPathsData[targetLevelId];
+  console.log('[moveDay] Target level:', JSON.stringify(level, null, 2));
+  
+  const currentIndex = level.days.findIndex(day => day.dayIndex === dayIndex);
+  if (currentIndex === -1) {
+    console.error(`[moveDay] Error: Day with index ${dayIndex} not found in level ${targetLevelId}.`);
+    return newPathsData;
+  }
+  
+  const newIndex = currentIndex + direction;
+  console.log(`[moveDay] Current index: ${currentIndex}, New index: ${newIndex}`);
+  
+  if (newIndex < 0 || newIndex >= level.days.length) {
+    console.error(`[moveDay] Error: Cannot move day outside of valid range. New index: ${newIndex}, Days length: ${level.days.length}`);
+    return newPathsData;
+  }
+  
+  // Swap the days
+  [level.days[currentIndex], level.days[newIndex]] = [level.days[newIndex], level.days[currentIndex]];
+  console.log('[moveDay] Days swapped');
+  
+  // Reindex all days
+  level.days = level.days.map((day, index) => ({
+    ...day,
+    dayIndex: index + 1
+  }));
+  console.log('[moveDay] Days reindexed');
+  
+  console.log('[moveDay] Final level state:', JSON.stringify(level, null, 2));
+  console.log('[moveDay] Final pathsData:', JSON.stringify(newPathsData, null, 2));
+  return newPathsData;
+}
+
+// The handleMoveDay function remains the same
+function handleMoveDay(levelId, dayIndex, direction) {
+  console.log(`[handleMoveDay] Starting: levelId ${levelId}, dayIndex ${dayIndex}, direction ${direction}`);
+  
+  let currentData = challengePathsBeingEdited.value;
+  console.log('[handleMoveDay] Current state:', JSON.stringify(currentData, null, 2));
+  
+  let newData = moveDay(currentData, levelId, dayIndex, direction);
+  console.log('[handleMoveDay] Move operation completed');
+  
+  challengePathsBeingEdited.setValue(newData);
+  console.log('[handleMoveDay] State updated with setValue');
+  
+  console.log('[handleMoveDay] New state after setValue:', JSON.stringify(challengePathsBeingEdited.value, null, 2));
+  
+  console.log('[handleMoveDay] Completed. UI update may be needed.');
+}
+
+// Usage
+handleMoveDay(levelId, dayIndex, direction);
+
+####################################################################################################
+### JS QUERY changeMinimumDaysForPath  (additionalScope params: ['levelId', 'days'])
+####################################################################################################
+function modifyMinimumDaysForPath(pathsData, targetLevelId, days) {
+  if (!pathsData[targetLevelId]) {
+    console.error(`Level ${targetLevelId} not found in the challenge data.`);
+    return pathsData;
+  }
+
+  const level = pathsData[targetLevelId];
+  level.minimumDaysToComplete = days
+
+  
+  console.log(`Changed minimum days to complete for level ${levelId} to ${days}`)
+  
+  return pathsData;
+}
+
+let newData = modifyMinimumDaysForPath(challengePathsBeingEdited.value, levelId, days)
+challengePathsBeingEdited.setValue(newData)
+
+####################################################################################################
+### REST QUERY messagesQuery
+####################################################################################################
+METHOD: GET
+URL: api/manageMessageDrafts/list?
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=False): return data
+
+####################################################################################################
+### JS QUERY startCreatingOrEditingMessage  (additionalScope params: ['messageId'])
+####################################################################################################
+function setFormField(message) {
+  messageIdField.setValue(message.id)
+  messageTitleField.setValue(message.title)
+  messageFormFancyContentLabel.setValue( message.fancyContent)
+  messageFormFancyContentLabel.setValue(message.fancyContent)
+  messageStatusRawField.setValue(message.status)
+  messageSenderFromField.setValue(message.from)
+  messageTargetGroupSelect.setValue(message.targetGroup)
+  messageDateCreatedField.setValue(message.createdAtUtc)
+  
+if (message.targetGroupValue){
+  messageTargetGroupValueSelect.setValue(message.targetGroupValue)}
+}
+
+let isCreatingANewMessage = messageId == null || messageId == undefined || messageId == "-1"
+messageForm.clear()
+messageFormFancyContentLabel.setValue([])
+if (isCreatingANewMessage) {
+  isInEditModeForCurrentMessage.setValue(true)
+  isCreatingNewMessage.setValue(true);
+  isEditingExistingMessage.setValue(false);
+  messageIdField.setValue(null)
+  messageStatusRawField.setValue("new")
+  messageDateCreatedField.setValue(new Date())
+} else {
+  isInEditModeForCurrentMessage.setValue(false)
+  isCreatingNewMessage.setValue(false);
+  isEditingExistingMessage.setValue(true);
+  let messageById = messagesQuery.data.messages.find(i => i.id == messageId)
+  setFormField(messageById)
+}
+messageForm.validate()
+isShowingMessageDetails.setValue(true)
+
+####################################################################################################
+### JS QUERY getMessageUpsertJson  (additionalScope params: [])
+####################################################################################################
+return {
+  "title" : messageTitleField.value,
+  "from": messageSenderFromField.value,
+  "targetGroup": messageTargetGroupSelect.value,
+  "targetGroupValue": messageTargetGroupValueSelect.hidden ? undefined : messageTargetGroupValueSelect.value,
+  "fancyContent": messageFormFancyContentLabel.value,
+  "createdAtUtc": messageDateCreatedField.value
+}
+
+####################################################################################################
+### REST QUERY upsertMessagePOST
+####################################################################################################
+METHOD: POST
+URL: api/manageMessageDrafts/upsert
+BODY TYPE: raw
+BODY: {{getMessageUpsertJson.data}}
+HEADER NAMES: ['Content-Type']
+TRANSFORMER (enabled=False): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### JS QUERY upsertMessage  (additionalScope params: [])
+####################################################################################################
+await getMessageUpsertJson.trigger({onSuccess:function(data){ {
+  upsertMessagePOST.trigger()
+}}})
+
+####################################################################################################
+### REST QUERY publishMessagePOST
+####################################################################################################
+METHOD: POST
+URL: api/manageMessageDrafts/publish
+BODY TYPE: json
+BODY: [{"key":"id","value":"{{ messageIdField.value }}"},{"key":"","value":""}]
+HEADER NAMES: ['Content-Type']
+TRANSFORMER (enabled=False): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### REST QUERY archiveMessagePOST
+####################################################################################################
+METHOD: POST
+URL: api/manageMessageDrafts/archive
+BODY TYPE: json
+BODY: [{"key":"id","value":"{{ messageIdField.value }}"},{"key":"","value":""}]
+HEADER NAMES: ['Content-Type']
+TRANSFORMER (enabled=False): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### REST QUERY fetchImage
+####################################################################################################
+METHOD: GET
+URL: https://blobs.codzienniefitapp.com/public/{{path}}
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=False): return data
+
+####################################################################################################
+### REST QUERY uploadAudio
+####################################################################################################
+METHOD: POST
+URL: api/manageMedia/files?relativePath=audio%2F{{fileInputAudio?.value['0']?.name ?? ""}}
+BODY TYPE: binary
+BODY: {{fileInputAudio.value[0]?.base64Data}}
+HEADER NAMES: []
+TRANSFORMER (enabled=False): // Query results are available as the `data` variable
+return data.files.filter(x => x.type == 'image')
+
+####################################################################################################
+### REST QUERY allAudioFilesQuery
+####################################################################################################
+METHOD: GET
+URL: api/manageMedia/files
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data.files.filter(x => x.type == "audio")
+
+####################################################################################################
+### JS QUERY changeEquipmentForPath  (additionalScope params: ['levelId', 'eq'])
+####################################################################################################
+function changeEquipment(pathsData, targetLevelId, equipments) {
+  if (!pathsData[targetLevelId]) {
+    console.error(`Level ${targetLevelId} not found in the challenge data.`);
+    return pathsData;
+  }
+
+  const level = pathsData[targetLevelId];
+  level.equipmentIds = equipments
+
+  
+  console.log(`Changed equipments for level ${levelId} to ${equipments}`)
+  
+  return pathsData;
+}
+
+let newData = changeEquipment(challengePathsBeingEdited.value, levelId, eq)
+challengePathsBeingEdited.setValue(newData)
+
+####################################################################################################
+### REST QUERY badgesQuery
+####################################################################################################
+METHOD: GET
+URL: api/manageBadges
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data.sort(x => x.updatedAtUtc).reverse()
+
+####################################################################################################
+### JS QUERY startCreatingOrEditingBadge  (additionalScope params: ['badgeId'])
+####################################################################################################
+function setFormField(badge) {
+  badgeFormId.setValue(badge.id)
+  badgeFormName.setValue(badge.name)
+  badgeFormComment.setValue(badge.comment)
+  badgeFormClaimToken.setValue(badge.claimToken)
+  formBadgeEventTokenActive.setValue(badge.isClaimLinkActive)
+  badgeFormTypeSelect.setValue(badge.type)
+  formBadgeImagePath.setValue(badge.imageRelativePath)
+  formBadgeHidden.setValue(badge.isHidden ?? false)
+  formBadgeActiveFromDate.setValue(badge.activeFromUtc)
+  formBadgeActiveToDate.setValue(badge.activeTillUtc)
+var parts = [
+  ...(badge.assignedToChallenges ?? []).map(c => "Wyzwanie '" + c.name + "'"),
+  ...(badge.assignedToWorkouts ?? []).map(w => "Trening '" + w.name + "'"),
+];
+formBadgAssignedTo.setValue(parts.join(", ") || "Nieprzypisana");
+}
+
+let isCreatingANewBadge = badgeId == null || badgeId == undefined || badgeId == "-1"
+badgeForm.clear()
+if (isCreatingANewBadge) {
+  isCreatingNewBadge.setValue(true);
+  isEditingExistingBadge.setValue(false);
+  badgeFormId.setValue(null)
+  badgeFormTypeSelect.setValue("normal")
+} else {
+  isCreatingNewBadge.setValue(false);
+  isEditingExistingBadge.setValue(true);
+  let badgeById = badgesQuery.data.find(i => i.id == badgeId)
+  setFormField(badgeById)
+}
+badgeForm.validate()
+isShowingBadgeDetails.setValue(true)
+
+####################################################################################################
+### REST QUERY upsertBadge
+####################################################################################################
+METHOD: POST
+URL: api/manageBadges
+BODY TYPE: raw
+BODY: {{getGetUpsertJson.data}}
+HEADER NAMES: ['Content-Type']
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### JS QUERY getGetUpsertJson  (additionalScope params: [])
+####################################################################################################
+let editedBadge = badgesQuery.data.find(x => x.id == badgeFormId.value)
+
+let badgeDefaults = editedBadge ?? {
+  "type": badgeFormTypeSelect.value
+}
+
+let isEvent = badgeDefaults.type == "manual"
+
+return { ...badgeDefaults,
+  "id" : badgeFormId.value ? badgeFormId.value : null,
+  "name" : badgeFormName.value,
+  "specialCategory": isEvent ? "event" : null,
+      "comment" : badgeFormComment.value == "" ? null : badgeFormComment.value,
+  "imageRelativePath": formBadgeImagePath.value,
+  "activeFromUtc": formBadgeActiveFromDate.value == "" ? null : formBadgeActiveFromDate.value,
+  "activeToUtc": formBadgeActiveToDate.value == "" ? null : formBadgeActiveToDate.value,
+        "isHidden": formBadgeHidden.value,
+        "isClaimLinkActive": isEvent ? formBadgeEventTokenActive.value: null,
+        "claimToken": isEvent ? badgeFormClaimToken.value: null,
+        "sectionId": null,
+        "subsectionId": null
+}
+
+####################################################################################################
+### JS QUERY BadgesTableClickToolbarHandler  (additionalScope params: [])
+####################################################################################################
+(empty)
+
+####################################################################################################
+### TRANSFORMER badgesAssignable
+####################################################################################################
+return {{ badgesQuery.data?.filter(x => x.type == 'normal') }}
+
+####################################################################################################
+### REST QUERY usersBadges
+####################################################################################################
+METHOD: GET
+URL: api/manageUserBadges/{{userIdField.value}}
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### REST QUERY userProgress
+####################################################################################################
+METHOD: GET
+URL: api/manageUserProgress/{{userIdField.value}}?
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### REST QUERY updatePromotedChallengePOST
+####################################################################################################
+METHOD: POST
+URL: api/manageChallenges/promotedChallenge
+BODY TYPE: json
+BODY: [{"key":"promotedChallengeId","value":"{{ challengesPromotedDropdown.value }}"}]
+HEADER NAMES: ['Content-Type']
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### REST QUERY challengeQueryById
+####################################################################################################
+METHOD: GET
+URL: api/manageChallenges/{{id}}
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### REST QUERY usersData
+####################################################################################################
+METHOD: GET
+URL: api/accounts/{{userIdField.value}}
+BODY TYPE: none
+BODY: 
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### REST QUERY usersDataChangeEmail
+####################################################################################################
+METHOD: PUT
+URL: api/accounts/{{userIdField.value}}
+BODY TYPE: json
+BODY: [{"key":"email","value":"{{ userEmailAddress.value }}"}]
+HEADER NAMES: []
+TRANSFORMER (enabled=True): // Query results are available as the `data` variable
+return data
+
+####################################################################################################
+### EVENT SCRIPT adminConfig [RESTQuery] on "success"
+####################################################################################################
+workoutById.setValue( workoutsQuery.data.reduce((acc, item) => {
+    const { id, ...rest } = item
+    acc[id] = rest
+    return acc
+  }, {}))
+challengesPromotedDropdown.setValue(adminConfig.data.promotedChallengeId)
+
+####################################################################################################
+### EVENT SCRIPT workoutsQuery [RESTQuery] on "success"
+####################################################################################################
+workoutById.setValue( workoutsQuery.data.reduce((acc, item) => {
+    const { id, ...rest } = item
+    acc[id] = rest
+    return acc
+  }, {}))
+
+####################################################################################################
+### EVENT SCRIPT workoutsTableForm [FormWidget2] on "submit"
+####################################################################################################
+let data = await getWorkoutUpsertJson.trigger()
+
+upsertWorkout.trigger({
+  
+  onSuccess: function (data) {
+  WorkoutModal.close()
+    }}
+)
+
+####################################################################################################
+### EVENT SCRIPT WorkoutModal [ModalWidget] on "open"
+####################################################################################################
+startCreatingOrEditingWorkout.trigger({additionalScope: {
+  workoutId: "-1"
+}})
+
+####################################################################################################
+### EVENT SCRIPT WorkoutModal [ModalWidget] on "close"
+####################################################################################################
+workoutsTableForm.clear()
+workoutsTableForm.reset()
+formFancyContentLabel.setValue([])
+
+####################################################################################################
+### EVENT UTIL link1 on "click" -> copyToClipboard
+####################################################################################################
+{
+ "value": "{{JSON.stringify([{\n  \"type\": \"Title\",\n  \"content\": \"Treść\"\n},{\n  \"type\": \"Text\",\n  \"content\": \"Treść\"\n}], null, \" \")}}"
+}
+
+####################################################################################################
+### EVENT SCRIPT container2 [ContainerWidget2] on "click"
+####################################################################################################
+formImageRelativePath.setValue(allMediaFilesQuery.data[i].path)
+workoutTabs.setCurrentViewIndex(0)
+
+####################################################################################################
+### EVENT SCRIPT link2 [LinkWidget] on "click"
+####################################################################################################
+workoutTabs.setCurrentViewIndex(1)
+
+####################################################################################################
+### EVENT SCRIPT fileSendButton [ButtonWidget2] on "click"
+####################################################################################################
+uploadImage.trigger({onSuccess: () => {
+  fileInput.clearValue()
+  allMediaFilesQuery.trigger()
+}})
+
+####################################################################################################
+### EVENT UTIL link3 on "click" -> openUrl
+####################################################################################################
+{
+ "url": "https://www.youtube.com/@codziennie_fit/videos"
+}
+
+####################################################################################################
+### EVENT SCRIPT challengesTable [TableWidget2] on "clickToolbar" target=3c
+####################################################################################################
+startCreatingOrEditingChallenge.trigger({additionalScope: {challengeId: "-1"}})
+
+####################################################################################################
+### EVENT SCRIPT challengesTable [TableWidget2] on "doubleClickRow"
+####################################################################################################
+startCreatingOrEditingChallenge.trigger({
+  additionalScope: {
+    challengeId: currentRow.id
+  }})
+
+####################################################################################################
+### EVENT SCRIPT challengesTable [TableWidget2] on "clickAction" target=d8ed4
+####################################################################################################
+startCreatingOrEditingChallenge.trigger({
+  additionalScope: {
+    challengeId: currentRow.id
+  }})
+
+####################################################################################################
+### EVENT SCRIPT ChallengeModal [ModalWidget] on "open"
+####################################################################################################
+startCreatingOrEditingChallenge.trigger({additionalScope: {
+  challengeId: "-1"
+}})
+
+####################################################################################################
+### EVENT SCRIPT ChallengeModal [ModalWidget] on "close"
+####################################################################################################
+challengesTableForm.clear()
+challengesTableForm.reset()
+challengeFormFancyContentLabel.setValue([])
+
+####################################################################################################
+### EVENT UTIL link4 on "click" -> copyToClipboard
+####################################################################################################
+{
+ "value": "{{JSON.stringify([{\n  \"type\": \"Title\",\n  \"content\": \"Treść\"\n},{\n  \"type\": \"Text\",\n  \"content\": \"Treść\"\n}], null, \" \")}}"
+}
+
+####################################################################################################
+### EVENT SCRIPT container3 [ContainerWidget2] on "click"
+####################################################################################################
+challengeFormImageRelativePath.setValue(allMediaFilesQuery.data[i].path)
+challengeTabs.setCurrentViewIndex(0)
+
+####################################################################################################
+### EVENT SCRIPT link5 [LinkWidget] on "click"
+####################################################################################################
+challengeTabs.setCurrentViewIndex(1)
+
+####################################################################################################
+### EVENT SCRIPT fileSendButton2 [ButtonWidget2] on "click"
+####################################################################################################
+uploadImage.trigger({onSuccess: () => {
+  fileInput2.clearValue()
+  allMediaFilesQuery.trigger()
+}})
+
+####################################################################################################
+### EVENT SCRIPT challengePathDaysPerWeek [NumberInputWidget] on "change"
+####################################################################################################
+changeFrequencyForPath.trigger({
+additionalScope: {
+  levelId: challengePathTabs.value,
+  frequency: challengePathDaysPerWeek.value
+}  
+})
+
+####################################################################################################
+### EVENT SCRIPT mapChallengePathsToLocalPaths [JavascriptQuery] on "success"
+####################################################################################################
+challengePathTabs.setValue(Object.keys(challengePathsBeingEdited.value)[0])
+
+####################################################################################################
+### EVENT SCRIPT challengePathDayWorkoutId1 [SelectWidget2] on "change"
+####################################################################################################
+let dayIndex = item.dayIndex
+let workoutId = challengePathDayWorkoutId1.value
+
+setWorkoutIdForPathDay.trigger({additionalScope:{
+  dayIndex: dayIndex,
+  workoutIndex:0,
+  workoutId: workoutId,
+  pathLevelId: challengePathTabs.value
+}})
+
+####################################################################################################
+### EVENT UTIL challengeDayLink on "click" -> openUrl
+####################################################################################################
+{
+ "url": "{{ workoutById.value[item.workoutId].videoUrl }}"
+}
+
+####################################################################################################
+### EVENT SCRIPT challengeDayButtonGroup [ButtonGroupWidget2] on "click" target=908cd
+####################################################################################################
+moveDayForCurrentPath.trigger({
+  additionalScope: {
+    levelId: challengePathTabs.value,
+    dayIndex: item.dayIndex,
+    direction: -1
+  }
+})
+
+####################################################################################################
+### EVENT SCRIPT challengeDayButtonGroup [ButtonGroupWidget2] on "click" target=5d088
+####################################################################################################
+moveDayForCurrentPath.trigger({
+  additionalScope: {
+    levelId: challengePathTabs.value,
+    dayIndex: item.dayIndex,
+    direction: 1
+  }
+})
+
+####################################################################################################
+### EVENT SCRIPT challengeDayButtonGroup [ButtonGroupWidget2] on "click" target=360df
+####################################################################################################
+removeDayFromCurrentPath.trigger({
+  additionalScope: {
+    levelId: challengePathTabs.value,
+  dayIndex: item.dayIndex}
+})
+
+####################################################################################################
+### EVENT SCRIPT workoutsTable [TableWidget2] on "doubleClickRow"
+####################################################################################################
+startCreatingOrEditingWorkout.trigger({
+  additionalScope: {
+    workoutId: currentRow.id
+  }})
+
+####################################################################################################
+### EVENT SCRIPT workoutsTable [TableWidget2] on "clickAction" target=d8ed4
+####################################################################################################
+startCreatingOrEditingWorkout.trigger({
+  additionalScope: {
+    workoutId: currentRow.id
+  }})
+
+####################################################################################################
+### EVENT SCRIPT workoutsTable [TableWidget2] on "clickToolbar" target=3c
+####################################################################################################
+startCreatingOrEditingWorkout.trigger({additionalScope: {workoutId: "-1"}})
+
+####################################################################################################
+### EVENT UTIL workoutsTable on "clickCell" -> openUrl
+####################################################################################################
+{
+ "url": "{{ currentSourceRow.VideoUrl }}"
+}
+
+####################################################################################################
+### EVENT SCRIPT challengePathMinimumDays [NumberInputWidget] on "change"
+####################################################################################################
+changeMinimumDaysForPath.trigger({
+additionalScope: {
+  levelId: challengePathTabs.value,
+  days: challengePathMinimumDays.value
+}  
+})
+
+####################################################################################################
+### EVENT SCRIPT challengePathDayWorkoutId2 [SelectWidget2] on "change"
+####################################################################################################
+let dayIndex = item.dayIndex
+let workoutId = challengePathDayWorkoutId2.value
+
+setWorkoutIdForPathDay.trigger({additionalScope:{
+  dayIndex: dayIndex,
+  workoutId: workoutId,
+  workoutIndex: 1,
+  pathLevelId: challengePathTabs.value
+}})
+
+####################################################################################################
+### EVENT SCRIPT messagesQuery [RESTQuery] on "success"
+####################################################################################################
+workoutById.setValue( workoutsQuery.data.reduce((acc, item) => {
+    const { id, ...rest } = item
+    acc[id] = rest
+    return acc
+  }, {}))
+
+####################################################################################################
+### EVENT SCRIPT MessagesTable [TableWidget2] on "clickToolbar" target=861aa
+####################################################################################################
+startCreatingOrEditingMessage.trigger({additionalScope: {messageId: "-1"}})
+
+####################################################################################################
+### EVENT SCRIPT MessagesTable [TableWidget2] on "clickAction" target=8e198
+####################################################################################################
+startCreatingOrEditingMessage.trigger({
+  additionalScope: {
+    messageId: currentRow.id
+  }})
+
+####################################################################################################
+### EVENT SCRIPT MessagesTable [TableWidget2] on "doubleClickRow"
+####################################################################################################
+startCreatingOrEditingMessage.trigger({
+  additionalScope: {
+    messageId: currentRow.id
+  }})
+
+####################################################################################################
+### EVENT UTIL link6 on "click" -> copyToClipboard
+####################################################################################################
+{
+ "value": "{{JSON.stringify([{\n  \"type\": \"Title\",\n  \"content\": \"Treść\"\n},{\n  \"type\": \"Text\",\n  \"content\": \"Treść\"\n}, {\n  \"type\": \"Image\",\n  \"content\": \"\",\n  \"metadata\": {\n    \"imageRelativePath\": \"challenges/CF_20240315_034.webp\",\n    \"heightToWidthRatio\": 0.642578125\n  }\n\n                }], null, \" \")}}"
+}
+
+####################################################################################################
+### EVENT SCRIPT fileSendButton3 [ButtonWidget2] on "click"
+####################################################################################################
+uploadImage.trigger({onSuccess: () => {
+  fileInput3.clearValue()
+  allMediaFilesQuery.trigger()
+}})
+
+####################################################################################################
+### EVENT SCRIPT copyMessageImageJson [ButtonWidget2] on "click"
+####################################################################################################
+if (messageImagesByName.value[item.path]){
+  utils.copyToClipboard(messageImagesByName.value[item.path])
+
+return
+
+}
+
+(async () => {
+imageNameBeingPreparedForMessages.setValue(item.path)
+    try {
+        // Step 0: Block UI - Show loading indicator
+        utils.showNotification({ title: "Processing", description: "Fetching and processing image..." });
+
+        console.log("Step 1: Fetching image with path:", item.path);
+        
+        // 1. Fetch Image from Retool Query
+        const response = await fetchImage.trigger({ additionalScope: { path: item.path } });
+        console.log("Step 2: Image fetched successfully.");
+
+        // Debug: Log response keys
+        console.log("Debug: Response structure keys:", Object.keys(response));
+
+        // 2. Validate Response
+        if (!response || !response.base64Data) {
+            throw new Error("No base64Data received from fetchImage.");
+        }
+        console.log("Step 3: Base64 data found (not logged for performance).");
+
+        // 3. Convert Base64 to Image
+        const img = new Image();
+        img.src = `data:image/png;base64,${response.base64Data}`;
+        console.log("Step 4: Image source set.");
+
+        // 4. Get Image Dimensions
+        const ratio = await new Promise((resolve, reject) => {
+            img.onload = () => {
+                console.log("Step 5: Image loaded successfully.");
+                resolve(img.naturalHeight / img.naturalWidth);
+            };
+            img.onerror = (err) => {
+                console.error("Step 5 Error: Image failed to load.", err);
+                reject(new Error("Could not load image from Base64."));
+            };
+        });
+
+        console.log("Step 6: Height-to-width ratio calculated:", ratio);
+
+        // 5. Generate JSON Output
+        const jsonData = JSON.stringify({
+            "type": "Image",
+            "content": "",
+            "metadata": {
+                "imageRelativePath": item.path,
+                "heightToWidthRatio": ratio
+            }
+        }, null, 2);
+        console.log("Step 7: JSON generated successfully.");
+
+        // 6. Store JSON Data in messageImagesByName using setValue
+        messageImagesByName.setValue({
+            ...messageImagesByName.value,
+            [item.path]: jsonData
+        });
+        console.log("Step 8: JSON stored in messageImagesByName.");
+
+        // 7. Show success notification
+        utils.showNotification({ title: "Stored", description: "Image metadata stored successfully." });
+
+    } catch (error) {
+        console.error("Error occurred:", error);
+        utils.showNotification({ title: "Error", description: error.message || "Could not process the image." });
+    } finally {
+imageNameBeingPreparedForMessages.setValue("")
+    }
+})();
+
+####################################################################################################
+### EVENT SCRIPT challengeDayProToggle [SwitchWidget2] on "true"
+####################################################################################################
+challengePathsBeingEdited.setIn([challengePathTabs.value, "pro"], true)
+
+####################################################################################################
+### EVENT SCRIPT challengeDayProToggle [SwitchWidget2] on "false"
+####################################################################################################
+challengePathsBeingEdited.setIn([challengePathTabs.value, "pro"], false)
+
+####################################################################################################
+### EVENT SCRIPT audioSendButton [ButtonWidget2] on "click"
+####################################################################################################
+uploadAudio.trigger({onSuccess: () => {
+  fileInputAudio.clearValue()
+  allAudioFilesQuery.trigger()
+}})
+
+####################################################################################################
+### EVENT UTIL audioFilePlayButton on "click" -> openUrl
+####################################################################################################
+{
+ "url": "{{mediaEndpoint.value + item.path}}"
+}
+
+####################################################################################################
+### EVENT SCRIPT audioFileChooseButton [ButtonWidget2] on "click"
+####################################################################################################
+formAudioFileRelativePath.setValue(item.path)
+workoutTabs.setCurrentViewIndex(0)
+
+####################################################################################################
+### EVENT SCRIPT link7 [LinkWidget] on "click"
+####################################################################################################
+workoutTabs.setCurrentViewIndex(2)
+
+####################################################################################################
+### EVENT UTIL button1 on "click" -> openUrl
+####################################################################################################
+{
+ "url": "{{mediaEndpoint.value}}{{formAudioFileRelativePath.value}}"
+}
+
+####################################################################################################
+### EVENT SCRIPT challengePathDayWorkoutId3 [SelectWidget2] on "change"
+####################################################################################################
+let dayIndex = item.dayIndex
+let workoutId = challengePathDayWorkoutId3.value
+
+setWorkoutIdForPathDay.trigger({additionalScope:{
+  dayIndex: dayIndex,
+  workoutId: workoutId,
+  workoutIndex: 2,
+  pathLevelId: challengePathTabs.value
+}})
+
+####################################################################################################
+### EVENT SCRIPT badgesQuery [RESTQuery] on "success"
+####################################################################################################
+workoutById.setValue( workoutsQuery.data.reduce((acc, item) => {
+    const { id, ...rest } = item
+    acc[id] = rest
+    return acc
+  }, {}))
+
+####################################################################################################
+### EVENT SCRIPT BadgesTable [TableWidget2] on "doubleClickRow"
+####################################################################################################
+startCreatingOrEditingBadge.trigger({
+  additionalScope: {
+    badgeId: currentRow.id
+  }})
+
+####################################################################################################
+### EVENT SCRIPT BadgesTable [TableWidget2] on "clickToolbar" target=1f9d3
+####################################################################################################
+startCreatingOrEditingBadge.trigger({additionalScope: {badgeId: "-1"}})
+
+####################################################################################################
+### EVENT SCRIPT container11 [ContainerWidget2] on "click"
+####################################################################################################
+formBadgeImagePath.setValue(item.path)
+tabbedContainer3.setCurrentViewIndex(0)
+
+####################################################################################################
+### EVENT SCRIPT image5 [ImageWidget2] on "click"
+####################################################################################################
+formBadgeImagePath.setValue(item.path)
+tabbedContainer3.setCurrentViewIndex(0)
+
+####################################################################################################
+### EVENT SCRIPT fileSendButton4 [ButtonWidget2] on "click"
+####################################################################################################
+uploadImage.trigger({onSuccess: () => {
+  fileInput4.clearValue()
+  allMediaFilesQuery.trigger()
+}})
+
+####################################################################################################
+### EVENT SCRIPT upsertBadge [RESTQuery] on "success"
+####################################################################################################
+isCreatingNewBadge.setValue(false);
+  isEditingExistingBadge.setValue(false);
+isShowingBadgeDetails.setValue(false)
+
+####################################################################################################
+### EVENT SCRIPT badgeFormSubmitButton [ButtonWidget2] on "click"
+####################################################################################################
+let data = await getGetUpsertJson.trigger()
+
+upsertBadge.trigger({
+  
+  onSuccess: function (data) {
+  BadgeModal.close()
+    }}
+)
+
+####################################################################################################
+### EVENT SCRIPT usersBadges [RESTQuery] on "success"
+####################################################################################################
+workoutById.setValue( workoutsQuery.data.reduce((acc, item) => {
+    const { id, ...rest } = item
+    acc[id] = rest
+    return acc
+  }, {}))
+
+####################################################################################################
+### EVENT SCRIPT userProgress [RESTQuery] on "success"
+####################################################################################################
+workoutById.setValue( workoutsQuery.data.reduce((acc, item) => {
+    const { id, ...rest } = item
+    acc[id] = rest
+    return acc
+  }, {}))
+
+####################################################################################################
+### EVENT SCRIPT challengePathDescription [TextAreaWidget] on "change"
+####################################################################################################
+changeDescriptionForPath.trigger({
+additionalScope: {
+  levelId: challengePathTabs.value,
+  description: challengePathDescription.value
+}  
+})
+
+####################################################################################################
+### EVENT SCRIPT challengePathDifficultySelect [MultiselectWidget2] on "change"
+####################################################################################################
+changeLevelsForPath.trigger({
+additionalScope: {
+  levelId: challengePathTabs.value,
+  levels: challengePathDifficultySelect.value
+}  
+})
+
+####################################################################################################
+### EVENT SCRIPT addPathButtonSubmit [ButtonWidget2] on "click"
+####################################################################################################
+let key = addPathNewSelect.value
+if (!addPathNewSelectDuplicateFrom.value){
+  addPathToCurrentPaths.trigger({additionalScope: { levelId: key}})
+}
+else {
+  let newValue = challengePathsBeingEdited.value[addPathNewSelectDuplicateFrom.value]
+challengePathsBeingEdited.setValue({
+  ...challengePathsBeingEdited.value,
+  [key]: newValue
+})
+}
+
+challengePathTabs.setValue(key)
+ModalAddPath.hide()
+addPathNewSelect.setValue(null)
+addPathNewSelectDuplicateFrom.setValue(null)
+
+####################################################################################################
+### EVENT SCRIPT usersData [RESTQuery] on "success"
+####################################################################################################
+userEmailAddress.setValue(usersData.data?.account?.email)
+
+####################################################################################################
+### EVENT UTIL formBadgeCopyClaim on "click" -> copyToClipboard
+####################################################################################################
+{
+ "value": "codzienniefit://badge?code={{ badgeFormClaimToken.value }}"
+}
+
+####################################################################################################
+### TABLE workoutsTable column 70189 (key=imageRelativePath, label=Grafika) value expression
+####################################################################################################
+{{mediaEndpoint.value}}{{currentSourceRow.imageRelativePath}}
+
+####################################################################################################
+### TABLE workoutsTable column d4484 (key=title, label=Nazwa) value expression
+####################################################################################################
+{{ item }}
+
+####################################################################################################
+### TABLE workoutsTable column dd1aa (key=levelId, label=Poziom) value expression
+####################################################################################################
+{{workoutsConfig.data.trainingLevels.find(x => x.id === item)?.title ?? "-"}}
+
+####################################################################################################
+### TABLE workoutsTable column aa1bf (key=videoUrl, label=Link) value expression
+####################################################################################################
+Youtube
+
+####################################################################################################
+### TABLE workoutsTable column 858e1 (key=durationMinutes, label=Czas) value expression
+####################################################################################################
+{{ item + " min" }}
+
+####################################################################################################
+### TABLE workoutsTable column 8da9c (key=imageRelativePath, label=Image relative path) value expression
+####################################################################################################
+{{ _.startCase(item) }}
+
+####################################################################################################
+### TABLE workoutsTable column d5e09 (key=liveAtUtc, label=LIVE) value expression
+####################################################################################################
+{{item ? "LIVE" : null}}
+
+####################################################################################################
+### TABLE workoutsTable column 45c72 (key=availableAtUtc, label=PREMIERA) value expression
+####################################################################################################
+{{item?"PREMIERA":null}}
+
+####################################################################################################
+### TABLE challengesTable column 70189 (key=imageRelativePath, label=Grafika) value expression
+####################################################################################################
+{{mediaEndpoint.value}}{{currentSourceRow.imageRelativePath}}
+
+####################################################################################################
+### TABLE challengesTable column d4484 (key=title, label=Nazwa) value expression
+####################################################################################################
+{{ item }}
+
+####################################################################################################
+### TABLE challengesTable column cf4f0 (key=, label=Typ) value expression
+####################################################################################################
+{{ currentSourceRow.liveAtUtc ? "challenge" : currentSourceRow.categoryId ?? "plan"}}
+
+####################################################################################################
+### TABLE challengesTable column 8da9c (key=imageRelativePath, label=Image relative path) value expression
+####################################################################################################
+{{ _.startCase(item) }}
+
+####################################################################################################
+### TABLE MessagesTable column cd0f5 (key=title, label=Opis) value expression
+####################################################################################################
+{{ _.startCase(item) }}
+
+####################################################################################################
+### TABLE MessagesTable column e110e (key=from, label=Nadawca) value expression
+####################################################################################################
+{{ _.startCase(item) }}
+
+####################################################################################################
+### TABLE MessagesTable column 55004 (key=targetGroup, label=Odbiorcy) value expression
+####################################################################################################
+{{ adminConfig?.data?.draftMessageTargetGroups?.find(x => x.state == item)?.label }}
+
+####################################################################################################
+### TABLE BadgesTable column 7b0e8 (key=name, label=Nazwa) value expression
+####################################################################################################
+{{ _.startCase(item) }}
+
+####################################################################################################
+### TABLE BadgesTable column 9779e (key=imageRelativePath, label=Grafika) value expression
+####################################################################################################
+{{mediaEndpoint.value}}{{currentSourceRow.imageRelativePath}}
+
+####################################################################################################
+### TABLE BadgesTable column f4ba1 (key=type, label=Typ) value expression
+####################################################################################################
+{{ item }}
+
+####################################################################################################
+### TABLE BadgesTable column 51798 (key=id, label=Info techniczne) value expression
+####################################################################################################
+{{ 
+  currentSourceRow.type == "milestone" 
+    ? currentSourceRow.milestoneCount + "x" + " (" + currentSourceRow.repeatCategory + ")" 
+    : currentSourceRow.type == "normal" 
+      ? (() => {
+          const w = currentSourceRow.assignedToWorkouts?.length || 0;
+          const c = currentSourceRow.assignedToChallenges?.length || 0;
+          const wStr = w ? w + " " + (w === 1 ? "treningu" : "treningów") : "";
+          const cStr = c ? c + " " + (c === 1 ? "wyzwania" : "wyzwań") : "";
+          if (!w && !c) return "Nieprzypisana";
+          return "Przypisana do " + [wStr, cStr].filter(Boolean).join(" i ");
+        })()
+      : "" 
+}}

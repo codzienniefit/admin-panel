@@ -48,14 +48,18 @@ function isObj(v: Json): v is Obj {
 }
 
 /** Arrays of objects that share an identity key merge item by item. */
-interface KeyedArrayRule {
+export interface KeyedArrayRule {
 	key: string;
 	/** Nested keyed arrays inside each item. */
 	children?: Record<string, KeyedArrayRule>;
 }
 
-const CHALLENGE_RULES: Record<string, KeyedArrayRule> = {
+// Known by key name, whichever document they appear in.
+export const KEYED_ARRAYS: Record<string, KeyedArrayRule> = {
 	paths: { key: "pathId", children: { days: { key: "dayIndex" } } },
+	planTypes: { key: "id" },
+	customPlanTypes: { key: "id" },
+	folders: { key: "id" },
 };
 
 function mergeObject(
@@ -94,6 +98,21 @@ function mergeObject(
 				mine[k] as Json[],
 				theirs[k] as Json[],
 				rule,
+				here,
+				opts,
+				conflicts,
+			);
+			continue;
+		}
+
+		// Nested objects (settings, records keyed by id) merge key by key, so
+		// two people changing different entries do not collide.
+		if (isObj(base[k]) && isObj(mine[k]) && isObj(theirs[k])) {
+			merged[k] = mergeObject(
+				base[k],
+				mine[k],
+				theirs[k],
+				rules,
 				here,
 				opts,
 				conflicts,
@@ -176,7 +195,7 @@ export function rebase<T extends object>(
 		base as Obj,
 		mine as Obj,
 		theirs as Obj,
-		CHALLENGE_RULES,
+		KEYED_ARRAYS,
 		"",
 		opts,
 		conflicts,

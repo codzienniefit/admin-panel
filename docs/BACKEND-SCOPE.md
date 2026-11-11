@@ -244,6 +244,45 @@ backend does not need to understand them.
 | B3.3 | **Stable path id.** A variant is identified by `levelId`, which must come from `workoutsConfig.challengeLevels`, must be unique per challenge (not validated today) and is what user attempts store. Planning data keyed by `levelId` breaks when a variant's level changes. Add an immutable `pathId` to each path, generated on first save, and key planning data by it | M    |
 | B3.4 | **Production fields on a workout** the planner shows on every card: `recordingStatus` (`not_recorded`, `recorded`, `in_editing`, `published`, `live`) and `format` (`premiere`, `live`, `running`). They describe the workout, not one placement, so they belong on the workout row, admin-only                                                                           | S    |
 
+### What has to sync between people (checked against the panel on 2026-11-11)
+
+Everything on the panel's "Ustawienia" screen and every planning note is today in the Test
+environment's sample data, in one browser. Until B3 exists, two people do not see each other's
+folders, plan types, colours or notes. This is the full list of what the panel keeps and expects
+the backend to store and return unchanged; the shapes are in `src/data/schemas/settings.ts` and
+`src/data/schemas/planning.ts` of the panel.
+
+| Where in the panel | Document | Fields |
+| --- | --- | --- |
+| Ustawienia → Rodzaje planów | `settings` / `planner` | `planTypes[]`: `id`, `name`, `description`, `conditions[]` (the week rules) |
+| Ustawienia → Typy treningów | `settings` / `planner` | `trainingTypeStyles{typeId}`: `tone`, `emoji` |
+| Ustawienia → Foldery | `settings` / `planner` | `folders[]`: `id`, `name` |
+| Challenge → Przegląd → Planowanie | `challengePlanning` / `{challengeId}` | `folderId`, `calendarColor`, `note` |
+| Challenge → Wymagania | `challengePlanning` / `{challengeId}` | `customPlanTypes[]`, `conditionOverrides{planTypeId}` |
+| Variant settings | `challengePlanning` / `{challengeId}` | `variants{pathId}`: `planTypeId`, `prepStatus`, `prepNote` |
+| Planner | `challengePlanning` / `{challengeId}` | `scratchpad[]`; `variants{pathId}`: `notes`, `days{dayIndex}` (`note`, `tint`), `cards{dayIndex:workoutId}` (`note`, `color`) |
+
+The panel built the three settings as **one** document (`settings` / `planner`) with one etag, not
+the three kinds listed above: its merge already works item by item inside that document, so two
+people changing different folders or plan types do not collide. Either layout works for the
+backend; one document is one row.
+
+What the panel needs from the store for this to sync safely, beyond B3.1:
+
+| #    | Piece | Size |
+| ---- | --- | ---- |
+| B3.5 | **Read every planning document in one call**, bodies included (`GET manage/panelDocs/challengePlanning?bodies=true`). The challenge list, its folder filter and the calendar read the folder and the colour of every challenge at once; one request per challenge would be hundreds | S |
+| B3.6 | **A document nobody has saved yet reads as empty, not as 404**, or the list in B3.5 simply leaves it out and the panel fills in a blank one. The first `PUT` creates it (`If-None-Match: *`) | S |
+| B3.7 | **The saved document comes back in the response** with its new `etag` and `updatedAtUtc`, and the body is stored and returned **verbatim**: a field the backend does not know must survive, because the panel's schema will grow | S |
+| B3.8 | **409 carries the current document**, so the panel can merge and retry without a second request (the same contract as B2.1) | S |
+
+Done when: two people on two computers see the same folders, plan types, colours and notes after a
+reload; a change by one to a folder the other is renaming is reported to the second person, not
+overwritten.
+
+Deliberately **not** synced, because they are preferences of one browser: the list of recently
+opened plans, developer mode, the Test environment's sample-data switches.
+
 **Alternative if backend capacity is the bottleneck:** keep these documents in a Cloudflare D1
 database bound to the panel's Worker, which then has to verify the Firebase token and the `admin`
 claim itself. It needs no Azure work, but it splits content across two stores and two backup

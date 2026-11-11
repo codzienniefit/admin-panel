@@ -1,3 +1,4 @@
+import { readStored, writeStored } from "@/lib/storage";
 import type { Tone } from "@/ui/tones";
 
 // Which backend the panel talks to. Chosen in the top bar.
@@ -33,20 +34,17 @@ export const ENVIRONMENTS: readonly EnvironmentInfo[] = [
 	},
 ];
 
-const STORAGE_KEY = "cf.environment";
+export const STORAGE_KEY = "cf.environment";
+/** Where the panel starts, and where the automated UI tests always run. */
+export const DEFAULT_ENVIRONMENT: Environment = "test";
 
 function isAvailable(value: string | null): value is Environment {
 	return ENVIRONMENTS.some((e) => e.value === value && e.available);
 }
 
 export function currentEnvironment(): Environment {
-	try {
-		const stored = globalThis.localStorage?.getItem(STORAGE_KEY) ?? null;
-		if (isAvailable(stored)) return stored;
-	} catch {
-		// Storage can be blocked; fall through to the default.
-	}
-	return "test";
+	const stored = readStored(STORAGE_KEY);
+	return isAvailable(stored) ? stored : DEFAULT_ENVIRONMENT;
 }
 
 /**
@@ -55,10 +53,5 @@ export function currentEnvironment(): Environment {
  */
 export function switchEnvironment(next: Environment): void {
 	if (!isAvailable(next) || next === currentEnvironment()) return;
-	try {
-		globalThis.localStorage?.setItem(STORAGE_KEY, next);
-	} catch {
-		return;
-	}
-	window.location.reload();
+	if (writeStored(STORAGE_KEY, next)) window.location.reload();
 }

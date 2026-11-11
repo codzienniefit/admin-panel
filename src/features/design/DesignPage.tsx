@@ -11,14 +11,14 @@ import {
 	type ContentBlock,
 	type Workout,
 } from "@/data/schemas/workout";
-import type { DaySlot } from "@/domain/schedule";
 import { ChallengeCard } from "@/features/challenges/ChallengeCard";
 import { ContentField } from "@/features/content/ContentField";
-import { DayCell } from "@/features/spike/DayCell";
+import { JsonPreviewDialog } from "@/features/saving/JsonPreview";
 import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
+import { ColorPalette } from "@/ui/ColorPalette";
 import { confirm } from "@/ui/confirm";
-import { DateTimeField } from "@/ui/DateTimeField";
+import { DateField, DateTimeField } from "@/ui/DateField";
 import { Dialog } from "@/ui/Dialog";
 import { EmptyState } from "@/ui/EmptyState";
 import { ErrorScreen } from "@/ui/ErrorScreen";
@@ -29,20 +29,27 @@ import {
 	STATUS_META,
 	trainingTypeMeta,
 } from "@/ui/enums";
+import { Facts } from "@/ui/Facts";
 import { TextAreaField, TextField } from "@/ui/Field";
+import { IssuesNotice } from "@/ui/formIssues";
+import { JsonView } from "@/ui/JsonView";
+import { SearchInput } from "@/ui/ListPage";
+import { Spinner } from "@/ui/Loading";
 import { Menu } from "@/ui/Menu";
 import { MultiSelect } from "@/ui/MultiSelect";
 import { Notice } from "@/ui/Notice";
+import { Popover } from "@/ui/Popover";
 import { SaveStatusText } from "@/ui/SaveStatusText";
+import { Segmented } from "@/ui/Segmented";
 import { Select, type SelectOption } from "@/ui/Select";
-import { Skeleton } from "@/ui/Skeleton";
 import { StatusBadge } from "@/ui/StatusBadge";
 import { Switch } from "@/ui/Switch";
 import { type Column, Table } from "@/ui/Table";
+import { Tabs } from "@/ui/Tabs";
 import { Tag } from "@/ui/Tag";
 import { toast } from "@/ui/toast";
 import { TONES } from "@/ui/tones";
-import { WorkoutChip } from "@/ui/WorkoutChip";
+import { WorkoutCard } from "@/ui/WorkoutCard";
 
 // Every shared component in every state, on one page. A change to a
 // component is checked here first, on desktop and phone width, before it is
@@ -84,7 +91,6 @@ const sampleWorkouts: Workout[] = [
 	trainingTypeIds: trainingTypeIds as string[],
 	updatedAtUtc: "2026-11-10T09:00:00.000Z",
 }));
-const workoutById = new Map(sampleWorkouts.map((w) => [w.id, w]));
 
 const sampleChallenges: Challenge[] = STATUSES.map((status, i) => ({
 	...blankChallenge("2026-11-10T09:00:00.000Z"),
@@ -218,7 +224,12 @@ export function DesignPage() {
 	const [workout, setWorkout] = useState<string | null>(null);
 	const [level, setLevel] = useState<string | null>("beginner");
 	const [many, setMany] = useState<string | null>(null);
-	const [selected, setSelected] = useState<DaySlot | null>(null);
+	const [paletteColor, setPaletteColor] = useState<string | null>("#22c55e");
+	const [layout, setLayout] = useState<"cards" | "table">("cards");
+	const [search, setSearch] = useState("");
+	const [tabId, setTabId] = useState<"badges" | "progress" | "account">(
+		"badges",
+	);
 	const [exploded, setExploded] = useState(false);
 	const [name, setName] = useState("Wiosenny start");
 	const [hidden, setHidden] = useState(false);
@@ -226,6 +237,8 @@ export function DesignPage() {
 	const [content, setContent] = useState<ContentBlock[]>(sampleContent);
 	const [types, setTypes] = useState<string[]>(["strength", "stretching"]);
 	const [when, setWhen] = useState<string | null>("2026-11-10T12:00:00.000Z");
+	const [day, setDay] = useState<string | null>("2026-12-24");
+	const [jsonOpen, setJsonOpen] = useState(false);
 	const [answer, setAnswer] = useState<string | null>(null);
 
 	if (exploded) return <Bomb />;
@@ -457,61 +470,129 @@ export function DesignPage() {
 				</Row>
 			</Section>
 
-			<Section title="Trening w dniu">
+			<Section title="Trening w planie">
 				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-					<WorkoutChip
-						title="Poranna mobilność bioder"
-						durationMinutes={15}
-						trainingTypeIds={["stretching"]}
-						onSelect={() => undefined}
-						onRemove={() => undefined}
+					<WorkoutCard
+						fallbackTitle="W1"
+						workout={{
+							title: "Poranna mobilność bioder",
+							durationMinutes: 15,
+							trainingTypeIds: ["stretching"],
+							status: "published",
+							videoUrl: "https://www.youtube.com/watch?v=x",
+						}}
 					/>
-					<WorkoutChip
-						title="Interwały HIIT"
-						durationMinutes={22}
-						trainingTypeIds={["hiit", "cardio"]}
-						selected
-						onSelect={() => undefined}
-						onRemove={() => undefined}
+					<WorkoutCard
+						fallbackTitle="W2"
+						note="Nagrać ponownie, słaby dźwięk."
+						workout={{
+							title: "Interwały HIIT",
+							durationMinutes: 22,
+							trainingTypeIds: ["hiit", "cardio"],
+							status: "draft",
+							audioRelativePath: "audio/hiit.m4a",
+						}}
 					/>
-					<WorkoutChip
-						title="Bardzo długa nazwa treningu, która zajmuje więcej niż dwie linie w wąskiej komórce"
-						durationMinutes={45}
-						trainingTypeIds={["strength", "stretching", "yoga"]}
-						onSelect={() => undefined}
-						onRemove={() => undefined}
+					<WorkoutCard
+						fallbackTitle="W3"
+						color="#6366f1"
+						workout={{
+							title:
+								"Bardzo długa nazwa treningu, która zajmuje więcej niż dwie linie w wąskiej komórce",
+							durationMinutes: 45,
+							trainingTypeIds: ["strength", "stretching", "yoga"],
+							status: "published",
+						}}
 					/>
-					<WorkoutChip title="Bez typu i czasu" />
+					<WorkoutCard
+						fallbackTitle="W4"
+						color="#facc15"
+						workout={{
+							title: "Na jasnym kolorze tekst jest ciemny",
+							durationMinutes: 30,
+							trainingTypeIds: ["pilates"],
+							status: "hidden",
+						}}
+					/>
+					<WorkoutCard fallbackTitle="W999" workout={undefined} />
 				</div>
 			</Section>
 
-			<Section title="Dzień w planie">
-				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-					{(
-						[
-							[1, ["W1"]],
-							[2, []],
-							[3, ["W2", "W5", "W6"]],
-							[4, ["W3"]],
-						] as Array<[number, string[]]>
-					).map(([dayIndex, workoutIds]) => (
-						<DayCell
-							key={dayIndex}
-							pathId="sample"
-							dayIndex={dayIndex}
-							workoutIds={workoutIds}
-							workoutById={workoutById}
-							allWorkouts={sampleWorkouts}
-							selected={selected}
-							onSelect={setSelected}
-							onEdit={() => setSelected(null)}
-						/>
-					))}
-				</div>
-				<p className="mt-3 text-xs text-muted">
-					Kliknij trening, żeby zobaczyć stan „cel przeniesienia” w pozostałych
-					dniach.
-				</p>
+			<Section title="Kolory planera i okienko">
+				<Row label="Paleta">
+					<ColorPalette
+						label="Kolor dnia"
+						value={paletteColor}
+						onChange={setPaletteColor}
+					/>
+				</Row>
+				<Row label="Przełącznik">
+					<Segmented
+						label="Układ listy"
+						options={[
+							{ value: "cards", label: "Karty" },
+							{ value: "table", label: "Tabela" },
+						]}
+						value={layout}
+						onChange={setLayout}
+					/>
+				</Row>
+				<Row label="Okienko">
+					<Popover
+						label="Wymagania tygodnia"
+						title="Wymagania rodzaju planu"
+						trigger={
+							<span className="rounded-control border border-line-input px-3 py-1.5 text-sm">
+								Pokaż wymagania
+							</span>
+						}
+					>
+						<ul className="flex flex-col gap-1">
+							<li>✓ Min. 2 (wszystkie treningi)</li>
+							<li>✗ Max 3 (Cardio)</li>
+						</ul>
+					</Popover>
+				</Row>
+			</Section>
+
+			<Section title="Części ekranów list i edytorów">
+				<Row label="Wyszukiwarka">
+					<SearchInput
+						label="Szukaj"
+						placeholder="Szukaj po nazwie…"
+						value={search}
+						onChange={setSearch}
+					/>
+				</Row>
+				<Row label="Zakładki">
+					<Tabs
+						label="Przykładowe zakładki"
+						tabs={[
+							{ id: "badges", label: "Odznaki" },
+							{ id: "progress", label: "Wykonania" },
+							{ id: "account", label: "Dane ogólne" },
+						]}
+						value={tabId}
+						onChange={setTabId}
+					/>
+				</Row>
+				<Row label="Fakty">
+					<Facts
+						items={[
+							{ label: "Identyfikator", value: "W12" },
+							{ label: "Zmieniono", value: "10.11.2026, 12:00" },
+						]}
+					/>
+				</Row>
+				<Row label="Problemy bez pola">
+					<IssuesNotice
+						title="Nie można opublikować"
+						issues={[
+							{ path: "paths", message: "Dodaj przynajmniej jeden wariant" },
+							{ path: "image", message: "Wybierz miniaturkę" },
+						]}
+					/>
+				</Row>
 			</Section>
 
 			<Section title="Karta wyzwania">
@@ -657,9 +738,73 @@ export function DesignPage() {
 							label="Data premiery"
 							value={when}
 							onChange={setWhen}
-							hint="Edytowana w czasie lokalnym, zapisywana w UTC."
+							hint="Wpisz albo wybierz z kalendarza. Czas lokalny, zapis w UTC."
 						/>
 					</div>
+				</Row>
+				<Row label="Sam dzień">
+					<div className="w-72 max-w-full">
+						<DateField
+							label="Widoczne od"
+							value={day}
+							onChange={setDay}
+							hint="Święta w kalendarzu są na czerwono."
+						/>
+					</div>
+				</Row>
+			</Section>
+
+			<Section title="JSON: co trafia na serwer">
+				<p className="mb-3 text-sm text-muted">
+					Jeden sposób pokazywania JSON-u, z kopiowaniem. Okno „Podgląd JSON”
+					jest w menu „Więcej” każdego edytora: różnice, wersja przed i wersja
+					po.
+				</p>
+				<Row label="Widok JSON">
+					<div className="w-full max-w-xl">
+						<JsonView
+							value={{ title: name, isHidden: hidden, liveAtUtc: when }}
+							label="Przykładowy JSON"
+							height="h-32"
+						/>
+					</div>
+				</Row>
+				<Row label="Przed, po i różnice">
+					<Button onClick={() => setJsonOpen(true)}>Pokaż podgląd JSON</Button>
+					{jsonOpen && (
+						<JsonPreviewDialog
+							of="przykładu"
+							before={{
+								id: "C1",
+								title: "Wiosenny start",
+								isHidden: false,
+								paths: [
+									{
+										pathId: "p-easy",
+										days: [
+											{ dayIndex: 1, workoutIds: ["W1"] },
+											{ dayIndex: 2, workoutIds: [] },
+										],
+									},
+								],
+							}}
+							after={{
+								id: "C1",
+								title: name,
+								isHidden: hidden,
+								paths: [
+									{
+										pathId: "p-easy",
+										days: [
+											{ dayIndex: 1, workoutIds: ["W1"] },
+											{ dayIndex: 2, workoutIds: ["W5"] },
+										],
+									},
+								],
+							}}
+							onClose={() => setJsonOpen(false)}
+						/>
+					)}
 				</Row>
 			</Section>
 
@@ -847,19 +992,15 @@ export function DesignPage() {
 			</Section>
 
 			<Section title="Ładowanie">
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-					<div className="rounded-card border border-line p-4">
-						<Skeleton className="h-6 w-3/4" />
-						<Skeleton className="mt-4 h-5 w-24" />
-						<Skeleton className="mt-4 h-4 w-1/2" />
-					</div>
-					<div className="flex flex-col gap-2">
-						<Skeleton className="h-9" />
-						<Skeleton className="h-9" />
-						<Skeleton className="h-9" />
-					</div>
-					<Skeleton className="h-40" />
-				</div>
+				<p className="mb-3 text-sm text-muted">
+					Jedno kółko na środku strony, w kolorach logo; pojawia się i znika
+					płynnie. Ekran, który jeszcze czeka na dane, zgłasza to znacznikiem
+					Loading i sam nic nie rysuje.
+				</p>
+				<Row label="Kółko">
+					<Spinner />
+					<Spinner className="size-6" />
+				</Row>
 			</Section>
 
 			<Section title="Błąd widoku">

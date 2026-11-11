@@ -7,3 +7,10 @@ const appRoute = getRouteApi("/_app");
 export function useConfig(): PanelConfig {
 	return appRoute.useLoaderData();
 }
+
+/** The ids of the training types that exist, as the rule functions take them. */
+export function trainingTypeIdsOf(config: {
+	trainingTypes: ReadonlyArray<{ id: string }>;
+}): ReadonlySet<string> {
+	return new Set(config.trainingTypes.map((type) => type.id));
+}

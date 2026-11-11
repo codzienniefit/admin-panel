@@ -10,7 +10,11 @@ export interface ChallengeFilters {
 	status?: ContentStatus;
 	kind?: ChallengeKind;
 	sort?: ChallengeSort;
+	/** A folder id, or NO_FOLDER for challenges that are in none. */
+	folder?: string;
 }
+
+export const NO_FOLDER = "none";
 
 const byTitle = new Intl.Collator("pl", { sensitivity: "base", numeric: true });
 
@@ -18,14 +22,22 @@ const byTitle = new Intl.Collator("pl", { sensitivity: "base", numeric: true });
 export function filterChallenges(
 	challenges: readonly Challenge[],
 	filters: ChallengeFilters,
+	/** The folder each challenge is in; needed only for the folder filter. */
+	folderOf: (challengeId: string) => string | null = () => null,
 ): Challenge[] {
-	const { q, status, kind, sort = "updated" } = filters;
+	const { q, status, kind, folder, sort = "updated" } = filters;
 
 	const shown = challenges.filter((challenge) => {
 		if (status ? challenge.status !== status : challenge.status === "deleted") {
 			return false;
 		}
 		if (kind && challengeKind(challenge) !== kind) return false;
+		if (folder) {
+			const actual = folderOf(challenge.id);
+			if (folder === NO_FOLDER ? actual !== null : actual !== folder) {
+				return false;
+			}
+		}
 		if (
 			q &&
 			!matchesQuery(

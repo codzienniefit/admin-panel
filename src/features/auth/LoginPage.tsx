@@ -1,10 +1,13 @@
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { auth } from "@/auth";
+import { errorMessage } from "@/data/api/errors";
 import { currentEnvironment, ENVIRONMENTS } from "@/data/environment";
 import { Button } from "@/ui/Button";
+import { Logo } from "@/ui/Logo";
 import { Notice } from "@/ui/Notice";
 import { Tag } from "@/ui/Tag";
+import { attempt } from "@/ui/tasks";
 
 /** Sign-in. `redirect` is where the person was heading when they were stopped. */
 export function LoginPage({ redirect }: { redirect: string }) {
@@ -18,25 +21,23 @@ export function LoginPage({ redirect }: { redirect: string }) {
 	const signIn = async (methodId: string) => {
 		setBusy(methodId);
 		setError(null);
-		try {
-			await auth.signIn(methodId);
-			// The guard decides what happens next: the page that was asked for,
-			// or "Brak dostępu".
-			router.history.push(redirect);
-		} catch (cause) {
-			setError(
-				cause instanceof Error ? cause.message : "Nie udało się zalogować",
-			);
+		const signedIn = await attempt(() => auth.signIn(methodId));
+		if (!signedIn.ok) {
+			setError(errorMessage(signedIn.error, "Nie udało się zalogować"));
 			setBusy(null);
+			return;
 		}
+		// The guard decides what happens next: the page that was asked for,
+		// or "Brak dostępu".
+		router.history.push(redirect);
 	};
 
 	return (
 		<div className="flex min-h-full items-center justify-center p-4">
 			<div className="w-full max-w-md rounded-dialog border border-line bg-surface p-6 shadow-card md:p-8">
 				<div className="flex items-center justify-between gap-3">
-					<h1 className="text-2xl font-semibold tracking-tight">
-						Codziennie Fit
+					<h1>
+						<Logo className="h-6" />
 					</h1>
 					{environment && (
 						<Tag tone={environment.tone}>{environment.label}</Tag>

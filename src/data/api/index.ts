@@ -1,4 +1,5 @@
 import { currentEnvironment } from "@/data/environment";
+import { withCallLog } from "./callLog";
 import { createMockApi } from "./mock";
 import type { ApiClient } from "./types";
 
@@ -10,4 +11,6 @@ function createApi(): ApiClient {
 	throw new Error(`Środowisko "${environment}" nie jest jeszcze dostępne.`);
 }
 
-export const api: ApiClient = createApi();
+// Every call goes through the developer's register (callLog.ts), whichever
+// backend is behind it.
+export const api: ApiClient = withCallLog(createApi());

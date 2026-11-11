@@ -1,7 +1,7 @@
 # Admin panel plan
 
-Status: Phases 0 to 4 are built (see the `PHASE-N-RESULT.md` files next to this one); everything
-after them is still a proposal. Last updated 2026-11-10.
+Status: Phases 0 to 7 are built (see the `PHASE-N-RESULT.md` files next to this one); everything
+after them is still a proposal. Last updated 2026-11-11.
 
 Companion documents:
 

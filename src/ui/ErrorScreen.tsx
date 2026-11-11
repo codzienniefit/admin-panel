@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { copyText } from "@/lib/clipboard";
 import { Button } from "./Button";
 
 interface ErrorScreenProps {
@@ -30,12 +31,7 @@ export function ErrorScreen({ error, onRetry }: ErrorScreenProps) {
 	const details = technicalDetails(error);
 
 	const copy = async () => {
-		try {
-			await navigator.clipboard.writeText(details);
-			setCopied(true);
-		} catch {
-			setCopied(false);
-		}
+		setCopied(await copyText(details));
 	};
 
 	return (

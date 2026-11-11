@@ -3,6 +3,7 @@ import { useStore } from "@/lib/store";
 import { Button } from "@/ui/Button";
 import { confirm } from "@/ui/confirm";
 import { Notice } from "@/ui/Notice";
+import { attempt } from "@/ui/tasks";
 
 interface HeldEditsNoticeProps<T extends Versioned> {
 	saver: Saver<T>;
@@ -30,12 +31,9 @@ export function HeldEditsNotice<T extends Versioned>({
 	const isConflict = held.reason === "conflict";
 
 	const keepMine = async () => {
-		try {
-			await saver.reapplyHeld("mine");
-			onResolved?.("mine");
-		} catch {
-			// The save stopped again; the notice stays with the new reason.
-		}
+		const applied = await attempt(() => saver.reapplyHeld("mine"));
+		// Otherwise the save stopped again; the notice stays with the new reason.
+		if (applied.ok) onResolved?.("mine");
 	};
 
 	const discard = async () => {

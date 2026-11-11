@@ -5,6 +5,8 @@ import {
 	contentErrors,
 	contentExcerpt,
 	contentIssues,
+	linkAddressIn,
+	linkAddressProblem,
 	looksLikeJson,
 	parseContentJson,
 	textSegments,
@@ -217,6 +219,74 @@ describe("content validation", () => {
 		const blocks = [text("Plan [AUDIO]"), title("")];
 		expect(contentIssues(blocks)).toHaveLength(2);
 		expect(contentErrors(blocks)).toHaveLength(1);
+	});
+});
+
+describe("an address typed for a link", () => {
+	it.each([
+		["https://codzienniefitapp.com/faq"],
+		["http://codzienniefitapp.com"],
+		["HTTPS://CODZIENNIEFITAPP.COM"],
+		["mailto:pomoc@example.test"],
+		["tel:+48123456789"],
+		["  https://codzienniefitapp.com/faq?a=1&b=2#c  "],
+	])("accepts %s", (address) => {
+		expect(linkAddressProblem(address)).toBeNull();
+	});
+
+	it.each([
+		["javascript:alert(1)"],
+		["JavaScript:alert(1)"],
+		["data:text/html,x"],
+		["file:///etc/hosts"],
+		["intent://x"],
+		["ftp://x.pl"],
+	])("refuses %s with the words the block's own check uses", (address) => {
+		const problem = linkAddressProblem(address);
+		expect(problem).toBe(
+			`Adres linku „${address}” jest niedozwolony. Link musi zaczynać się od https://`,
+		);
+		expect(errorsOf(text(`<a href="${address}">x</a>`))).toEqual([problem]);
+	});
+
+	it("needs one of the schemes the app can open", () => {
+		expect(linkAddressProblem("codzienniefitapp.com/faq")).toBe(
+			"Adres linku „codzienniefitapp.com/faq” nie zaczyna się od https://",
+		);
+		expect(linkAddressProblem("/workouts")).toContain("nie zaczyna się od");
+		expect(linkAddressProblem("https:codzienniefitapp.com")).toContain(
+			"nie zaczyna się od",
+		);
+	});
+
+	it("needs something after the scheme", () => {
+		expect(linkAddressProblem("")).toBe("Wpisz adres linku");
+		expect(linkAddressProblem("   ")).toBe("Wpisz adres linku");
+		expect(linkAddressProblem("https://")).toBe("Adres linku jest niepełny");
+		expect(linkAddressProblem("mailto:")).toBe("Adres linku jest niepełny");
+	});
+
+	it("refuses what would end the address early inside the tag", () => {
+		for (const address of [
+			'https://x.pl/"onclick="alert(1)',
+			"https://x.pl/<b>",
+			"https://x.pl/a>b",
+			"https://x.pl/a b",
+			"https://x.pl/a\nb",
+		]) {
+			expect(linkAddressProblem(address), address).toContain(
+				"nie może zawierać",
+			);
+		}
+	});
+
+	it("reads the address out of a tag the way the app does", () => {
+		expect(linkAddressIn('<a href="https://x.pl">')).toBe("https://x.pl");
+		expect(linkAddressIn('<a target="_blank" href="https://x.pl">')).toBe(
+			"_blank",
+		);
+		expect(linkAddressIn("<a href='https://x.pl'>")).toBe("");
+		expect(linkAddressIn("<a>")).toBe("");
 	});
 });
 

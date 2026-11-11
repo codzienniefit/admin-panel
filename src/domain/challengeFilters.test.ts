@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { blankChallenge, type Challenge } from "@/data/schemas/challenge";
-import { filterChallenges, scheduleStats } from "./challengeFilters";
+import { filterChallenges, NO_FOLDER, scheduleStats } from "./challengeFilters";
 
 const make = (id: string, patch: Partial<Challenge>): Challenge => ({
 	...blankChallenge("2026-01-01T00:00:00.000Z"),
@@ -91,6 +91,18 @@ describe("challenge list filters", () => {
 
 	it("orders by premiere: latest first, plans after", () => {
 		expect(idsOf({ sort: "premiere" })).toEqual(["C3", "C1", "C5", "C2"]);
+	});
+
+	it("filters by folder, and by having none", () => {
+		const folders: Record<string, string> = { C1: "f-a", C2: "f-b" };
+		const folderOf = (id: string) => folders[id] ?? null;
+		const ids = (folder: string) =>
+			filterChallenges(challenges, { folder }, folderOf)
+				.map((challenge) => challenge.id)
+				.sort();
+		expect(ids("f-a")).toEqual(["C1"]);
+		expect(ids(NO_FOLDER)).toEqual(["C3", "C5"]);
+		expect(ids("f-missing")).toEqual([]);
 	});
 
 	it("does not reorder the list it was given", () => {

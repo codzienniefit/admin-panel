@@ -1,22 +1,31 @@
-import { useBlocker } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { ApiIssue } from "@/data/api/errors";
-import type { Challenge } from "@/data/schemas/challenge";
+import { blankChallenge, type Challenge } from "@/data/schemas/challenge";
 import { resizeDays, workoutsLostByResize } from "@/domain/challengeRules";
+import { prunePlanning } from "@/domain/plannerOps";
 import { plural } from "@/domain/text";
+import { trainingTypeIdsOf } from "@/features/config/useConfig";
 import { ContentField } from "@/features/content/ContentField";
 import { MediaField } from "@/features/media/MediaField";
+import { applyPlanningChange } from "@/features/planner/planningActions";
+import { usePlanning } from "@/features/planner/usePlanning";
+import { useUnsavedGuard } from "@/features/saving/useUnsavedGuard";
 import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
 import { confirm } from "@/ui/confirm";
-import { DateTimeField } from "@/ui/DateTimeField";
+import { DateTimeField } from "@/ui/DateField";
 import { Field, TextField } from "@/ui/Field";
+import { IssuesNotice, placeIssues } from "@/ui/formIssues";
 import { MultiSelect } from "@/ui/MultiSelect";
-import { Notice } from "@/ui/Notice";
 import { Select } from "@/ui/Select";
 import { Switch } from "@/ui/Switch";
-import { applyChallengeChange, markUnsaved } from "./challengeActions";
+import { attempt, whileBusy } from "@/ui/tasks";
+import {
+	applyChallengeChange,
+	markUnsaved,
+	offerCandidate,
+} from "./challengeActions";
 import { useChallengeRules } from "./useChallengeRules";
 
 /** What the form holds. Lists of ids typed by hand are kept as text. */
@@ -124,6 +133,11 @@ function applyValues(draft: Challenge, values: FormValues) {
 	}
 }
 
+/** Every field of the form, for placing problems next to them. */
+const FIELDS = Object.keys(
+	fromChallenge(blankChallenge() as Challenge),
+) as Array<keyof FormValues>;
+
 /** Which form field a problem belongs next to. */
 const FIELD_OF: Record<string, keyof FormValues> = {
 	unlockedByEntitlementIds: "unlockedBy",
@@ -132,15 +146,16 @@ const FIELD_OF: Record<string, keyof FormValues> = {
 
 /** The second tab of a challenge: everything about it except the plans. */
 export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
+	const planning = usePlanning(challenge.id);
 	const { config, context, badges, challenges } = useChallengeRules(
 		challenge.id,
 	);
 	const form = useForm<FormValues>({ defaultValues: fromChallenge(challenge) });
-	const { control, register, formState, watch } = form;
+	const { control, register, formState } = form;
 	const [busy, setBusy] = useState(false);
 	const [other, setOther] = useState<readonly ApiIssue[]>([]);
 	const readOnly = challenge.status === "deleted";
-	const paid = watch("pro");
+	const paid = useWatch({ control, name: "pro" });
 	const dirty = formState.isDirty;
 
 	// Status actions in the page header wait while this form has unsaved input.
@@ -149,34 +164,29 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 		return () => markUnsaved(challenge.id, false);
 	}, [challenge.id, dirty]);
 
-	// Leaving the tab or the page with unsaved input asks first.
-	useBlocker({
-		disabled: !dirty,
-		enableBeforeUnload: dirty,
-		shouldBlockFn: async () => {
-			const leave = await confirm({
-				title: "Porzucić niezapisane zmiany?",
-				description: "Zmiany w treści wyzwania nie zostały zapisane.",
-				confirmLabel: "Porzuć zmiany",
-				cancelLabel: "Zostań",
-				destructive: true,
-			});
-			return !leave;
-		},
-	});
+	// The JSON preview in the page header shows what this form would save.
+	useEffect(() =>
+		offerCandidate(challenge.id, () => {
+			const draft = structuredClone(challenge);
+			applyValues(draft, form.getValues());
+			return draft;
+		}),
+	);
 
-	const showIssues = (issues: readonly ApiIssue[]) => {
-		const elsewhere: ApiIssue[] = [];
-		for (const issue of issues) {
-			const field = (FIELD_OF[issue.path] ?? issue.path) as keyof FormValues;
-			if (field in form.getValues()) {
-				form.setError(field, { message: issue.message });
-			} else {
-				elsewhere.push(issue);
-			}
-		}
-		setOther(elsewhere);
-	};
+	// Leaving the tab or the page with unsaved input asks first.
+	useUnsavedGuard(dirty, "Zmiany w treści wyzwania nie zostały zapisane.");
+
+	const showIssues = (issues: readonly ApiIssue[]) =>
+		setOther(
+			placeIssues(
+				form,
+				FIELDS,
+				issues.map((issue) => ({
+					...issue,
+					path: FIELD_OF[issue.path] ?? issue.path,
+				})),
+			),
+		);
 
 	const save = async () => {
 		form.clearErrors();
@@ -195,20 +205,35 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 			if (!sure) return;
 		}
 
-		setBusy(true);
-		try {
-			const result = await applyChallengeChange(
-				challenge,
-				(draft) => applyValues(draft, values),
-				{ config, context, done: "Zapisano" },
-			);
-			if (result.ok) form.reset(values);
-			else showIssues(result.issues);
-		} catch {
-			// Held by the saver; the notice above the tabs explains.
-		} finally {
-			setBusy(false);
-		}
+		const applied = await whileBusy(setBusy, () =>
+			attempt(async () => {
+				const result = await applyChallengeChange(
+					challenge,
+					(draft) => applyValues(draft, values),
+					{ config, context, done: "Zapisano" },
+				);
+				// Notes and colours of days that no longer exist go with them.
+				if (result.ok && planning && lengthDays < challenge.lengthDays) {
+					const paths = challenge.paths.map((path) => ({
+						...path,
+						days: resizeDays(path.days, lengthDays),
+					}));
+					await applyPlanningChange(
+						planning,
+						(draft) => {
+							draft.variants = prunePlanning(draft, paths).variants;
+						},
+						trainingTypeIdsOf(config),
+					);
+				}
+				return result;
+			}),
+		);
+		// A conflict or a failed save is held by the saver; the notice above
+		// the tabs explains.
+		if (!applied.ok) return;
+		if (applied.value.ok) form.reset(values);
+		else showIssues(applied.value.issues);
 	};
 
 	const error = (field: keyof FormValues) => formState.errors[field]?.message;
@@ -226,15 +251,7 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 			}}
 			className="flex flex-col gap-4 pb-20"
 		>
-			{other.length > 0 && (
-				<Notice tone="red" role="alert" title="Nie można zapisać">
-					<ul className="list-disc pl-5">
-						{other.map((issue) => (
-							<li key={`${issue.path}-${issue.message}`}>{issue.message}</li>
-						))}
-					</ul>
-				</Notice>
-			)}
+			<IssuesNotice title="Nie można zapisać" issues={other} />
 
 			<fieldset
 				disabled={readOnly || busy}
@@ -409,7 +426,22 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 				</Card>
 
 				<Card className="flex flex-col gap-4">
-					<h2 className="text-lg font-semibold">Dostęp</h2>
+					<h2 className="text-lg font-semibold">Miniaturka i dostęp</h2>
+					<Controller
+						control={control}
+						name="imageRelativePath"
+						render={({ field }) => (
+							<MediaField
+								label="Miniaturka"
+								kind="image"
+								folderId="challenges"
+								value={field.value}
+								onChange={field.onChange}
+								error={error("imageRelativePath")}
+								disabled={readOnly}
+							/>
+						)}
+					/>
 					<Controller
 						control={control}
 						name="pro"
@@ -513,23 +545,10 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 					/>
 				</Card>
 
+				{/* The description always has the full width to itself: its editor
+				    shows blocks and preview side by side only when there is room. */}
 				<Card className="xl:col-span-2">
-					<div className="grid gap-4 lg:grid-cols-2">
-						<Controller
-							control={control}
-							name="imageRelativePath"
-							render={({ field }) => (
-								<MediaField
-									label="Miniaturka"
-									kind="image"
-									folderId="challenges"
-									value={field.value}
-									onChange={field.onChange}
-									error={error("imageRelativePath")}
-									disabled={readOnly}
-								/>
-							)}
-						/>
+					<div>
 						<Controller
 							control={control}
 							name="descriptionFancyContent"

@@ -1,5 +1,5 @@
 import { useLiveQuery } from "@tanstack/react-db";
-import { Link, Outlet } from "@tanstack/react-router";
+import { Link, Outlet, useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ApiIssue } from "@/data/api/errors";
 import {
@@ -13,25 +13,31 @@ import {
 	KIND_LABELS,
 } from "@/domain/challengeRules";
 import { formatDateTime } from "@/domain/dates";
+import { usePlanning } from "@/features/planner/usePlanning";
+import { settleChange } from "@/features/saving/applyChange";
 import { HeldEditsNotice } from "@/features/saving/HeldEditsNotice";
+import { useJsonPreview } from "@/features/saving/JsonPreview";
 import { useStore } from "@/lib/store";
 import { Button } from "@/ui/Button";
 import { type ConfirmOptions, confirm } from "@/ui/confirm";
 import { EmptyState } from "@/ui/EmptyState";
+import { IssuesNotice } from "@/ui/formIssues";
+import { Loading, useDelayedLoading } from "@/ui/Loading";
 import { Menu, type MenuAction } from "@/ui/Menu";
 import { Notice } from "@/ui/Notice";
-import { Skeleton, useDelayedLoading } from "@/ui/Skeleton";
 import { StatusBadge } from "@/ui/StatusBadge";
+import { tabItem, tabItemActive } from "@/ui/Tabs";
 import { Tag } from "@/ui/Tag";
+import { whileBusy } from "@/ui/tasks";
 import { KIND_TONES } from "./ChallengeCard";
-import { applyChallengeChange, unsavedContent } from "./challengeActions";
+import {
+	applyChallengeChange,
+	challengeVersions,
+	unsavedContent,
+} from "./challengeActions";
 import { useChallengeRules } from "./useChallengeRules";
 
-const tab =
-	"rounded-control px-3 py-1.5 text-sm text-subtle hover:bg-hover hover:text-ink";
-const tabActive = {
-	className: "bg-primary-soft text-primary hover:bg-primary-soft",
-};
+const tabActive = { className: tabItemActive };
 
 const FIELD_LABELS: Record<string, string> = {
 	title: "Nazwa",
@@ -69,16 +75,16 @@ export function ChallengeLayout({ challengeId }: { challengeId: string }) {
 	const { data, isLoading } = useLiveQuery({
 		query: (q) => q.from({ challenge: challengesCollection }),
 	});
-	const showSkeleton = useDelayedLoading(isLoading);
+	const showLoading = useDelayedLoading(isLoading);
 	const challenge = data?.find((item) => item.id === challengeId);
 
 	if (!challenge) {
 		if (isLoading) {
-			return showSkeleton ? (
+			return showLoading ? (
 				<div className="mx-auto max-w-6xl">
-					<Skeleton className="mb-4 h-9 w-80" />
-					<Skeleton className="mb-6 h-8 w-56" />
-					<Skeleton className="h-72 rounded-card" />
+					<Loading />
+					<Loading />
+					<Loading />
 				</div>
 			) : null;
 		}
@@ -102,8 +108,18 @@ export function ChallengeLayout({ challengeId }: { challengeId: string }) {
 }
 
 function Loaded({ challenge }: { challenge: Challenge }) {
-	const { config, context, ready } = useChallengeRules(challenge.id);
+	const rules = useChallengeRules(challenge.id);
+	const { config, context } = rules;
+	// Notes, colours and plan types live in the planning document; every tab
+	// reads or writes it, so it has to be there as well.
+	const planning = usePlanning(challenge.id);
+	const ready = rules.ready && planning !== undefined;
 	const unsaved = useStore(unsavedContent).has(challenge.id);
+	// The Plan tab leads to the variant that is open, else to the first one.
+	const openPathId = useParams({ strict: false }).pathId;
+	const planPathId =
+		challenge.paths.find((path) => path.pathId === openPathId)?.pathId ??
+		challenge.paths[0]?.pathId;
 	const [busy, setBusy] = useState(false);
 	const [problems, setProblems] = useState<{
 		title: string;
@@ -120,6 +136,8 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 		/** Asked first, once the rules allow the change. */
 		ask?: ConfirmOptions,
 	) => {
+		// The rules below need the full lists; see useChallengeRules.
+		if (!ready) return;
 		setProblems(null);
 		if (ask) {
 			const issues = challengeIssues(
@@ -133,20 +151,20 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 			}
 			if (!(await confirm(ask))) return;
 		}
-		setBusy(true);
-		try {
-			const result = await applyChallengeChange(
-				challenge,
-				(draft) => {
-					draft.status = next;
-				},
-				{ config, context, done },
-			);
-			if (!result.ok) setProblems({ title: refused, issues: result.issues });
-		} catch {
-			// The saver holds the change; HeldEditsNotice below explains.
-		} finally {
-			setBusy(false);
+		const result = await whileBusy(setBusy, () =>
+			settleChange(() =>
+				applyChallengeChange(
+					challenge,
+					(draft) => {
+						draft.status = next;
+					},
+					{ config, context, done },
+				),
+			),
+		);
+		// Null: the saver holds the change; HeldEditsNotice below explains.
+		if (result && !result.ok) {
+			setProblems({ title: refused, issues: result.issues });
 		}
 	};
 
@@ -163,10 +181,13 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 		}
 	};
 
-	const more: MenuAction[] = [];
+	const json = useJsonPreview("wyzwania", () => challengeVersions(challenge));
+
+	const more: MenuAction[] = [json.action];
 	if (status === "published") {
 		more.push({
 			label: "Ukryj",
+			disabled: !ready,
 			onSelect: () =>
 				void setStatus("hidden", "Wyzwanie ukryte", "Nie można ukryć", {
 					title: "Ukryć wyzwanie?",
@@ -179,6 +200,7 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 	if (status === "hidden") {
 		more.push({
 			label: "Cofnij do szkicu",
+			disabled: !ready,
 			onSelect: () =>
 				void setStatus(
 					"draft",
@@ -191,7 +213,7 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 		more.push({
 			label: promoted ? "Usuń (jest promowane)" : "Usuń",
 			destructive: true,
-			disabled: promoted,
+			disabled: promoted || !ready,
 			onSelect: () => void remove(),
 		});
 	}
@@ -225,7 +247,7 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 					<div className="flex flex-wrap items-center gap-2">
 						{unsaved && (
 							<span className="text-xs text-muted">
-								Najpierw zapisz zmiany w treści
+								Najpierw zapisz albo odrzuć zmiany
 							</span>
 						)}
 						{status === "deleted" ? (
@@ -244,56 +266,77 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 								Przywróć jako szkic
 							</Button>
 						) : (
-							<>
-								{(status === "draft" || status === "hidden") && (
-									<Button
-										variant="primary"
-										size="md"
-										disabled={waiting}
-										onClick={() =>
-											void setStatus(
-												"published",
-												"Wyzwanie opublikowane",
-												"Nie można opublikować",
-												{
-													title: "Opublikować wyzwanie?",
-													description:
-														"Stanie się widoczne dla użytkowników aplikacji, zgodnie z ustawionymi datami.",
-													confirmLabel: "Opublikuj",
-												},
-											)
-										}
-									>
-										Opublikuj
-									</Button>
-								)}
-								<Menu
-									label="Więcej akcji"
-									trigger="Więcej ▾"
-									triggerClassName="h-9 rounded-control border border-line-input bg-surface px-4 text-sm hover:border-primary"
-									actions={more}
-								/>
-							</>
+							(status === "draft" || status === "hidden") && (
+								<Button
+									variant="primary"
+									size="md"
+									disabled={waiting}
+									onClick={() =>
+										void setStatus(
+											"published",
+											"Wyzwanie opublikowane",
+											"Nie można opublikować",
+											{
+												title: "Opublikować wyzwanie?",
+												description:
+													"Stanie się widoczne dla użytkowników aplikacji, zgodnie z ustawionymi datami.",
+												confirmLabel: "Opublikuj",
+											},
+										)
+									}
+								>
+									Opublikuj
+								</Button>
+							)
 						)}
+						{/* In every status, the bin included: the JSON preview is here. */}
+						<Menu
+							label="Więcej akcji"
+							trigger="Więcej ▾"
+							triggerClassName="h-9 rounded-control border border-line-input bg-surface px-4 text-sm hover:border-primary"
+							actions={more}
+						/>
 					</div>
 				</div>
-				<nav aria-label="Części wyzwania" className="flex gap-1">
+				<nav
+					aria-label="Części wyzwania"
+					className="flex gap-1 overflow-x-auto"
+				>
 					<Link
 						to="/challenges/$challengeId"
 						params={{ challengeId: challenge.id }}
-						className={tab}
+						className={tabItem}
 						activeProps={tabActive}
 						activeOptions={{ exact: true }}
 					>
 						Przegląd
 					</Link>
+					{planPathId && (
+						<Link
+							to="/challenges/$challengeId/plan/$pathId"
+							params={{ challengeId: challenge.id, pathId: planPathId }}
+							className={tabItem}
+							activeProps={tabActive}
+							activeOptions={{ includeSearch: false }}
+						>
+							Plan
+						</Link>
+					)}
 					<Link
 						to="/challenges/$challengeId/content"
 						params={{ challengeId: challenge.id }}
-						className={tab}
+						className={tabItem}
 						activeProps={tabActive}
 					>
 						Treść
+					</Link>
+					<Link
+						to="/challenges/$challengeId/requirements"
+						params={{ challengeId: challenge.id }}
+						className={tabItem}
+						activeProps={tabActive}
+					>
+						Wymagania
 					</Link>
 				</nav>
 			</header>
@@ -304,18 +347,11 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 				describe={describeChallengeConflict}
 			/>
 			{problems && (
-				<Notice
-					tone="red"
-					role="alert"
+				<IssuesNotice
 					title={problems.title}
+					issues={problems.issues}
 					actions={<Button onClick={() => setProblems(null)}>Zamknij</Button>}
-				>
-					<ul className="list-disc pl-5">
-						{problems.issues.map((issue) => (
-							<li key={`${issue.path}-${issue.message}`}>{issue.message}</li>
-						))}
-					</ul>
-				</Notice>
+				/>
 			)}
 			{status === "deleted" && (
 				<Notice tone="grey" title="To wyzwanie jest w koszu">
@@ -324,7 +360,10 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 				</Notice>
 			)}
 
-			<Outlet />
+			{/* Every tab checks the challenge against the rules and keeps notes in
+			    its planning document: no tab before those have loaded. */}
+			{ready ? <Outlet /> : <Loading />}
+			{json.dialog}
 		</div>
 	);
 }

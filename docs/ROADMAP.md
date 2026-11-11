@@ -197,12 +197,14 @@ deploys it → §2 check, under the rules in §4. A slice is small enough to fin
 
 ### L7. Planning data
 
-- **Backend:** B3 — panel document store, stable path id, production fields on workouts.
+- **Backend:** B3 — panel document store, stable path id, production fields on workouts, and the
+  four pieces that make the settings and planning notes sync between people (B3.5–B3.8).
 - **Panel:** `planning` on — notes, tints, scratchpad, plan types and requirements, preparation
   status, folders, calendar colours from the real store. One-off import of Patryk's existing local
   plans as drafts.
 - **Check:** a long plan with many notes saves (document size); two variants keep their own notes
-  when one changes level.
+  when one changes level; two people on two computers see the same folders, plan types and colours
+  after a reload.
 
 ### L8. Hardening and extras
 

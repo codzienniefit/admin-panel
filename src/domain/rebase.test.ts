@@ -141,3 +141,104 @@ describe("rebase", () => {
 		expect(rebase(base(), mine, theirs).conflicts).toEqual(["paths[p1].days"]);
 	});
 });
+
+describe("rebase of nested documents", () => {
+	interface Variant {
+		notes: string;
+		days: Record<string, { note?: string }>;
+	}
+	interface Folder {
+		id: string;
+		name: string;
+	}
+	interface Doc {
+		id: string;
+		etag: string;
+		note: string;
+		variants: { a: Variant; b: Variant };
+		folders: [Folder, Folder, ...Folder[]];
+	}
+	const base: Doc = {
+		id: "C1",
+		etag: "1",
+		note: "",
+		variants: {
+			a: { notes: "", days: { "1": { note: "x" } } },
+			b: { notes: "", days: {} },
+		},
+		folders: [
+			{ id: "f1", name: "Jeden" },
+			{ id: "f2", name: "Dwa" },
+		],
+	};
+	const edit = (change: (draft: Doc) => void) => {
+		const draft = structuredClone(base);
+		change(draft);
+		return draft;
+	};
+
+	it("merges changes to different entries of a record", () => {
+		const mine = edit((d) => {
+			d.variants.a.days["2"] = { note: "moja" };
+		});
+		const theirs = edit((d) => {
+			d.variants.b.notes = "ich";
+			d.variants.a.days["3"] = { note: "ich dzień" };
+		});
+		const { merged, conflicts } = rebase(base, mine, theirs);
+		expect(conflicts).toEqual([]);
+		expect(merged.variants.a.days).toEqual({
+			"1": { note: "x" },
+			"2": { note: "moja" },
+			"3": { note: "ich dzień" },
+		});
+		expect(merged.variants.b.notes).toBe("ich");
+	});
+
+	it("reports the exact entry both sides changed", () => {
+		const mine = edit((d) => {
+			d.variants.a.days["1"] = { note: "moja" };
+		});
+		const theirs = edit((d) => {
+			d.variants.a.days["1"] = { note: "ich" };
+		});
+		expect(rebase(base, mine, theirs).conflicts).toEqual([
+			"variants.a.days.1.note",
+		]);
+	});
+
+	it("keeps my removal of an entry they did not touch", () => {
+		const mine = edit((d) => {
+			delete d.variants.a.days["1"];
+		});
+		const theirs = edit((d) => {
+			d.note = "ich";
+		});
+		const { merged, conflicts } = rebase(base, mine, theirs);
+		expect(conflicts).toEqual([]);
+		expect(merged.variants.a.days).toEqual({});
+		expect(merged.note).toBe("ich");
+	});
+
+	it("merges lists of folders by id when both renamed different ones", () => {
+		const mine = edit((d) => {
+			d.folders[0].name = "Pierwszy";
+		});
+		const theirs = edit((d) => {
+			d.folders[1].name = "Drugi";
+		});
+		const { merged, conflicts } = rebase(base, mine, theirs);
+		expect(conflicts).toEqual([]);
+		expect(merged.folders.map((f) => f.name)).toEqual(["Pierwszy", "Drugi"]);
+	});
+
+	it("treats the folder list as one unit when one side added a folder", () => {
+		const mine = edit((d) => {
+			d.folders[0].name = "Pierwszy";
+		});
+		const theirs = edit((d) => {
+			d.folders.push({ id: "f3", name: "Trzy" });
+		});
+		expect(rebase(base, mine, theirs).conflicts).toEqual(["folders"]);
+	});
+});

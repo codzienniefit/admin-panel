@@ -57,8 +57,21 @@ export function Table<T>({
 						{rows.map((row) => (
 							<tr
 								key={rowKey(row)}
+								tabIndex={onRowClick ? 0 : undefined}
+								onKeyDown={
+									onRowClick
+										? (event) => {
+												if (
+													event.key === "Enter" &&
+													event.target === event.currentTarget
+												) {
+													onRowClick(row);
+												}
+											}
+										: undefined
+								}
 								onClick={onRowClick ? () => onRowClick(row) : undefined}
-								className={`border-line border-b last:border-b-0 ${clickable}`}
+								className={`border-line border-b outline-none last:border-b-0 focus-visible:bg-primary-soft ${clickable}`}
 							>
 								{columns.map((column) => (
 									<td

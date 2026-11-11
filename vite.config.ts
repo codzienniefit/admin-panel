@@ -19,10 +19,22 @@ export default defineConfig({
 	// first time a screen uses it, re-bundles and reloads mid-session.
 	optimizeDeps: {
 		include: [
+			"@dnd-kit/core",
 			"@base-ui/react/combobox",
 			"@base-ui/react/dialog",
 			"@base-ui/react/menu",
+			"@base-ui/react/popover",
 			"@base-ui/react/switch",
+			"@tiptap/core",
+			"@tiptap/extension-bold",
+			"@tiptap/extension-document",
+			"@tiptap/extension-hard-break",
+			"@tiptap/extension-paragraph",
+			"@tiptap/extension-text",
+			"@tiptap/extensions/undo-redo",
+			"@tiptap/pm/model",
+			"@tiptap/pm/state",
+			"@tiptap/react",
 		],
 	},
 	resolve: {

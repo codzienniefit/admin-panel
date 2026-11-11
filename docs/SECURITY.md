@@ -1,7 +1,8 @@
 # Security
 
 What was checked, what was found, what protects the panel today, and what must be true before it
-is connected to real data. Reviewed 2026-11-10, after Phase 4, on the code in the working tree.
+is connected to real data. Reviewed 2026-11-10, after Phase 4, and again 2026-11-11, after Phase 7, on the code in the working
+tree.
 
 Related: [RISKS.md](RISKS.md), [BACKEND-SCOPE.md](BACKEND-SCOPE.md) (B0 is the backend's side of
 sign-in), [research/backend-audit.md](research/backend-audit.md).
@@ -46,6 +47,31 @@ hardened during it (section 3). The list of what stage 2 must add is in section 
 | **A link in content could use any scheme.** `<a href="javascript:…">` in a description only got a warning | Content is shown in the mobile app. A `javascript:`, `data:` or `file:` address must never be sent there | `contentIssues` now refuses every scheme except `https`, `http`, `mailto`, `tel`. Publishing content with such a link is blocked. 10 tests |
 | **An undeclared variable passed the typecheck** because `name` is a browser global | Not a security hole, but the same mistake with `status` or `origin` in security-relevant code would be | Lint rule refusing these globals |
 | **Publish and hide acted on one click** | An accidental click changes what app users see | Both ask for confirmation |
+
+## 3a. Second review, after Phases 5 to 7 (2026-11-11)
+
+The same searches as in section 2 were run again over the new code (planner, calendar, settings,
+messages, badges, users): no raw HTML, no `eval`, no links or addresses built from data, no network
+calls, no secrets, `npm audit` clean. The new screens were walked on a local production build with
+the security headers on: no policy violations.
+
+What is new and how it is handled:
+
+| Area | Concern | Handling |
+|---|---|---|
+| **Users** | Personal data (names, e-mail addresses) | There is no "all users" list. A search needs at least 3 characters, runs only on "Szukaj", and returns at most 20 people. Results live in memory for a few minutes after the screen is left, never in browser storage. The sample people are invented, with `example.test` addresses |
+| **Users** | The search text is in the address (`?q=`), so a link can be shared | Accepted: it is what the admin typed, not a result. Do not paste such links outside the team. Reconsider before stage 2 if e-mail addresses are searched often |
+| **Users** | Changing someone's e-mail address | A confirmation shows the old and the new address; the address is validated; nothing is sent in Test |
+| **Messages** | A sent message reaches real people and cannot be taken back | Sending is refused while the content has errors; a confirmation names the recipients; a second click cannot send twice; the request carries the version that was confirmed, so a message changed in the meantime is not sent |
+| **Call register (developer mode)** | It keeps every backend call with its parameters and answer, and answers can hold personal data (the user search, an account) | In memory only: never stored, never sent, at most 300 calls, emptied by a reload and by signing out (which reloads). Files are recorded as name, type and size, not content. It shows nothing the signed-in admin could not already see. Before real sign-in (L1): make sure no token is ever passed as a call argument, or mask it in `snapshot` |
+| **Dates** | New dependency `react-day-picker` (with `date-fns`) | No install scripts, no network use, its stylesheet is not loaded; `npm audit` clean |
+| **Logo and tab icon** | Files brought in from outside: the logotype SVG (from Michał) and the site's own icon from codzienniefit.pl | The SVG holds only paths and fills (no script, no link, no embedded image) and is shown through `<img>`, where an SVG cannot run code. The icon was converted to PNG and ICO locally. Both are served from the panel's own origin |
+| **Rich text in content** | New dependency Tiptap (ProseMirror) for bold and links in text blocks | Content never passes through an HTML string: the stored text is converted to and from the editor's document by pure functions (`domain/richText.ts`). Pasting takes plain text only. A link in the editor has no `href`, so a click cannot navigate; "Otwórz w nowej karcie" opens only `http(s)`, `mailto` and `tel` addresses, with `noopener,noreferrer`. The library writes no style tag (`injectCSS: false`). `npm audit` clean |
+| **Browser storage** | New key `cf.devMode` | "on" or "off" only |
+| **Colours from data** | A stored colour is put into a `style` attribute | Only values that are exactly `#rrggbb` get there (`isHexColor`); the mock server refuses others on save |
+| **Notes and names** | Free text typed by admins is shown to other admins | Rendered as text by React, never as HTML |
+| **Browser storage** | New key `cf.recentPlans` | Ids of recently opened plans only |
+| **Drag and drop library** | New dependency `@dnd-kit/core` | No install scripts, no network use; `npm audit` clean |
 
 ## 4. What protects the panel today
 
@@ -135,6 +161,11 @@ These are requirements, not suggestions. Each belongs to a slice in [ROADMAP.md 
     is accepted, enforced by the panel.
 18. **Every admin change is recorded with who made it** (B0.8, B4.3).
 
+17a. **User search stays limited on the server too**: a minimum query length, a result cap, and no
+    endpoint that lists everyone. The panel's limits are a courtesy, not the protection.
+17b. **Sending a message is its own request**, tied to the version the admin confirmed (etag), and
+    safe to repeat (an idempotency key), so a retry after a timeout cannot send twice.
+
 ### Process
 
 19. `npm audit` clean before each push; dependency updates reviewed, not automatic.
@@ -154,6 +185,8 @@ The short list used by [DEFINITION-OF-DONE.md §5](DEFINITION-OF-DONE.md).
 - [ ] No request to the real backend from a test, a script or a seed.
 - [ ] Anything that changes what app users see, or discards input, asks first.
 - [ ] Data from outside (server, paste, file, address, storage) is parsed before use.
+- [ ] Personal data is held in memory only, shown only as far as the task needs, and never logged.
+- [ ] A value from data goes into a `style` attribute only after it is checked (`isHexColor`).
 
 ## 7. Known and accepted
 

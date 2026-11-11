@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { auth, signOutAndLeave } from "@/auth";
 import { currentEnvironment } from "@/data/environment";
+import { devMode, setDevMode } from "@/features/devtools/devMode";
 import { SampleDataDialog } from "@/features/devtools/SampleDataDialog";
 import { useStore } from "@/lib/store";
 import { Menu, type MenuAction } from "@/ui/Menu";
@@ -18,6 +19,7 @@ function initials(name: string): string {
 export function UserMenu() {
 	const session = useStore(auth.session);
 	const [sampleDataOpen, setSampleDataOpen] = useState(false);
+	const developer = useStore(devMode);
 	if (session.status !== "admin" && session.status !== "forbidden") return null;
 	const { user } = session;
 
@@ -28,6 +30,10 @@ export function UserMenu() {
 			onSelect: () => setSampleDataOpen(true),
 		});
 	}
+	actions.push({
+		label: developer ? "Tryb deweloperski: wyłącz" : "Tryb deweloperski: włącz",
+		onSelect: () => setDevMode(!developer),
+	});
 	actions.push({
 		label: "Wyloguj",
 		destructive: true,

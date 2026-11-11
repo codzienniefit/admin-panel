@@ -11,13 +11,13 @@ import { useConfig } from "@/features/config/useConfig";
  */
 export function useChallengeRules(ownId?: string) {
 	const config = useConfig();
-	const { data: workouts } = useLiveQuery({
+	const { data: workouts, isLoading: loadingWorkouts } = useLiveQuery({
 		query: (q) => q.from({ workout: workoutsCollection }),
 	});
-	const { data: badges } = useLiveQuery({
+	const { data: badges, isLoading: loadingBadges } = useLiveQuery({
 		query: (q) => q.from({ badge: badgesCollection }),
 	});
-	const { data: challenges } = useLiveQuery({
+	const { data: challenges, isLoading: loadingChallenges } = useLiveQuery({
 		query: (q) => q.from({ challenge: challengesCollection }),
 	});
 
@@ -36,7 +36,11 @@ export function useChallengeRules(ownId?: string) {
 		context,
 		badges: (badges ?? []).filter((b) => b.type === "normal" && !b.isHidden),
 		challenges: challenges ?? [],
-		/** False until the lists the rules depend on have arrived. */
-		ready: workouts !== undefined && badges !== undefined,
+		/**
+		 * False until the lists the rules depend on have arrived. Checking a
+		 * challenge before that would call every workout in it unknown, so a
+		 * screen must not validate or save while this is false.
+		 */
+		ready: !loadingWorkouts && !loadingBadges && !loadingChallenges,
 	};
 }

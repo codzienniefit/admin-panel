@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { mediaUrl } from "@/data/collections/media";
 import type { Challenge } from "@/data/schemas/challenge";
 import { challengeKind, KIND_LABELS } from "@/domain/challengeRules";
 import { plural } from "@/domain/text";
+import { MediaImage } from "@/features/media/MediaImage";
 import { levelMeta } from "@/ui/enums";
 import { StatusBadge } from "@/ui/StatusBadge";
 import { Tag } from "@/ui/Tag";
@@ -30,18 +30,13 @@ export function ChallengeCard({ challenge, promoted }: ChallengeCardProps) {
 			params={{ challengeId: challenge.id }}
 			className="flex flex-col overflow-hidden rounded-card border border-line bg-surface transition hover:-translate-y-0.5 hover:border-primary hover:shadow-card"
 		>
-			{challenge.imageRelativePath ? (
-				<img
-					src={mediaUrl(challenge.imageRelativePath)}
-					alt=""
-					loading="lazy"
-					className="aspect-[5/2] w-full bg-hover object-cover"
-				/>
-			) : (
-				<div className="flex aspect-[5/2] w-full items-center justify-center bg-bg text-xs text-muted">
-					brak grafiki
-				</div>
-			)}
+			<MediaImage
+				path={challenge.imageRelativePath}
+				placeholder="brak grafiki"
+				className="aspect-[5/2] w-full"
+				imageClassName="bg-hover object-cover"
+				placeholderClassName="bg-bg text-xs text-muted"
+			/>
 			<div className="flex flex-1 flex-col gap-3 p-4">
 				<div className="flex items-start justify-between gap-3">
 					{/* Always two lines tall, so tags align across a row of cards. */}

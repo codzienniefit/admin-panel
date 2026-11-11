@@ -41,6 +41,11 @@ export function isApiError(error: unknown): error is ApiError {
 	return error instanceof ApiError;
 }
 
+/** The text to show for a failure: the error's own, or the fallback. */
+export function errorMessage(error: unknown, fallback: string): string {
+	return error instanceof Error && error.message ? error.message : fallback;
+}
+
 export function isConflict<T>(error: unknown): error is ApiError<T> {
 	return isApiError(error) && error.kind === "conflict";
 }

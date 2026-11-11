@@ -28,10 +28,22 @@ One command, and it must pass with no warnings waved through:
 npm run check
 ```
 
+**After every big set of changes, run everything, locally:**
+
+```bash
+npm run test:all
+```
+
+That is `npm run check` plus the browser tests (72 of them; about a minute in all). There is no continuous
+integration and none is planned for now (decided 2026-11-11), so this local run is the only thing
+that runs the tests. "Big" means: a phase or a feature, a refactor across several files, anything
+that touches saving, the planner or a shared component, a dependency update, and always the last
+thing before handing work over for a push. A one-line fix needs `npm run check` only.
+
 | Step | Command | Passes when |
 |---|---|---|
 | Secrets | `npm run secrets` | no environment or key file, and no text that looks like a key, token or connection string, in anything git would take |
-| Types | `npm run typecheck` | `tsc -b` reports nothing; strict mode, no `any`, no `@ts-ignore` |
+| Types | `npm run typecheck` | `tsc -b` and the UI tests' own type check report nothing; strict mode, no `any`, no `@ts-ignore` |
 | Lint and format | `npm run lint` | Biome reports nothing: recommended rules, unused imports and variables are errors, browser globals such as `name` are refused |
 | Tests | `npm run test` | every Vitest test passes; none skipped or marked `.only` |
 | Build | `npm run build` | the production build succeeds |
@@ -52,7 +64,15 @@ Passes when it reports 0 vulnerabilities. A finding is fixed, or written down in
 - [ ] A change to saving, merging or a schema has a test that **an unknown field survives**.
 - [ ] A new rule is tested for the draft case (allowed incomplete) and the published case (refused).
 - [ ] A change to the mock's behaviour is covered in `data/api/mock/mock.test.ts`.
+- [ ] A new planner operation has a test that its inverse undoes it.
+- [ ] Date logic passes in another time zone too: `TZ=America/Los_Angeles npx vitest run src/domain`.
 - [ ] No test needs the network, the real clock or the real backend.
+- [ ] A change to a screen passes the UI tests: `npm run test:ui` (72 tests, about 30 seconds, Test
+      environment only; see [TESTING.md](TESTING.md)).
+- [ ] A new screen, or a new thing a person must be able to rely on, has a UI test
+      ([e2e/README.md](../e2e/README.md) says how to write one).
+- [ ] A screen that checks rules or saves waits until the lists it reads have loaded. Three bugs of
+      exactly this kind were found on 2026-11-11.
 
 ## 4. Done: checked in the running app
 
@@ -64,7 +84,10 @@ Tests cover rules. These are checked by hand, in `npm run dev`, in the Test envi
 - [ ] Reload in the middle: the address brings back the same screen, filters and tab.
 - [ ] **Phone width (375 px)**: no sideways scroll, every action reachable.
 - [ ] Keyboard: every action reachable with Tab and Enter; dialogs close with Esc; focus is visible.
-- [ ] Loading shows skeletons; an empty list says what to do next.
+- [ ] Anything that can be dragged can also be done from its "⋯" menu, and both give the same result.
+- [ ] On a published item, a change that app users would see waits for an explicit save and asks
+      first; nothing of that kind saves by itself.
+- [ ] Loading shows the page spinner (`<Loading />`); an empty list says what to do next.
 - [ ] No errors in the browser console.
 - [ ] New or changed shared components appear on `/design`.
 - [ ] With the large dataset ("Dane testowe…" → large): lists and search still feel instant.
@@ -77,6 +100,7 @@ Tests cover rules. These are checked by hand, in `npm run dev`, in the Test envi
       then only as agreed under "Ready".
 - [ ] Anything that changes what app users see asks for confirmation first.
 - [ ] Anything that discards the user's input asks first, or can be undone.
+- [ ] Personal data (the Users section) is not added to browser storage, logs or exports.
 - [ ] If the change adds a place the panel loads something from (API host, image host, video
       embed), `public/_headers` is updated and the reason is in [SECURITY.md](SECURITY.md).
 
@@ -109,8 +133,10 @@ files (`wrangler.json`, `public/_headers`, `worker/`), also:
 
 Stated so that nobody assumes more than is true:
 
-- **No browser tests.** Playwright is not set up; the hand checks in section 4 stand in for it.
-- **No continuous integration.** Nothing runs `npm run check` on push; it is run before pushing.
+- **Browser tests cover the basic paths only**: 72 tests in Chromium with a mouse. Not touch, not
+  other browsers, not every screen in depth; the hand checks in section 4 still apply.
+- **No continuous integration, on purpose.** Nothing runs the tests on push. They are run locally,
+  with `npm run test:all`, after every big set of changes (section 2).
 - **No test coverage number.** Coverage is by rule: everything in `domain/` is tested.
 - **No accessibility audit.** Biome's accessibility rules and the keyboard check only.
 

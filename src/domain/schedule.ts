@@ -35,6 +35,13 @@ export type ScheduleOp =
 	  }
 	| { type: "move"; pathId: string; from: DaySlot; to: DaySlot };
 
+/**
+ * The app shows up to three workouts in a day (the limit Retool enforced).
+ * Open decision 10 in docs/PLAN.md: raise it only once the app team confirms.
+ */
+export const MAX_WORKOUTS_PER_DAY = 3;
+const DAY_FULL = `W jednym dniu mogą być najwyżej ${MAX_WORKOUTS_PER_DAY} treningi`;
+
 function findDay(
 	paths: readonly SchedulePath[],
 	pathId: string,
@@ -58,6 +65,7 @@ export function rejectReason(
 		if (!day) return "Nie ma takiego dnia";
 		if (day.workoutIds.includes(op.workoutId))
 			return "Ten trening jest już w tym dniu";
+		if (day.workoutIds.length >= MAX_WORKOUTS_PER_DAY) return DAY_FULL;
 		return null;
 	}
 	if (op.type === "remove") {
@@ -73,6 +81,8 @@ export function rejectReason(
 		return "Tego treningu nie ma już w tym miejscu";
 	if (from !== to && to.workoutIds.includes(workoutId))
 		return "Ten trening jest już w tym dniu";
+	if (from !== to && to.workoutIds.length >= MAX_WORKOUTS_PER_DAY)
+		return DAY_FULL;
 	return null;
 }
 

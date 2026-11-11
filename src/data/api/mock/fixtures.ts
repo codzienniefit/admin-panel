@@ -8,6 +8,7 @@ import {
 import type { MediaFile } from "@/data/schemas/media";
 import type { Workout } from "@/data/schemas/workout";
 import { slugify } from "@/domain/text";
+import { buildBadgeFixtures } from "./badgeFixtures";
 
 // Synthetic sample data. Nothing here comes from the real backend: the Test
 // environment is public.
@@ -59,7 +60,8 @@ function random(seed: number) {
 
 const BASE_TIME = Date.UTC(2026, 10, 10, 9, 0, 0);
 const DAY = 86_400_000;
-const iso = (daysAgo: number) =>
+/** A moment `daysAgo` days before the fixed "now" of the sample data. */
+export const iso = (daysAgo: number) =>
 	new Date(BASE_TIME - daysAgo * DAY).toISOString();
 
 const hand: Array<[string, string, number, string[]]> = [
@@ -418,22 +420,9 @@ function buildChallenges(count: number, workouts: Workout[]): Challenge[] {
 	return challenges;
 }
 
+/** The rows are in badgeFixtures.ts, with the rest of the badges area. */
 function buildBadges(): Badge[] {
-	return [
-		["n_1", "Pierwszy trening", "normal"],
-		["n_2", "Mistrzyni mobilności", "normal"],
-		["n_3", "Siła charakteru", "normal"],
-		["n_4", "Spokój ducha", "normal"],
-		["m_workouts_10", "10 treningów", "milestone"],
-		["s_1", "Spotkanie na żywo", "manual"],
-	].map(([id, name, type]) => ({
-		id: id as string,
-		name: name as string,
-		type: type as string,
-		imageRelativePath: `badges/${slugify(name as string)}.webp`,
-		isHidden: false,
-		[UNKNOWN_FIELD]: `badge:${id}`,
-	}));
+	return buildBadgeFixtures(UNKNOWN_FIELD);
 }
 
 function buildMedia(

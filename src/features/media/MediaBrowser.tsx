@@ -1,6 +1,6 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
-import { mediaCollection, mediaUrl } from "@/data/collections/media";
+import { mediaCollection } from "@/data/collections/media";
 import type { MediaFile } from "@/data/schemas/media";
 import { formatDate } from "@/domain/dates";
 import { folderOf, formatBytes, MEDIA_FOLDERS } from "@/domain/mediaRules";
@@ -8,9 +8,11 @@ import { matchesQuery, plural } from "@/domain/text";
 import { useStore } from "@/lib/store";
 import { Button } from "@/ui/Button";
 import { EmptyState } from "@/ui/EmptyState";
+import { SearchInput } from "@/ui/ListPage";
+import { Loading, useDelayedLoading } from "@/ui/Loading";
 import { Select } from "@/ui/Select";
-import { Skeleton, useDelayedLoading } from "@/ui/Skeleton";
 import { nowPlaying, togglePlayback } from "./audioPlayer";
+import { MediaImage } from "./MediaImage";
 import { MediaUpload } from "./MediaUpload";
 
 const PAGE = 60;
@@ -46,7 +48,7 @@ export function MediaBrowser({
 	const { data, isLoading } = useLiveQuery({
 		query: (q) => q.from({ file: mediaCollection }),
 	});
-	const showSkeleton = useDelayedLoading(isLoading);
+	const showLoading = useDelayedLoading(isLoading);
 	const [limit, setLimit] = useState(PAGE);
 
 	const folders = kind
@@ -84,16 +86,14 @@ export function MediaBrowser({
 						className="w-44"
 					/>
 				)}
-				<input
-					type="search"
-					aria-label="Szukaj pliku"
+				<SearchInput
+					label="Szukaj pliku"
 					placeholder="Szukaj po nazwie pliku…"
 					value={query}
-					onChange={(event) => {
+					onChange={(next) => {
 						setLimit(PAGE);
-						onQueryChange(event.target.value);
+						onQueryChange(next);
 					}}
-					className="h-10 min-w-48 flex-1 rounded-control border border-line-input bg-surface px-3 text-sm outline-none placeholder:text-muted hover:border-primary focus:border-primary focus:shadow-focus any-pointer-coarse:text-base"
 				/>
 				<MediaUpload folder={folder} onUploaded={onPick} />
 			</div>
@@ -118,10 +118,10 @@ export function MediaBrowser({
 			</p>
 
 			{isLoading ? (
-				showSkeleton && (
+				showLoading && (
 					<div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
 						{[1, 2, 3, 4, 5, 6].map((n) => (
-							<Skeleton key={n} className="aspect-[3/2]" />
+							<Loading key={n} />
 						))}
 					</div>
 				)
@@ -163,11 +163,10 @@ function ImageGrid({ files, onPick, selectedPath }: FilesProps) {
 				const selected = file.path === selectedPath;
 				const body = (
 					<>
-						<img
-							src={mediaUrl(file.path)}
-							alt=""
-							loading="lazy"
-							className="aspect-[3/2] w-full bg-hover object-cover"
+						<MediaImage
+							path={file.path}
+							className="aspect-[3/2] w-full"
+							imageClassName="bg-hover object-cover"
 						/>
 						<span className="block truncate px-2 py-1.5 text-xs text-subtle">
 							{fileName(file.path)}

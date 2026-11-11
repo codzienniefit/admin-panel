@@ -15,7 +15,12 @@ export function placeholderImage(path: string): string {
 	const square = path.startsWith("badges/");
 	const [width, height] = square ? [300, 300] : [600, 400];
 	const name = (path.split("/").pop() ?? path).replace(/\.[a-z0-9]+$/i, "");
-	const label = name.length > 26 ? `${name.slice(0, 25)}…` : name;
+	const short = name.length > 26 ? `${name.slice(0, 25)}…` : name;
+	// The name goes into markup: a "&" or "<" in it must stay text.
+	const label = short
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;");
 	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">
 <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
 <stop offset="0" stop-color="hsl(${hue} 70% 82%)"/>

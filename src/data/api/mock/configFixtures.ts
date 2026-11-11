@@ -76,7 +76,26 @@ export const internalConfigFixture: InternalConfig = {
 		{
 			id: "challenges",
 			label: "Wyzwania",
-			subsections: [{ id: "completed", label: "Ukończone" }],
+			subsections: [
+				{ id: "completed", label: "Ukończone" },
+				{ id: "perfect", label: "Ukończone w 100%" },
+			],
+		},
+		{
+			id: "workouts",
+			label: "Treningi",
+			subsections: [
+				{ id: "single", label: "Za trening" },
+				{ id: "repeats", label: "Za liczbę treningów" },
+			],
+		},
+		{
+			id: "special",
+			label: "Specjalne",
+			subsections: [
+				{ id: "events", label: "Wydarzenia" },
+				{ id: "trainings", label: "Specjalne treningi" },
+			],
 		},
 	],
 	promotedChallengeId: "C2",

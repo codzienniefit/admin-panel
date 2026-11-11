@@ -39,9 +39,7 @@ export function ConfirmHost() {
 	return (
 		<Dialog
 			open={current !== null}
-			onOpenChange={(open) => {
-				if (!open) answer(false);
-			}}
+			onClose={() => answer(false)}
 			title={current?.title ?? ""}
 			description={current?.description}
 			size="sm"

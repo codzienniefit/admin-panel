@@ -54,6 +54,13 @@ export const MEDIA_FOLDERS: readonly MediaFolder[] = [
 
 export const folderOf = (path: string): string => path.split("/")[0] ?? "";
 
+export const mediaFolder = (id: string): MediaFolder | undefined =>
+	MEDIA_FOLDERS.find((folder) => folder.id === id);
+
+/** The folder's file types in the form a file chooser's `accept` takes. */
+export const acceptedTypes = (folder: MediaFolder): string =>
+	folder.extensions.map((extension) => `.${extension}`).join(",");
+
 export const extensionOf = (name: string): string =>
 	name.includes(".") ? (name.split(".").pop() ?? "").toLowerCase() : "";
 
@@ -78,6 +85,21 @@ export function uploadProblem(
 		return "Nazwa pliku musi zawierać litery lub cyfry.";
 	}
 	return null;
+}
+
+/**
+ * Why what was dropped onto a field cannot be uploaded, or null when it can.
+ * A field holds one file, so a handful dropped at once is refused rather than
+ * one of them being picked without the person knowing which.
+ */
+export function dropProblem(
+	folder: MediaFolder,
+	files: ReadonlyArray<{ name: string; size: number }>,
+): string | null {
+	const [file, ...others] = files;
+	if (!file) return "Upuść tutaj plik z dysku.";
+	if (others.length > 0) return "Upuść jeden plik naraz.";
+	return uploadProblem(folder, file);
 }
 
 /** The path a file gets: folder plus a storage-safe version of its name. */

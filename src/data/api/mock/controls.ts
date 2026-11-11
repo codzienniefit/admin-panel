@@ -27,7 +27,7 @@ export const defaultMockControls: MockControls = {
 	dataset: "normal",
 };
 
-/** Knobs for exercising skeletons, rollbacks and the conflict flow. */
+/** Knobs for exercising loading states, rollbacks and the conflict flow. */
 export const mockControls = createStore<MockControls>({
 	...defaultMockControls,
 	dataset: readDataset(),

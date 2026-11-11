@@ -1,6 +1,7 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { ConfirmHost } from "@/ui/confirm";
 import { ErrorScreen } from "@/ui/ErrorScreen";
+import { LoadingOverlay } from "@/ui/Loading";
 import { ToastViewport } from "@/ui/toast";
 
 export const Route = createRootRoute({
@@ -15,6 +16,7 @@ function Root() {
 	return (
 		<>
 			<Outlet />
+			<LoadingOverlay />
 			<ToastViewport />
 			<ConfirmHost />
 		</>

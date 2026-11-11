@@ -1,6 +1,12 @@
-import { ApiError, isApiError, isConflict } from "@/data/api/errors";
-import type { SaveOptions } from "@/data/api/types";
+import {
+	ApiError,
+	errorMessage,
+	isApiError,
+	isConflict,
+} from "@/data/api/errors";
+import type { SaveOptions, Versioned } from "@/data/api/types";
 import { deepEqual, rebase } from "@/domain/rebase";
+import { sleep as realSleep } from "@/lib/sleep";
 import { createStore, type Store } from "@/lib/store";
 
 // The one path every save of a versioned entity takes.
@@ -19,10 +25,7 @@ import { createStore, type Store } from "@/lib/store";
 // that would throw the user's work away, so on failure and on conflict the
 // edits are kept here until the user retries, applies or discards them.
 
-export interface Versioned {
-	id: string;
-	etag: string;
-}
+export type { Versioned } from "@/data/api/types";
 
 export type SaveStatus =
 	| { phase: "idle" }
@@ -64,6 +67,8 @@ export interface SaverConfig<T extends Versioned> {
 export interface Saver<T extends Versioned> {
 	/** Latest versions seen from the server; called by the collection's fetch. */
 	remember(items: readonly T[]): void;
+	/** The latest version of one entity seen from the server, if any. */
+	known(id: string): T | undefined;
 	/** Saves `mine`, which was edited starting from `base`. */
 	persist(base: T, mine: T): Promise<void>;
 	markDirty(id: string): void;
@@ -80,9 +85,6 @@ export interface Saver<T extends Versioned> {
 
 const MAX_REBASES = 3;
 const TRANSIENT_RETRIES = 2;
-
-const realSleep = (ms: number) =>
-	new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export function createSaver<T extends Versioned>(
 	config: SaverConfig<T>,
@@ -174,8 +176,7 @@ export function createSaver<T extends Versioned>(
 					setStatus(id, { phase: "idle" });
 					throw error;
 				}
-				const message =
-					error instanceof Error ? error.message : "Nie udało się zapisać";
+				const message = errorMessage(error, "Nie udało się zapisać");
 				await hold("error", base, mine, theirs, [], message);
 				throw error;
 			}
@@ -191,6 +192,7 @@ export function createSaver<T extends Versioned>(
 		remember(items) {
 			for (const item of items) server.set(item.id, item);
 		},
+		known: (id) => server.get(id),
 		persist(base, mine) {
 			// One save at a time per entity, in order: a second save must start
 			// from the etag the first one produced.

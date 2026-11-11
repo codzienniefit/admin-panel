@@ -14,6 +14,19 @@ export const TONES = [
 
 export type Tone = (typeof TONES)[number];
 
+export const TONE_LABELS: Record<Tone, string> = {
+	blue: "Niebieski",
+	red: "Czerwony",
+	green: "Zielony",
+	purple: "Fioletowy",
+	orange: "Pomarańczowy",
+	pink: "Różowy",
+	amber: "Bursztynowy",
+	teal: "Morski",
+	indigo: "Indygo",
+	grey: "Szary",
+};
+
 const ASSIGNABLE: readonly Tone[] = TONES.filter((tone) => tone !== "grey");
 
 /**

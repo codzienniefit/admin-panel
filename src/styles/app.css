@@ -22,6 +22,10 @@
 	--color-line: #e5e5e7;
 	--color-line-input: #d2d2d7;
 
+	/* The two colours of the logo. */
+	--color-brand-pink: #ffb6dc;
+	--color-brand-violet: #838bc5;
+
 	--color-primary: #0071e3;
 	--color-primary-hover: #0077ed;
 	--color-primary-soft: #f0f7ff;
@@ -135,31 +139,5 @@
 
 	&::-webkit-scrollbar {
 		display: none;
-	}
-}
-
-/* Placeholder shape shown while data loads. */
-@utility skeleton {
-	border-radius: var(--radius-control);
-	background: linear-gradient(
-		90deg,
-		var(--color-hover) 25%,
-		#f2f2f5 37%,
-		var(--color-hover) 63%
-	);
-	background-size: 400% 100%;
-	animation: shimmer 1.4s ease infinite;
-
-	@media (prefers-reduced-motion: reduce) {
-		animation: none;
-	}
-}
-
-@keyframes shimmer {
-	from {
-		background-position: 100% 50%;
-	}
-	to {
-		background-position: 0 50%;
 	}
 }

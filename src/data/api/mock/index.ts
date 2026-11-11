@@ -1,6 +1,5 @@
 import { ApiError, type ApiIssue } from "@/data/api/errors";
 import type { ApiClient, SaveOptions } from "@/data/api/types";
-import { badgeSchema } from "@/data/schemas/badge";
 import {
 	type Challenge,
 	challengeSchema,
@@ -24,49 +23,24 @@ import { challengeIssues } from "@/domain/challengeRules";
 import { extensionOf } from "@/domain/mediaRules";
 import { slugify } from "@/domain/text";
 import { workoutIssues } from "@/domain/workoutRules";
-import type { Store } from "@/lib/store";
+import { badgesArea } from "./badges";
 import { internalConfigFixture, workoutConfigFixture } from "./configFixtures";
-import { type MockControls, mockControls } from "./controls";
-import { buildFixtures, type Fixtures, UNKNOWN_FIELD } from "./fixtures";
+import { UNKNOWN_FIELD } from "./fixtures";
+import { copy, createKernel, type MockApiOptions } from "./kernel";
 import { placeholderAudio, placeholderImage, toDataUrl } from "./mediaUrls";
-import { browserStorage, SNAPSHOT_KEY, type StorageLike } from "./persistence";
+import { messagesApi } from "./messages";
+import { planningApi } from "./planning";
+import { settingsApi } from "./settings";
+import { usersApi } from "./users";
 
 // An in-process ApiClient: no network, no service worker. It implements the
 // TARGET contract (statuses, etags and 409s, validation with field paths),
 // which makes it the executable specification for docs/BACKEND-SCOPE.md.
+//
+// This file holds the core areas (config, challenges, workouts, media). The
+// others are modules of their own, composed at the bottom.
 
-interface Versioned {
-	id: string;
-	etag: string;
-	updatedAtUtc: string;
-}
-
-export interface MockApiOptions {
-	fixtures?: Fixtures;
-	controls?: Store<MockControls>;
-	/** Where edits are kept across reloads; null keeps them in memory only. */
-	storage?: StorageLike | null;
-	/** Injected in tests so they do not wait on real timers. */
-	sleep?: (ms: number) => Promise<void>;
-	now?: () => string;
-}
-
-interface Snapshot {
-	dataset: string;
-	version: number;
-	challenges: Challenge[];
-	workouts: Workout[];
-	media: MediaFile[];
-	promotedChallengeId?: string | null;
-	/** Uploaded files small enough to keep, as data: addresses. */
-	uploads: Record<string, string>;
-}
-
-/** Everything crossing the boundary is copied, as JSON over HTTP would be. */
-const copy = <T>(value: T): T => structuredClone(value);
-
-const realSleep = (ms: number) =>
-	new Promise<void>((resolve) => setTimeout(resolve, ms));
+export type { MockApiOptions } from "./kernel";
 
 const AUDIO = new Set(["m4a", "m4v", "mp3", "wav"]);
 const IMAGE = new Set(["webp", "png", "jpg", "jpeg", "gif", "svg"]);
@@ -82,89 +56,49 @@ const MIME: Record<string, string> = {
 const KEEP_UPLOAD_BYTES = 400 * 1024;
 
 export function createMockApi(options: MockApiOptions = {}): ApiClient {
-	const controls = options.controls ?? mockControls;
-	const sleep = options.sleep ?? realSleep;
-	const now = options.now ?? (() => new Date().toISOString());
-	const storage =
-		options.storage === undefined ? browserStorage() : options.storage;
-	const dataset = controls.get().dataset;
+	const kernel = createKernel(options);
+	const {
+		now,
+		persist,
+		latency,
+		takeFailure,
+		takeConcurrentChange,
+		checkEtag,
+		reject,
+		store,
+		freeId,
+	} = kernel;
 
-	const restored = options.fixtures ? null : readSnapshot(storage, dataset);
-	const seed = options.fixtures ?? (restored ? null : buildFixtures(dataset));
-
-	const challenges = new Map(
-		(restored?.challenges ?? seed?.challenges ?? []).map((c) => [
-			c.id,
-			copy(c),
-		]),
+	const challenges = kernel.table<Challenge>(
+		"challenges",
+		() => kernel.seed().challenges,
+		(challenge) => challenge.id,
 	);
-	const workouts = new Map(
-		(restored?.workouts ?? seed?.workouts ?? []).map((w) => [w.id, copy(w)]),
+	const workouts = kernel.table<Workout>(
+		"workouts",
+		() => kernel.seed().workouts,
+		(workout) => workout.id,
 	);
-	const media = new Map(
-		(restored?.media ?? seed?.media ?? []).map((m) => [m.path, copy(m)]),
+	const media = kernel.table<MediaFile>(
+		"media",
+		() => kernel.seed().media,
+		(file) => file.path,
 	);
-	const badges = (options.fixtures ?? buildFixtures("normal")).badges;
-	const uploads = new Map(Object.entries(restored?.uploads ?? {}));
-	let promotedChallengeId =
-		restored?.promotedChallengeId === undefined
-			? internalConfigFixture.promotedChallengeId
-			: restored.promotedChallengeId;
-	let version = restored?.version ?? 1;
-	const nextEtag = () => String(++version);
-
-	function persist() {
-		if (!storage) return;
-		const snapshot = (withUploads: boolean): Snapshot => ({
-			dataset,
-			version,
-			challenges: [...challenges.values()],
-			workouts: [...workouts.values()],
-			media: [...media.values()],
-			promotedChallengeId,
-			uploads: withUploads ? Object.fromEntries(uploads) : {},
-		});
-		try {
-			storage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot(true)));
-		} catch {
-			// Most likely the storage quota. The records matter more than the
-			// uploaded pictures, so try again without them.
-			try {
-				storage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot(false)));
-			} catch {
-				// Keep working in memory.
-			}
-		}
-	}
-
-	async function latency() {
-		const { minLatencyMs, maxLatencyMs } = controls.get();
-		const span = Math.max(0, maxLatencyMs - minLatencyMs);
-		await sleep(minLatencyMs + Math.random() * span);
-	}
-
-	function takeFailure() {
-		if (!controls.get().failNextSave) return;
-		controls.set((c) => ({ ...c, failNextSave: false }));
-		throw new ApiError("server", "Symulowany błąd serwera");
-	}
-
-	/** Plays the part of another admin saving just before this request. */
-	function takeConcurrentChange<T extends Versioned>(
-		stored: T,
-		incoming: T,
-		change: {
-			otherField: (stored: T) => void;
-			sameFields: (stored: T, incoming: T) => void;
-		},
-	) {
-		const mode = controls.get().conflictNextSave;
-		if (!mode) return;
-		controls.set((c) => ({ ...c, conflictNextSave: null }));
-		change[mode](stored, incoming);
-		stored.etag = nextEtag();
-		stored.updatedAtUtc = now();
-	}
+	const badges = badgesArea(kernel, {
+		workouts: () => [...workouts.values()],
+		challenges: () => [...challenges.values()],
+	});
+	/** Uploaded files small enough to keep, as data: addresses. */
+	const uploadSlot = kernel.slot<Record<string, string>>(
+		"uploads",
+		() => ({}),
+		true,
+	);
+	const uploads = new Map(Object.entries(uploadSlot.get()));
+	const promoted = kernel.slot<string | null>(
+		"promotedChallengeId",
+		() => internalConfigFixture.promotedChallengeId,
+	);
 
 	const challengeChange = {
 		otherField: (stored: Challenge) => {
@@ -210,39 +144,13 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 		},
 	};
 
-	function checkEtag<T extends Versioned>(stored: T | undefined, etag: string) {
-		if (stored && stored.etag !== etag) {
-			throw new ApiError<T>(
-				"conflict",
-				"Ktoś inny zapisał ten element w międzyczasie",
-				{ current: copy(stored) },
-			);
-		}
-	}
-
-	function reject(issues: ApiIssue[]) {
-		if (issues.length === 0) return;
-		throw new ApiError("validation", issues.map((i) => i.message).join("\n"), {
-			issues,
-		});
-	}
-
-	function store<T extends Versioned>(table: Map<string, T>, incoming: T): T {
-		const saved = { ...copy(incoming), etag: nextEtag(), updatedAtUtc: now() };
-		table.set(saved.id, saved);
-		persist();
-		return copy(saved);
-	}
-
-	const badgeIds = new Set(
-		badges.filter((b) => b.type === "normal").map((b) => b.id),
-	);
-
 	function workoutProblems(
 		incoming: Workout,
 		stored: Workout | undefined,
 	): ApiIssue[] {
-		const issues = workoutIssues(incoming, workoutConfigFixture, { badgeIds });
+		const issues = workoutIssues(incoming, workoutConfigFixture, {
+			badgeIds: badges.assignableIds(),
+		});
 
 		if (incoming.videoUrl) {
 			const twin = [...workouts.values()].find(
@@ -293,12 +201,6 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 		return issues;
 	}
 
-	function freeId(prefix: string, table: ReadonlyMap<string, unknown>) {
-		for (let n = 1; ; n++) {
-			if (!table.has(`${prefix}${n}`)) return `${prefix}${n}`;
-		}
-	}
-
 	function challengeProblems(
 		incoming: Challenge,
 		stored: Challenge | undefined,
@@ -307,10 +209,10 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 			workoutStatus: new Map(
 				[...workouts.values()].map((w) => [w.id, w.status]),
 			),
-			badgeIds,
+			badgeIds: badges.assignableIds(),
 			challengeIds: new Set(challenges.keys()),
 			ownId: incoming.id,
-			promotedChallengeId,
+			promotedChallengeId: promoted.get(),
 		});
 		if (stored?.status === "deleted" && incoming.status === "deleted") {
 			issues.push({
@@ -324,7 +226,7 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 	const internalConfig = () =>
 		internalConfigSchema.parse({
 			...copy(internalConfigFixture),
-			promotedChallengeId,
+			promotedChallengeId: promoted.get(),
 		});
 
 	return {
@@ -353,7 +255,7 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 						reject([{ path: "promotedChallengeId", message: problem }]);
 					}
 				}
-				promotedChallengeId = challengeId;
+				promoted.set(challengeId);
 				persist();
 				return internalConfig();
 			},
@@ -466,6 +368,7 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 				if (type === "image" && file.size <= KEEP_UPLOAD_BYTES) {
 					const bytes = new Uint8Array(await file.arrayBuffer());
 					uploads.set(path, toDataUrl(bytes, MIME[extension] ?? file.type));
+					uploadSlot.set(Object.fromEntries(uploads));
 				}
 				media.set(path, {
 					path,
@@ -492,34 +395,18 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 					: placeholderImage(path);
 			},
 		},
-		badges: {
-			async list() {
-				await latency();
-				return badgeSchema.array().parse(copy(badges));
-			},
-		},
+		badges: badges.api,
+		messages: messagesApi(kernel),
+		users: usersApi(kernel, {
+			badges: badges.all,
+			workouts: () => [...workouts.values()],
+			challenges: () => [...challenges.values()],
+		}),
+		planning: planningApi(kernel, {
+			challenges: () => [...challenges.values()],
+		}),
+		settings: settingsApi(kernel),
 	};
-}
-
-function readSnapshot(
-	storage: StorageLike | null,
-	dataset: string,
-): Snapshot | null {
-	try {
-		const raw = storage?.getItem(SNAPSHOT_KEY);
-		if (!raw) return null;
-		const snapshot = JSON.parse(raw) as Snapshot;
-		if (snapshot.dataset !== dataset) return null;
-		if (
-			!Array.isArray(snapshot.workouts) ||
-			!Array.isArray(snapshot.challenges)
-		) {
-			return null;
-		}
-		return snapshot;
-	} catch {
-		return null;
-	}
 }
 
 function sameList(a: readonly string[], b: readonly string[]) {

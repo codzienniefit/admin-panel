@@ -7,11 +7,13 @@
 			"!docs",
 			"!src/routeTree.gen.ts",
 			"!worker-configuration.d.ts",
-			"!package-lock.json"
+			"!package-lock.json",
+			"!src/assets"
 		]
 	},
 	"formatter": { "indentStyle": "tab" },
 	"linter": {
+		"domains": { "playwright": "none" },
 		"rules": {
 			"preset": "recommended",
 			"correctness": {
@@ -37,5 +39,11 @@
 			}
 		}
 	},
+	"overrides": [
+		{
+			"includes": ["e2e/**", "playwright.config.ts"],
+			"linter": { "domains": { "playwright": "recommended" } }
+		}
+	],
 	"css": { "parser": { "tailwindDirectives": true } }
 }

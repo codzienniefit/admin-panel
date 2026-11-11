@@ -3,7 +3,10 @@ import { type ReactNode, useEffect, useState } from "react";
 
 interface DialogProps {
 	open: boolean;
-	onOpenChange: (open: boolean) => void;
+	/** For a dialog whose open state lives in a parent. */
+	onOpenChange?: (open: boolean) => void;
+	/** For a dialog that is rendered only while open: called when it closes. */
+	onClose?: () => void;
 	title: string;
 	description?: string;
 	children?: ReactNode;
@@ -30,6 +33,7 @@ const WIDTH = {
 export function Dialog({
 	open,
 	onOpenChange,
+	onClose,
 	title,
 	description,
 	children,
@@ -52,7 +56,13 @@ export function Dialog({
 	if (!open && !present) return null;
 
 	return (
-		<BaseDialog.Root open={open} onOpenChange={onOpenChange}>
+		<BaseDialog.Root
+			open={open}
+			onOpenChange={(next) => {
+				onOpenChange?.(next);
+				if (!next) onClose?.();
+			}}
+		>
 			<BaseDialog.Portal>
 				<BaseDialog.Backdrop className="fixed inset-0 z-50 min-h-dvh bg-black/40 backdrop-blur-sm transition-opacity duration-200 data-closed:pointer-events-none data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<BaseDialog.Popup

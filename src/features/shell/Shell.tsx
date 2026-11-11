@@ -1,7 +1,8 @@
 import { Link, Outlet } from "@tanstack/react-router";
 import { currentEnvironment, ENVIRONMENTS } from "@/data/environment";
+import { CallLogButton } from "@/features/devtools/CallLog";
 import { EnvironmentSelect } from "@/ui/EnvironmentSelect";
-import { Skeleton } from "@/ui/Skeleton";
+import { Logo, LogoMark } from "@/ui/Logo";
 import { Tag } from "@/ui/Tag";
 import { UserMenu } from "./UserMenu";
 
@@ -12,13 +13,11 @@ const SECTIONS = [
 	{ to: "/messages", label: "Wiadomości", exact: false },
 	{ to: "/badges", label: "Odznaki", exact: false },
 	{ to: "/users", label: "Użytkownicy", exact: false },
+	{ to: "/settings", label: "Ustawienia", exact: false },
 ] as const;
 
 // Not sections of the product: tools for building and checking it.
-const TOOLS = [
-	{ to: "/spike", label: "Test planera" },
-	{ to: "/design", label: "Komponenty" },
-] as const;
+const TOOLS = [{ to: "/design", label: "Komponenty" }] as const;
 
 const tab =
 	"shrink-0 rounded-control px-3 py-1.5 text-sm text-subtle hover:bg-hover hover:text-ink";
@@ -33,13 +32,13 @@ function TopBar({ children }: { children?: React.ReactNode }) {
 	return (
 		<header className="sticky top-0 z-40 border-line border-b bg-surface/90 backdrop-blur">
 			<div className="flex h-14 items-center gap-3 px-4 md:gap-5 md:px-6">
-				<Link
-					to="/challenges"
-					className="shrink-0 font-semibold tracking-tight"
-				>
-					Codziennie Fit
+				<Link to="/challenges" className="shrink-0">
+					{/* The full logotype needs room; a phone gets the sign. */}
+					<Logo className="hidden h-5 md:block" />
+					<LogoMark className="size-7 md:hidden" />
 				</Link>
 				{children}
+				<CallLogButton />
 				{/* The dropdown needs room; narrow screens get a plain label. */}
 				<div className="hidden shrink-0 lg:block">
 					<EnvironmentSelect />
@@ -90,37 +89,6 @@ export function Shell() {
 			</TopBar>
 			<main className="flex-1 p-4 md:p-6">
 				<Outlet />
-			</main>
-		</div>
-	);
-}
-
-/** Shown while the session and the configuration are being loaded. */
-export function ShellSkeleton() {
-	return (
-		<div className="flex min-h-full flex-col">
-			<header className="border-line border-b bg-surface">
-				<div className="flex h-14 items-center gap-5 px-4 md:px-6">
-					<span className="shrink-0 font-semibold tracking-tight">
-						Codziennie Fit
-					</span>
-					<div className="flex flex-1 gap-2">
-						<Skeleton className="h-7 w-24" />
-						<Skeleton className="h-7 w-20" />
-						<Skeleton className="hidden h-7 w-20 sm:block" />
-					</div>
-					<Skeleton className="size-8 rounded-full" />
-				</div>
-			</header>
-			<main className="flex-1 p-4 md:p-6">
-				<div className="mx-auto max-w-6xl">
-					<Skeleton className="mb-6 h-9 w-48" />
-					<div className="grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-4">
-						<Skeleton className="h-36 rounded-card" />
-						<Skeleton className="h-36 rounded-card" />
-						<Skeleton className="h-36 rounded-card" />
-					</div>
-				</div>
 			</main>
 		</div>
 	);

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { fromLocalInput, toLocalInput } from "./dates";
-import { MEDIA_FOLDERS, uploadPath, uploadProblem } from "./mediaRules";
+import {
+	acceptedTypes,
+	dropProblem,
+	MEDIA_FOLDERS,
+	mediaFolder,
+	uploadPath,
+	uploadProblem,
+} from "./mediaRules";
 import { matchesQuery, plural, slugify } from "./text";
 
 const folder = (id: string) => {
@@ -54,6 +61,48 @@ describe("media upload rules", () => {
 			"workouts/poranna-mobilnosc-1.webp",
 		);
 		expect(uploadPath("audio", "Żółć łąka.m4a")).toBe("audio/zolc-laka.m4a");
+	});
+});
+
+describe("a file dropped onto a field", () => {
+	const cover = { name: "Okładka wyzwania.webp", size: 120_000 };
+
+	it("is accepted when it is the one file the folder takes", () => {
+		expect(dropProblem(folder("challenges"), [cover])).toBeNull();
+	});
+
+	it("is refused by the same rules as a chosen file", () => {
+		const photo = { name: "zdjecie.png", size: 10_000 };
+		expect(dropProblem(folder("workouts"), [photo])).toBe(
+			uploadProblem(folder("workouts"), photo),
+		);
+		const heavy = { name: "odznaka.webp", size: 80_000 };
+		expect(dropProblem(folder("badges"), [heavy])).toContain("limit");
+	});
+
+	it("refuses several files at once, even when each would do", () => {
+		expect(
+			dropProblem(folder("challenges"), [
+				cover,
+				{ name: "druga.webp", size: 1000 },
+			]),
+		).toBe("Upuść jeden plik naraz.");
+	});
+
+	it("refuses a drop that carries no file", () => {
+		expect(dropProblem(folder("audio"), [])).toBe("Upuść tutaj plik z dysku.");
+	});
+});
+
+describe("media folders", () => {
+	it("finds a folder by its id and nothing for an unknown one", () => {
+		expect(mediaFolder("badges")?.label).toBe("Odznaki");
+		expect(mediaFolder("nieznany")).toBeUndefined();
+	});
+
+	it("lists the types a file chooser should offer", () => {
+		expect(acceptedTypes(folder("workouts"))).toBe(".webp");
+		expect(acceptedTypes(folder("audio"))).toBe(".m4a,.m4v,.mp3,.wav");
 	});
 });
 

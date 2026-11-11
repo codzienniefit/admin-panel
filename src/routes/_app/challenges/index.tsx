@@ -14,6 +14,7 @@ const searchSchema = z.object({
 		.enum(["updated", "added", "title", "premiere"])
 		.optional()
 		.catch(undefined),
+	folder: z.string().optional().catch(undefined),
 	view: z.enum(["cards", "table"]).optional().catch(undefined),
 });
 

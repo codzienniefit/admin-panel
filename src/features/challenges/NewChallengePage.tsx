@@ -1,12 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { isApiError } from "@/data/api/errors";
+import { errorMessage } from "@/data/api/errors";
 import { createChallenge } from "@/data/collections/challenges";
 import { blankChallenge } from "@/data/schemas/challenge";
 import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
 import { TextField } from "@/ui/Field";
 import { Notice } from "@/ui/Notice";
+import { attempt } from "@/ui/tasks";
 import { toast } from "@/ui/toast";
 
 /** Starts a challenge as a draft: a name and a length are enough. */
@@ -27,22 +28,22 @@ export function NewChallengePage({
 		}
 		setBusy(true);
 		setProblem(null);
-		try {
-			const created = await createChallenge({
+		const created = await attempt(() =>
+			createChallenge({
 				...blankChallenge(),
 				title: title.trim(),
 				lengthDays: Math.max(1, Number.parseInt(weeks, 10) || 1) * 7,
-			});
-			toast({ title: "Szkic wyzwania utworzony", tone: "green" });
-			onCreated(created.id);
-		} catch (error) {
+			}),
+		);
+		if (!created.ok) {
 			setProblem(
-				isApiError(error) || error instanceof Error
-					? error.message
-					: "Nie udało się utworzyć wyzwania",
+				errorMessage(created.error, "Nie udało się utworzyć wyzwania"),
 			);
 			setBusy(false);
+			return;
 		}
+		toast({ title: "Szkic wyzwania utworzony", tone: "green" });
+		onCreated(created.value.id);
 	};
 
 	return (

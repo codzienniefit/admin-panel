@@ -17,16 +17,28 @@ import { Route as AppBadgesRouteImport } from './routes/_app/badges'
 import { Route as AppDesignRouteImport } from './routes/_app/design'
 import { Route as AppMediaRouteImport } from './routes/_app/media'
 import { Route as AppMessagesRouteImport } from './routes/_app/messages'
-import { Route as AppSpikeRouteImport } from './routes/_app/spike'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
 import { Route as AppWorkoutsRouteImport } from './routes/_app/workouts'
+import { Route as AppBadgesBadgeIdRouteImport } from './routes/_app/badges/$badgeId'
+import { Route as AppBadgesNewRouteImport } from './routes/_app/badges/new'
 import { Route as AppChallengesIndexRouteImport } from './routes/_app/challenges/index'
 import { Route as AppChallengesChallengeIdRouteImport } from './routes/_app/challenges/$challengeId'
+import { Route as AppChallengesCalendarRouteImport } from './routes/_app/challenges/calendar'
 import { Route as AppChallengesNewRouteImport } from './routes/_app/challenges/new'
+import { Route as AppMessagesMessageIdRouteImport } from './routes/_app/messages/$messageId'
+import { Route as AppMessagesNewRouteImport } from './routes/_app/messages/new'
+import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsFoldersRouteImport } from './routes/_app/settings/folders'
+import { Route as AppSettingsPlanTypesRouteImport } from './routes/_app/settings/plan-types'
+import { Route as AppSettingsTrainingTypesRouteImport } from './routes/_app/settings/training-types'
+import { Route as AppUsersIndexRouteImport } from './routes/_app/users/index'
+import { Route as AppUsersUidRouteImport } from './routes/_app/users/$uid'
 import { Route as AppWorkoutsWorkoutIdRouteImport } from './routes/_app/workouts/$workoutId'
 import { Route as AppWorkoutsNewRouteImport } from './routes/_app/workouts/new'
 import { Route as AppChallengesChallengeIdIndexRouteImport } from './routes/_app/challenges/$challengeId/index'
 import { Route as AppChallengesChallengeIdContentRouteImport } from './routes/_app/challenges/$challengeId/content'
+import { Route as AppChallengesChallengeIdRequirementsRouteImport } from './routes/_app/challenges/$challengeId/requirements'
 import { Route as AppChallengesChallengeIdPlanPathIdRouteImport } from './routes/_app/challenges/$challengeId/plan.$pathId'
 
 const AppRoute = AppRouteImport.update({
@@ -68,9 +80,9 @@ const AppMessagesRoute = AppMessagesRouteImport.update({
   path: '/messages',
   getParentRoute: () => AppRoute,
 } as any)
-const AppSpikeRoute = AppSpikeRouteImport.update({
-  id: '/spike',
-  path: '/spike',
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AppRoute,
 } as any)
 const AppUsersRoute = AppUsersRouteImport.update({
@@ -83,6 +95,16 @@ const AppWorkoutsRoute = AppWorkoutsRouteImport.update({
   path: '/workouts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBadgesBadgeIdRoute = AppBadgesBadgeIdRouteImport.update({
+  id: '/$badgeId',
+  path: '/$badgeId',
+  getParentRoute: () => AppBadgesRoute,
+} as any)
+const AppBadgesNewRoute = AppBadgesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AppBadgesRoute,
+} as any)
 const AppChallengesIndexRoute = AppChallengesIndexRouteImport.update({
   id: '/challenges/',
   path: '/challenges/',
@@ -94,10 +116,56 @@ const AppChallengesChallengeIdRoute =
     path: '/challenges/$challengeId',
     getParentRoute: () => AppRoute,
   } as any)
+const AppChallengesCalendarRoute = AppChallengesCalendarRouteImport.update({
+  id: '/challenges/calendar',
+  path: '/challenges/calendar',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppChallengesNewRoute = AppChallengesNewRouteImport.update({
   id: '/challenges/new',
   path: '/challenges/new',
   getParentRoute: () => AppRoute,
+} as any)
+const AppMessagesMessageIdRoute = AppMessagesMessageIdRouteImport.update({
+  id: '/$messageId',
+  path: '/$messageId',
+  getParentRoute: () => AppMessagesRoute,
+} as any)
+const AppMessagesNewRoute = AppMessagesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AppMessagesRoute,
+} as any)
+const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsFoldersRoute = AppSettingsFoldersRouteImport.update({
+  id: '/folders',
+  path: '/folders',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsPlanTypesRoute = AppSettingsPlanTypesRouteImport.update({
+  id: '/plan-types',
+  path: '/plan-types',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsTrainingTypesRoute =
+  AppSettingsTrainingTypesRouteImport.update({
+    id: '/training-types',
+    path: '/training-types',
+    getParentRoute: () => AppSettingsRoute,
+  } as any)
+const AppUsersIndexRoute = AppUsersIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AppUsersRoute,
+} as any)
+const AppUsersUidRoute = AppUsersUidRouteImport.update({
+  id: '/$uid',
+  path: '/$uid',
+  getParentRoute: () => AppUsersRoute,
 } as any)
 const AppWorkoutsWorkoutIdRoute = AppWorkoutsWorkoutIdRouteImport.update({
   id: '/$workoutId',
@@ -121,6 +189,12 @@ const AppChallengesChallengeIdContentRoute =
     path: '/content',
     getParentRoute: () => AppChallengesChallengeIdRoute,
   } as any)
+const AppChallengesChallengeIdRequirementsRoute =
+  AppChallengesChallengeIdRequirementsRouteImport.update({
+    id: '/requirements',
+    path: '/requirements',
+    getParentRoute: () => AppChallengesChallengeIdRoute,
+  } as any)
 const AppChallengesChallengeIdPlanPathIdRoute =
   AppChallengesChallengeIdPlanPathIdRouteImport.update({
     id: '/plan/$pathId',
@@ -132,38 +206,60 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/forbidden': typeof ForbiddenRoute
   '/login': typeof LoginRoute
-  '/badges': typeof AppBadgesRoute
+  '/badges': typeof AppBadgesRouteWithChildren
   '/design': typeof AppDesignRoute
   '/media': typeof AppMediaRoute
-  '/messages': typeof AppMessagesRoute
-  '/spike': typeof AppSpikeRoute
-  '/users': typeof AppUsersRoute
+  '/messages': typeof AppMessagesRouteWithChildren
+  '/settings': typeof AppSettingsRouteWithChildren
+  '/users': typeof AppUsersRouteWithChildren
   '/workouts': typeof AppWorkoutsRouteWithChildren
+  '/badges/$badgeId': typeof AppBadgesBadgeIdRoute
+  '/badges/new': typeof AppBadgesNewRoute
   '/challenges/$challengeId': typeof AppChallengesChallengeIdRouteWithChildren
+  '/challenges/calendar': typeof AppChallengesCalendarRoute
   '/challenges/new': typeof AppChallengesNewRoute
+  '/messages/$messageId': typeof AppMessagesMessageIdRoute
+  '/messages/new': typeof AppMessagesNewRoute
+  '/settings/folders': typeof AppSettingsFoldersRoute
+  '/settings/plan-types': typeof AppSettingsPlanTypesRoute
+  '/settings/training-types': typeof AppSettingsTrainingTypesRoute
+  '/users/$uid': typeof AppUsersUidRoute
   '/workouts/$workoutId': typeof AppWorkoutsWorkoutIdRoute
   '/workouts/new': typeof AppWorkoutsNewRoute
   '/challenges/': typeof AppChallengesIndexRoute
+  '/settings/': typeof AppSettingsIndexRoute
+  '/users/': typeof AppUsersIndexRoute
   '/challenges/$challengeId/content': typeof AppChallengesChallengeIdContentRoute
+  '/challenges/$challengeId/requirements': typeof AppChallengesChallengeIdRequirementsRoute
   '/challenges/$challengeId/': typeof AppChallengesChallengeIdIndexRoute
   '/challenges/$challengeId/plan/$pathId': typeof AppChallengesChallengeIdPlanPathIdRoute
 }
 export interface FileRoutesByTo {
   '/forbidden': typeof ForbiddenRoute
   '/login': typeof LoginRoute
-  '/badges': typeof AppBadgesRoute
+  '/badges': typeof AppBadgesRouteWithChildren
   '/design': typeof AppDesignRoute
   '/media': typeof AppMediaRoute
-  '/messages': typeof AppMessagesRoute
-  '/spike': typeof AppSpikeRoute
-  '/users': typeof AppUsersRoute
+  '/messages': typeof AppMessagesRouteWithChildren
   '/workouts': typeof AppWorkoutsRouteWithChildren
   '/': typeof AppIndexRoute
+  '/badges/$badgeId': typeof AppBadgesBadgeIdRoute
+  '/badges/new': typeof AppBadgesNewRoute
+  '/challenges/calendar': typeof AppChallengesCalendarRoute
   '/challenges/new': typeof AppChallengesNewRoute
+  '/messages/$messageId': typeof AppMessagesMessageIdRoute
+  '/messages/new': typeof AppMessagesNewRoute
+  '/settings/folders': typeof AppSettingsFoldersRoute
+  '/settings/plan-types': typeof AppSettingsPlanTypesRoute
+  '/settings/training-types': typeof AppSettingsTrainingTypesRoute
+  '/users/$uid': typeof AppUsersUidRoute
   '/workouts/$workoutId': typeof AppWorkoutsWorkoutIdRoute
   '/workouts/new': typeof AppWorkoutsNewRoute
   '/challenges': typeof AppChallengesIndexRoute
+  '/settings': typeof AppSettingsIndexRoute
+  '/users': typeof AppUsersIndexRoute
   '/challenges/$challengeId/content': typeof AppChallengesChallengeIdContentRoute
+  '/challenges/$challengeId/requirements': typeof AppChallengesChallengeIdRequirementsRoute
   '/challenges/$challengeId': typeof AppChallengesChallengeIdIndexRoute
   '/challenges/$challengeId/plan/$pathId': typeof AppChallengesChallengeIdPlanPathIdRoute
 }
@@ -172,20 +268,32 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/forbidden': typeof ForbiddenRoute
   '/login': typeof LoginRoute
-  '/_app/badges': typeof AppBadgesRoute
+  '/_app/badges': typeof AppBadgesRouteWithChildren
   '/_app/design': typeof AppDesignRoute
   '/_app/media': typeof AppMediaRoute
-  '/_app/messages': typeof AppMessagesRoute
-  '/_app/spike': typeof AppSpikeRoute
-  '/_app/users': typeof AppUsersRoute
+  '/_app/messages': typeof AppMessagesRouteWithChildren
+  '/_app/settings': typeof AppSettingsRouteWithChildren
+  '/_app/users': typeof AppUsersRouteWithChildren
   '/_app/workouts': typeof AppWorkoutsRouteWithChildren
   '/_app/': typeof AppIndexRoute
+  '/_app/badges/$badgeId': typeof AppBadgesBadgeIdRoute
+  '/_app/badges/new': typeof AppBadgesNewRoute
   '/_app/challenges/$challengeId': typeof AppChallengesChallengeIdRouteWithChildren
+  '/_app/challenges/calendar': typeof AppChallengesCalendarRoute
   '/_app/challenges/new': typeof AppChallengesNewRoute
+  '/_app/messages/$messageId': typeof AppMessagesMessageIdRoute
+  '/_app/messages/new': typeof AppMessagesNewRoute
+  '/_app/settings/folders': typeof AppSettingsFoldersRoute
+  '/_app/settings/plan-types': typeof AppSettingsPlanTypesRoute
+  '/_app/settings/training-types': typeof AppSettingsTrainingTypesRoute
+  '/_app/users/$uid': typeof AppUsersUidRoute
   '/_app/workouts/$workoutId': typeof AppWorkoutsWorkoutIdRoute
   '/_app/workouts/new': typeof AppWorkoutsNewRoute
   '/_app/challenges/': typeof AppChallengesIndexRoute
+  '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/users/': typeof AppUsersIndexRoute
   '/_app/challenges/$challengeId/content': typeof AppChallengesChallengeIdContentRoute
+  '/_app/challenges/$challengeId/requirements': typeof AppChallengesChallengeIdRequirementsRoute
   '/_app/challenges/$challengeId/': typeof AppChallengesChallengeIdIndexRoute
   '/_app/challenges/$challengeId/plan/$pathId': typeof AppChallengesChallengeIdPlanPathIdRoute
 }
@@ -199,15 +307,27 @@ export interface FileRouteTypes {
     | '/design'
     | '/media'
     | '/messages'
-    | '/spike'
+    | '/settings'
     | '/users'
     | '/workouts'
+    | '/badges/$badgeId'
+    | '/badges/new'
     | '/challenges/$challengeId'
+    | '/challenges/calendar'
     | '/challenges/new'
+    | '/messages/$messageId'
+    | '/messages/new'
+    | '/settings/folders'
+    | '/settings/plan-types'
+    | '/settings/training-types'
+    | '/users/$uid'
     | '/workouts/$workoutId'
     | '/workouts/new'
     | '/challenges/'
+    | '/settings/'
+    | '/users/'
     | '/challenges/$challengeId/content'
+    | '/challenges/$challengeId/requirements'
     | '/challenges/$challengeId/'
     | '/challenges/$challengeId/plan/$pathId'
   fileRoutesByTo: FileRoutesByTo
@@ -218,15 +338,25 @@ export interface FileRouteTypes {
     | '/design'
     | '/media'
     | '/messages'
-    | '/spike'
-    | '/users'
     | '/workouts'
     | '/'
+    | '/badges/$badgeId'
+    | '/badges/new'
+    | '/challenges/calendar'
     | '/challenges/new'
+    | '/messages/$messageId'
+    | '/messages/new'
+    | '/settings/folders'
+    | '/settings/plan-types'
+    | '/settings/training-types'
+    | '/users/$uid'
     | '/workouts/$workoutId'
     | '/workouts/new'
     | '/challenges'
+    | '/settings'
+    | '/users'
     | '/challenges/$challengeId/content'
+    | '/challenges/$challengeId/requirements'
     | '/challenges/$challengeId'
     | '/challenges/$challengeId/plan/$pathId'
   id:
@@ -238,16 +368,28 @@ export interface FileRouteTypes {
     | '/_app/design'
     | '/_app/media'
     | '/_app/messages'
-    | '/_app/spike'
+    | '/_app/settings'
     | '/_app/users'
     | '/_app/workouts'
     | '/_app/'
+    | '/_app/badges/$badgeId'
+    | '/_app/badges/new'
     | '/_app/challenges/$challengeId'
+    | '/_app/challenges/calendar'
     | '/_app/challenges/new'
+    | '/_app/messages/$messageId'
+    | '/_app/messages/new'
+    | '/_app/settings/folders'
+    | '/_app/settings/plan-types'
+    | '/_app/settings/training-types'
+    | '/_app/users/$uid'
     | '/_app/workouts/$workoutId'
     | '/_app/workouts/new'
     | '/_app/challenges/'
+    | '/_app/settings/'
+    | '/_app/users/'
     | '/_app/challenges/$challengeId/content'
+    | '/_app/challenges/$challengeId/requirements'
     | '/_app/challenges/$challengeId/'
     | '/_app/challenges/$challengeId/plan/$pathId'
   fileRoutesById: FileRoutesById
@@ -316,11 +458,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMessagesRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/spike': {
-      id: '/_app/spike'
-      path: '/spike'
-      fullPath: '/spike'
-      preLoaderRoute: typeof AppSpikeRouteImport
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/users': {
@@ -337,6 +479,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWorkoutsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/badges/$badgeId': {
+      id: '/_app/badges/$badgeId'
+      path: '/$badgeId'
+      fullPath: '/badges/$badgeId'
+      preLoaderRoute: typeof AppBadgesBadgeIdRouteImport
+      parentRoute: typeof AppBadgesRoute
+    }
+    '/_app/badges/new': {
+      id: '/_app/badges/new'
+      path: '/new'
+      fullPath: '/badges/new'
+      preLoaderRoute: typeof AppBadgesNewRouteImport
+      parentRoute: typeof AppBadgesRoute
+    }
     '/_app/challenges/': {
       id: '/_app/challenges/'
       path: '/challenges'
@@ -351,12 +507,75 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppChallengesChallengeIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/challenges/calendar': {
+      id: '/_app/challenges/calendar'
+      path: '/challenges/calendar'
+      fullPath: '/challenges/calendar'
+      preLoaderRoute: typeof AppChallengesCalendarRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/challenges/new': {
       id: '/_app/challenges/new'
       path: '/challenges/new'
       fullPath: '/challenges/new'
       preLoaderRoute: typeof AppChallengesNewRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/messages/$messageId': {
+      id: '/_app/messages/$messageId'
+      path: '/$messageId'
+      fullPath: '/messages/$messageId'
+      preLoaderRoute: typeof AppMessagesMessageIdRouteImport
+      parentRoute: typeof AppMessagesRoute
+    }
+    '/_app/messages/new': {
+      id: '/_app/messages/new'
+      path: '/new'
+      fullPath: '/messages/new'
+      preLoaderRoute: typeof AppMessagesNewRouteImport
+      parentRoute: typeof AppMessagesRoute
+    }
+    '/_app/settings/': {
+      id: '/_app/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/folders': {
+      id: '/_app/settings/folders'
+      path: '/folders'
+      fullPath: '/settings/folders'
+      preLoaderRoute: typeof AppSettingsFoldersRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/plan-types': {
+      id: '/_app/settings/plan-types'
+      path: '/plan-types'
+      fullPath: '/settings/plan-types'
+      preLoaderRoute: typeof AppSettingsPlanTypesRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/training-types': {
+      id: '/_app/settings/training-types'
+      path: '/training-types'
+      fullPath: '/settings/training-types'
+      preLoaderRoute: typeof AppSettingsTrainingTypesRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/users/': {
+      id: '/_app/users/'
+      path: '/'
+      fullPath: '/users/'
+      preLoaderRoute: typeof AppUsersIndexRouteImport
+      parentRoute: typeof AppUsersRoute
+    }
+    '/_app/users/$uid': {
+      id: '/_app/users/$uid'
+      path: '/$uid'
+      fullPath: '/users/$uid'
+      preLoaderRoute: typeof AppUsersUidRouteImport
+      parentRoute: typeof AppUsersRoute
     }
     '/_app/workouts/$workoutId': {
       id: '/_app/workouts/$workoutId'
@@ -386,6 +605,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppChallengesChallengeIdContentRouteImport
       parentRoute: typeof AppChallengesChallengeIdRoute
     }
+    '/_app/challenges/$challengeId/requirements': {
+      id: '/_app/challenges/$challengeId/requirements'
+      path: '/requirements'
+      fullPath: '/challenges/$challengeId/requirements'
+      preLoaderRoute: typeof AppChallengesChallengeIdRequirementsRouteImport
+      parentRoute: typeof AppChallengesChallengeIdRoute
+    }
     '/_app/challenges/$challengeId/plan/$pathId': {
       id: '/_app/challenges/$challengeId/plan/$pathId'
       path: '/plan/$pathId'
@@ -395,6 +621,66 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AppBadgesRouteChildren {
+  AppBadgesBadgeIdRoute: typeof AppBadgesBadgeIdRoute
+  AppBadgesNewRoute: typeof AppBadgesNewRoute
+}
+
+const AppBadgesRouteChildren: AppBadgesRouteChildren = {
+  AppBadgesBadgeIdRoute: AppBadgesBadgeIdRoute,
+  AppBadgesNewRoute: AppBadgesNewRoute,
+}
+
+const AppBadgesRouteWithChildren = AppBadgesRoute._addFileChildren(
+  AppBadgesRouteChildren,
+)
+
+interface AppMessagesRouteChildren {
+  AppMessagesMessageIdRoute: typeof AppMessagesMessageIdRoute
+  AppMessagesNewRoute: typeof AppMessagesNewRoute
+}
+
+const AppMessagesRouteChildren: AppMessagesRouteChildren = {
+  AppMessagesMessageIdRoute: AppMessagesMessageIdRoute,
+  AppMessagesNewRoute: AppMessagesNewRoute,
+}
+
+const AppMessagesRouteWithChildren = AppMessagesRoute._addFileChildren(
+  AppMessagesRouteChildren,
+)
+
+interface AppSettingsRouteChildren {
+  AppSettingsFoldersRoute: typeof AppSettingsFoldersRoute
+  AppSettingsPlanTypesRoute: typeof AppSettingsPlanTypesRoute
+  AppSettingsTrainingTypesRoute: typeof AppSettingsTrainingTypesRoute
+  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+}
+
+const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsFoldersRoute: AppSettingsFoldersRoute,
+  AppSettingsPlanTypesRoute: AppSettingsPlanTypesRoute,
+  AppSettingsTrainingTypesRoute: AppSettingsTrainingTypesRoute,
+  AppSettingsIndexRoute: AppSettingsIndexRoute,
+}
+
+const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
+  AppSettingsRouteChildren,
+)
+
+interface AppUsersRouteChildren {
+  AppUsersUidRoute: typeof AppUsersUidRoute
+  AppUsersIndexRoute: typeof AppUsersIndexRoute
+}
+
+const AppUsersRouteChildren: AppUsersRouteChildren = {
+  AppUsersUidRoute: AppUsersUidRoute,
+  AppUsersIndexRoute: AppUsersIndexRoute,
+}
+
+const AppUsersRouteWithChildren = AppUsersRoute._addFileChildren(
+  AppUsersRouteChildren,
+)
 
 interface AppWorkoutsRouteChildren {
   AppWorkoutsWorkoutIdRoute: typeof AppWorkoutsWorkoutIdRoute
@@ -412,6 +698,7 @@ const AppWorkoutsRouteWithChildren = AppWorkoutsRoute._addFileChildren(
 
 interface AppChallengesChallengeIdRouteChildren {
   AppChallengesChallengeIdContentRoute: typeof AppChallengesChallengeIdContentRoute
+  AppChallengesChallengeIdRequirementsRoute: typeof AppChallengesChallengeIdRequirementsRoute
   AppChallengesChallengeIdIndexRoute: typeof AppChallengesChallengeIdIndexRoute
   AppChallengesChallengeIdPlanPathIdRoute: typeof AppChallengesChallengeIdPlanPathIdRoute
 }
@@ -419,6 +706,8 @@ interface AppChallengesChallengeIdRouteChildren {
 const AppChallengesChallengeIdRouteChildren: AppChallengesChallengeIdRouteChildren =
   {
     AppChallengesChallengeIdContentRoute: AppChallengesChallengeIdContentRoute,
+    AppChallengesChallengeIdRequirementsRoute:
+      AppChallengesChallengeIdRequirementsRoute,
     AppChallengesChallengeIdIndexRoute: AppChallengesChallengeIdIndexRoute,
     AppChallengesChallengeIdPlanPathIdRoute:
       AppChallengesChallengeIdPlanPathIdRoute,
@@ -430,29 +719,31 @@ const AppChallengesChallengeIdRouteWithChildren =
   )
 
 interface AppRouteChildren {
-  AppBadgesRoute: typeof AppBadgesRoute
+  AppBadgesRoute: typeof AppBadgesRouteWithChildren
   AppDesignRoute: typeof AppDesignRoute
   AppMediaRoute: typeof AppMediaRoute
-  AppMessagesRoute: typeof AppMessagesRoute
-  AppSpikeRoute: typeof AppSpikeRoute
-  AppUsersRoute: typeof AppUsersRoute
+  AppMessagesRoute: typeof AppMessagesRouteWithChildren
+  AppSettingsRoute: typeof AppSettingsRouteWithChildren
+  AppUsersRoute: typeof AppUsersRouteWithChildren
   AppWorkoutsRoute: typeof AppWorkoutsRouteWithChildren
   AppIndexRoute: typeof AppIndexRoute
   AppChallengesChallengeIdRoute: typeof AppChallengesChallengeIdRouteWithChildren
+  AppChallengesCalendarRoute: typeof AppChallengesCalendarRoute
   AppChallengesNewRoute: typeof AppChallengesNewRoute
   AppChallengesIndexRoute: typeof AppChallengesIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppBadgesRoute: AppBadgesRoute,
+  AppBadgesRoute: AppBadgesRouteWithChildren,
   AppDesignRoute: AppDesignRoute,
   AppMediaRoute: AppMediaRoute,
-  AppMessagesRoute: AppMessagesRoute,
-  AppSpikeRoute: AppSpikeRoute,
-  AppUsersRoute: AppUsersRoute,
+  AppMessagesRoute: AppMessagesRouteWithChildren,
+  AppSettingsRoute: AppSettingsRouteWithChildren,
+  AppUsersRoute: AppUsersRouteWithChildren,
   AppWorkoutsRoute: AppWorkoutsRouteWithChildren,
   AppIndexRoute: AppIndexRoute,
   AppChallengesChallengeIdRoute: AppChallengesChallengeIdRouteWithChildren,
+  AppChallengesCalendarRoute: AppChallengesCalendarRoute,
   AppChallengesNewRoute: AppChallengesNewRoute,
   AppChallengesIndexRoute: AppChallengesIndexRoute,
 }

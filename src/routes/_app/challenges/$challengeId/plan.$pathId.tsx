@@ -1,22 +1,43 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SpikePage } from "@/features/spike/SpikePage";
+import { z } from "zod";
+import { useChallenge } from "@/features/challenges/useChallenge";
+import { PlannerPage } from "@/features/planner/PlannerPage";
 
-// The plan of one variant. Until the planner of Phase 5 replaces it, this is
-// the Phase 0 test editor: enough to put workouts into days.
+const searchSchema = z.object({
+	/** The week shown on a phone. */
+	week: z.coerce.number().int().min(1).optional().catch(undefined),
+});
+
 export const Route = createFileRoute(
 	"/_app/challenges/$challengeId/plan/$pathId",
 )({
+	validateSearch: (search) => searchSchema.parse(search),
 	component: PlanRoute,
 });
 
 function PlanRoute() {
 	const { challengeId, pathId } = Route.useParams();
+	const { week } = Route.useSearch();
+	const navigate = Route.useNavigate();
+	const challenge = useChallenge(challengeId);
+	if (!challenge) return null;
 	return (
-		<SpikePage
-			key={`${challengeId}:${pathId}`}
-			challengeId={challengeId}
-			initialPathId={pathId}
-			embedded
+		<PlannerPage
+			challenge={challenge}
+			pathId={pathId}
+			week={week ?? 1}
+			onWeekChange={(next) =>
+				navigate({ search: { week: next }, replace: true })
+			}
+			onOpenWorkout={(workoutId) =>
+				navigate({ to: "/workouts/$workoutId", params: { workoutId } })
+			}
+			onOpenPlan={(nextChallengeId, nextPathId) =>
+				navigate({
+					to: "/challenges/$challengeId/plan/$pathId",
+					params: { challengeId: nextChallengeId, pathId: nextPathId },
+				})
+			}
 		/>
 	);
 }

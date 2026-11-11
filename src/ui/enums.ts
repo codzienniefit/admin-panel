@@ -1,5 +1,6 @@
 import type { ContentStatus } from "@/data/schemas/challenge";
-import { type Tone, toneForId } from "./tones";
+import type { PrepStatus } from "@/data/schemas/planning";
+import { TONES, type Tone, toneForId } from "./tones";
 
 // How each enum value is shown: one label and one tone, decided here and
 // nowhere else. A component that needs to show a status, a training type or
@@ -12,6 +13,8 @@ import { type Tone, toneForId } from "./tones";
 export interface EnumMeta {
 	label: string;
 	tone: Tone;
+	/** Set for training types that have one in the planner's settings. */
+	emoji?: string;
 }
 
 export const STATUS_META: Record<ContentStatus, EnumMeta> = {
@@ -19,6 +22,13 @@ export const STATUS_META: Record<ContentStatus, EnumMeta> = {
 	published: { label: "Opublikowane", tone: "green" },
 	hidden: { label: "Ukryte", tone: "grey" },
 	deleted: { label: "Usunięte", tone: "red" },
+};
+
+/** How far the preparation of a variant is; the colours of Patryk's planner. */
+export const PREP_TONES: Record<PrepStatus, Tone> = {
+	not_started: "red",
+	in_progress: "amber",
+	ready: "green",
 };
 
 // Colours match the defaults in Patryk's planner app.
@@ -38,6 +48,25 @@ const LEVELS: Record<string, EnumMeta> = {
 };
 
 const trainingTypeLabels = new Map<string, string>();
+const trainingTypeStyles = new Map<string, { tone: Tone; emoji: string }>();
+
+/**
+ * Takes training-type colours and emoji from the planner's settings. Called
+ * when the panel loads; the settings page reloads the panel after a change,
+ * because every screen that shows a training type depends on this.
+ */
+export function applyTypeStyles(
+	styles: Readonly<Record<string, { tone: string; emoji?: string }>>,
+): void {
+	trainingTypeStyles.clear();
+	for (const [id, style] of Object.entries(styles)) {
+		if (!(TONES as readonly string[]).includes(style.tone)) continue;
+		trainingTypeStyles.set(id, {
+			tone: style.tone as Tone,
+			emoji: style.emoji ?? "",
+		});
+	}
+}
 const levelLabels = new Map<string, string>();
 
 interface LabelSource {
@@ -71,8 +100,13 @@ function meta(
 	};
 }
 
-export const trainingTypeMeta = (id: string): EnumMeta =>
-	meta(id, TRAINING_TYPES, trainingTypeLabels);
+export function trainingTypeMeta(id: string): EnumMeta {
+	const base = meta(id, TRAINING_TYPES, trainingTypeLabels);
+	const style = trainingTypeStyles.get(id);
+	return style
+		? { ...base, tone: style.tone, emoji: style.emoji || undefined }
+		: base;
+}
 
 export const levelMeta = (id: string): EnumMeta =>
 	meta(id, LEVELS, levelLabels);

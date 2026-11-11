@@ -8,6 +8,7 @@ import {
 	createWorkout,
 	workoutSaver,
 	workoutsCollection,
+	workoutTarget,
 } from "@/data/collections/workouts";
 import type { ContentStatus } from "@/data/schemas/challenge";
 import {
@@ -16,26 +17,34 @@ import {
 	type Workout,
 } from "@/data/schemas/workout";
 import { formatDateTime } from "@/domain/dates";
-import { deepEqual } from "@/domain/rebase";
 import { challengesUsing } from "@/domain/workoutFilters";
 import { workoutIssues } from "@/domain/workoutRules";
 import { useConfig } from "@/features/config/useConfig";
 import { ContentField } from "@/features/content/ContentField";
 import { MediaField } from "@/features/media/MediaField";
+import { applyChange, previewChange } from "@/features/saving/applyChange";
 import { HeldEditsNotice } from "@/features/saving/HeldEditsNotice";
+import { useJsonPreview } from "@/features/saving/JsonPreview";
+import { useUnsavedGuard } from "@/features/saving/useUnsavedGuard";
 import { Button } from "@/ui/Button";
 import { confirm } from "@/ui/confirm";
-import { DateTimeField } from "@/ui/DateTimeField";
+import { DateTimeField } from "@/ui/DateField";
 import { Dialog } from "@/ui/Dialog";
+import {
+	confirmDiscard,
+	EditorPlaceholder,
+	MoreActions,
+} from "@/ui/EditorParts";
 import { levelMeta, trainingTypeMeta } from "@/ui/enums";
 import { Field, TextField } from "@/ui/Field";
-import { Menu, type MenuAction } from "@/ui/Menu";
+import { generalIssue, IssuesNotice, placeIssues } from "@/ui/formIssues";
+import type { MenuAction } from "@/ui/Menu";
 import { MultiSelect } from "@/ui/MultiSelect";
 import { Notice } from "@/ui/Notice";
 import { Select } from "@/ui/Select";
-import { Skeleton } from "@/ui/Skeleton";
 import { StatusBadge } from "@/ui/StatusBadge";
 import { Switch } from "@/ui/Switch";
+import { attempt, whileBusy } from "@/ui/tasks";
 import { toast } from "@/ui/toast";
 
 /** The fields the form edits. Everything else on a workout passes through. */
@@ -135,25 +144,12 @@ export function WorkoutEditor({
 
 	if (workoutId && !workout) {
 		return (
-			<Dialog
-				open
-				onOpenChange={(open) => !open && onClose()}
-				title={isLoading ? "Wczytywanie…" : "Nie ma takiego treningu"}
-				description={
-					isLoading
-						? undefined
-						: `Trening ${workoutId} nie istnieje albo został usunięty na stałe.`
-				}
-				size="lg"
-			>
-				{isLoading && (
-					<div className="flex flex-col gap-3">
-						<Skeleton className="h-10" />
-						<Skeleton className="h-10" />
-						<Skeleton className="h-24" />
-					</div>
-				)}
-			</Dialog>
+			<EditorPlaceholder
+				loading={isLoading}
+				missingTitle="Nie ma takiego treningu"
+				missingText={`Trening ${workoutId} nie istnieje albo został usunięty na stałe.`}
+				onClose={onClose}
+			/>
 		);
 	}
 
@@ -176,7 +172,7 @@ interface WorkoutFormProps {
 
 function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 	const config = useConfig().workouts;
-	const { data: badges } = useLiveQuery({
+	const { data: badges, isLoading: loadingBadges } = useLiveQuery({
 		query: (q) => q.from({ badge: badgesCollection }),
 	});
 	const { data: challenges } = useLiveQuery({
@@ -187,7 +183,11 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 	const form = useForm<FormValues>({ defaultValues: pickFields(base) });
 	const { control, register, formState } = form;
 	const [busy, setBusy] = useState(false);
-	const [statusProblem, setStatusProblem] = useState<string | null>(null);
+	const [problems, setProblems] = useState<readonly ApiIssue[]>([]);
+	const leave = useUnsavedGuard(
+		formState.isDirty,
+		"Zmiany w tym treningu nie zostały zapisane.",
+	);
 
 	const status: ContentStatus = workout?.status ?? "draft";
 	const isDeleted = status === "deleted";
@@ -199,80 +199,83 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 	const minMinutes = Math.round(config.duration.fromSeconds / 60);
 	const maxMinutes = Math.round(config.duration.toSeconds / 60);
 
-	const showIssues = (issues: readonly ApiIssue[]) => {
-		setStatusProblem(null);
-		for (const issue of issues) {
-			if (FIELDS.includes(issue.path as keyof FormValues)) {
-				form.setError(issue.path as keyof FormValues, {
-					message: issue.message,
-				});
-			} else {
-				setStatusProblem(issue.message);
-			}
-		}
-	};
+	const showIssues = (issues: readonly ApiIssue[]) =>
+		setProblems(placeIssues(form, FIELDS, issues));
 
 	/** Saves the form's fields together with a status. */
 	const save = async (nextStatus: ContentStatus) => {
 		form.clearErrors();
-		setStatusProblem(null);
+		setProblems([]);
 		const values = normalise(form.getValues());
 		const candidate: NewWorkout = { ...base, ...values, status: nextStatus };
+		// Until the badge list has arrived the badge is not checked here (every
+		// badge would look unknown); the server checks it either way.
+		const rules = (item: NewWorkout) =>
+			workoutIssues(item, config, loadingBadges ? {} : { badgeIds });
 
-		// The same rules the server applies, checked first so that problems
-		// show next to their fields without a round trip.
-		const issues = workoutIssues(candidate, config, { badgeIds });
-		if (issues.length > 0) {
-			showIssues(issues);
+		if (!workout) {
+			// The same rules the server applies, checked first so that problems
+			// show next to their fields without a round trip.
+			const issues = rules(candidate);
+			if (issues.length > 0) {
+				showIssues(issues);
+				return;
+			}
+			const created = await whileBusy(setBusy, () =>
+				attempt(() => createWorkout(candidate)),
+			);
+			if (!created.ok) {
+				// A failed create has nothing to hold on to; say so in place.
+				const { error } = created;
+				showIssues(
+					isApiError(error) && error.kind === "validation"
+						? error.issues
+						: [
+								generalIssue(
+									error instanceof Error
+										? error.message
+										: "Nie udało się zapisać",
+								),
+							],
+				);
+				return;
+			}
+			toast({ title: "Trening utworzony", tone: "green" });
+			leave();
+			onCreated(created.value.id);
 			return;
 		}
 
-		setBusy(true);
-		try {
-			if (!workout) {
-				const created = await createWorkout(candidate);
-				toast({ title: "Trening utworzony", tone: "green" });
-				onCreated(created.id);
-				return;
-			}
-			const current = workoutsCollection.get(workout.id) ?? workout;
-			const changed = [...FIELDS, "status" as const].filter(
-				(field) => !deepEqual(current[field], candidate[field]),
-			);
-			if (changed.length === 0) {
-				onClose();
-				return;
-			}
-			await workoutsCollection
-				.update(workout.id, (draft) => {
-					const target = draft as Record<string, unknown>;
-					for (const field of changed) target[field] = candidate[field];
-				})
-				.when("settled");
-			const merged =
-				workoutSaver.status.get()[workout.id]?.phase === "saved" &&
-				(workoutSaver.status.get()[workout.id] as { mergedWithOthers: boolean })
-					.mergedWithOthers;
+		const applied = await whileBusy(setBusy, () =>
+			attempt(() =>
+				applyChange(
+					workoutTarget,
+					workout,
+					(draft) => {
+						Object.assign(draft, values, { status: nextStatus });
+					},
+					{ issuesOf: rules },
+				),
+			),
+		);
+		// A conflict or a failed save: the saver now holds the edits and
+		// HeldEditsNotice explains what happened.
+		if (!applied.ok) return;
+		if (!applied.value.ok) {
+			showIssues(applied.value.issues);
+			return;
+		}
+		if (applied.value.changed) {
 			toast({
 				title: "Trening zapisany",
-				description: merged ? "Połączono ze zmianami innej osoby." : undefined,
+				description: applied.value.merged
+					? "Połączono ze zmianami innej osoby."
+					: undefined,
 				tone: "green",
 			});
-			onClose();
-		} catch (error) {
-			if (isApiError(error) && error.kind === "validation") {
-				showIssues(error.issues);
-			} else if (!workout) {
-				// A failed create has nothing to hold on to; say so in place.
-				setStatusProblem(
-					error instanceof Error ? error.message : "Nie udało się zapisać",
-				);
-			}
-			// For an existing workout the saver now holds the edits and
-			// HeldEditsNotice explains what happened.
-		} finally {
-			setBusy(false);
 		}
+		leave();
+		onClose();
 	};
 
 	const remove = async () => {
@@ -287,19 +290,26 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 	};
 
 	const requestClose = async () => {
-		if (formState.isDirty && !busy) {
-			const sure = await confirm({
-				title: "Zamknąć bez zapisywania?",
-				description: "Zmiany w tym treningu nie zostały zapisane.",
-				confirmLabel: "Zamknij bez zapisu",
-				destructive: true,
-			});
-			if (!sure) return;
-		}
+		const sure = await confirmDiscard(
+			formState.isDirty && !busy,
+			"Zmiany w tym treningu nie zostały zapisane.",
+		);
+		if (!sure) return;
+		leave();
 		onClose();
 	};
 
-	const more: MenuAction[] = [];
+	// Built the way `save` builds it, so the preview shows what a save sends.
+	const json = useJsonPreview("treningu", () => {
+		const values = normalise(form.getValues());
+		return workout
+			? previewChange(workoutTarget, workout, (draft) => {
+					Object.assign(draft, values);
+				})
+			: { before: undefined, after: { ...base, ...values } };
+	});
+
+	const more: MenuAction[] = [json.action];
 	if (status === "published") {
 		more.push({ label: "Ukryj", onSelect: () => void save("hidden") });
 	}
@@ -323,9 +333,7 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 	return (
 		<Dialog
 			open
-			onOpenChange={(open) => {
-				if (!open) void requestClose();
-			}}
+			onClose={() => void requestClose()}
 			title={workout ? workout.title || "Bez nazwy" : "Nowy trening"}
 			description={
 				workout
@@ -350,17 +358,7 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 					</>
 				) : (
 					<>
-						{more.length > 0 && (
-							<div className="md:mr-auto">
-								<Menu
-									label="Więcej akcji"
-									trigger="Więcej ▾"
-									triggerClassName="h-9 w-full rounded-control border border-line-input px-4 text-sm hover:border-primary md:w-auto"
-									align="start"
-									actions={more}
-								/>
-							</div>
-						)}
+						<MoreActions actions={more} />
 						<Button size="md" onClick={() => void requestClose()}>
 							Anuluj
 						</Button>
@@ -438,11 +436,7 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 						}}
 					/>
 				)}
-				{statusProblem && (
-					<Notice tone="red" role="alert" title="Nie można zapisać">
-						{statusProblem}
-					</Notice>
-				)}
+				<IssuesNotice title="Nie można zapisać" issues={problems} />
 				{isDeleted && (
 					<Notice tone="grey" title="Ten trening jest w koszu">
 						Nie widać go w aplikacji i nie można go edytować. Przywrócenie
@@ -682,6 +676,7 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 					)}
 				/>
 			</div>
+			{json.dialog}
 		</Dialog>
 	);
 }

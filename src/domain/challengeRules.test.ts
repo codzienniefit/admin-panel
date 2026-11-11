@@ -198,7 +198,7 @@ describe("challenge rules", () => {
 						p.days[1]?.workoutIds.push("W99");
 					}),
 				),
-			).toContain("Nieznany workoutId: W99");
+			).toContain("Wariant „Początkujący”, dzień 2: trening W99 nie istnieje");
 		});
 
 		it("refuses day numbers that are not 1, 2, 3…", () => {

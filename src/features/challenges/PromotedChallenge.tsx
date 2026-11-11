@@ -1,11 +1,12 @@
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { isApiError } from "@/data/api/errors";
+import { errorMessage } from "@/data/api/errors";
 import { setPromotedChallenge } from "@/data/config";
 import type { Challenge } from "@/data/schemas/challenge";
 import { useConfig } from "@/features/config/useConfig";
 import { Button } from "@/ui/Button";
 import { Select } from "@/ui/Select";
+import { attempt, whileBusy } from "@/ui/tasks";
 import { toast } from "@/ui/toast";
 
 /**
@@ -28,29 +29,27 @@ export function PromotedChallenge({
 		.map((c) => ({ value: c.id, label: c.title, hint: c.id }));
 
 	const save = async () => {
-		setBusy(true);
-		try {
-			await setPromotedChallenge(choice);
-			// Every screen reads the configuration from the route; reload it.
-			await router.invalidate();
+		const saved = await whileBusy(setBusy, () =>
+			attempt(async () => {
+				await setPromotedChallenge(choice);
+				// Every screen reads the configuration from the route; reload it.
+				await router.invalidate();
+			}),
+		);
+		if (saved.ok) {
 			toast({
 				title: choice
 					? "Promowane wyzwanie zapisane"
 					: "Nic nie jest promowane",
 				tone: "green",
 			});
-		} catch (error) {
-			toast({
-				title: "Nie udało się zapisać",
-				description:
-					isApiError(error) || error instanceof Error
-						? error.message
-						: undefined,
-				tone: "red",
-			});
-		} finally {
-			setBusy(false);
+			return;
 		}
+		toast({
+			title: "Nie udało się zapisać",
+			description: errorMessage(saved.error, "") || undefined,
+			tone: "red",
+		});
 	};
 
 	return (
@@ -64,7 +63,8 @@ export function PromotedChallenge({
 				onChange={setChoice}
 				clearable
 				size="sm"
-				className="min-w-56 flex-1"
+				// Wide enough for a long title, and no wider.
+				className="w-[70ch] max-w-full"
 			/>
 			<Button
 				variant="primary"

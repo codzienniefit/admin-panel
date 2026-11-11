@@ -204,3 +204,7 @@ dist
 
 ### Claude Code ###
 .claude/settings.local.json
+
+### Playwright ###
+e2e/.results/
+e2e/.report/

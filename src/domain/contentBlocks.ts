@@ -7,6 +7,41 @@ import { type ContentBlock, contentBlockSchema } from "@/data/schemas/workout";
  */
 const UNSAFE_SCHEME = /^\s*(?!(?:https?|mailto|tel):)[a-z][a-z0-9+.-]*:/i;
 
+// The two things said about a link's address, worded once: the list of
+// problems under a block and the link panel of the text editor both use them.
+const unsafeAddress = (href: string) =>
+	`Adres linku „${href}” jest niedozwolony. Link musi zaczynać się od https://`;
+const notHttpsAddress = (href: string) =>
+	`Adres linku „${href}” nie zaczyna się od https://`;
+
+/**
+ * What is wrong with an address typed for a new or edited link, or null.
+ * Stricter than the check of stored content on purpose: what is already
+ * saved without a scheme ("x.pl") only earns a warning there, but an address
+ * being typed now has to be one the app can open: http, https, mailto or tel.
+ */
+export function linkAddressProblem(address: string): string | null {
+	const href = address.trim();
+	if (!href) return "Wpisz adres linku";
+	// The address is stored between double quotes inside a tag, with nothing
+	// escaped: these characters would end it early.
+	if (/["<>\s]/.test(href)) {
+		return "Adres nie może zawierać spacji, cudzysłowu ani znaków < i >";
+	}
+	if (UNSAFE_SCHEME.test(href)) return unsafeAddress(href);
+	const scheme = /^(?:https?:\/\/|mailto:|tel:)/i.exec(href)?.[0];
+	if (!scheme) return notHttpsAddress(href);
+	if (scheme.length === href.length) return "Adres linku jest niepełny";
+	return null;
+}
+
+/**
+ * The address the app takes from an opening <a …> tag: whatever comes first
+ * in double quotes, wherever it stands.
+ */
+export const linkAddressIn = (openingTag: string): string =>
+	/"(.+?)"/.exec(openingTag)?.[1] ?? "";
+
 // Rules for "fancy content": the blocks that make up a workout or challenge
 // description and a message body. Pure: no React, no storage.
 //
@@ -131,11 +166,9 @@ function textProblems(text: string): Array<[ContentIssue["severity"], string]> {
 			error("W linku href musi być pierwszym atrybutem");
 		} else if (UNSAFE_SCHEME.test(quoted[1] ?? "")) {
 			// javascript:, data:, file: and the like must never reach the app.
-			error(
-				`Adres linku „${quoted[1]}” jest niedozwolony. Link musi zaczynać się od https://`,
-			);
+			error(unsafeAddress(quoted[1] ?? ""));
 		} else if (!/^https?:\/\//i.test(quoted[1] ?? "")) {
-			warning(`Adres linku „${quoted[1]}” nie zaczyna się od https://`);
+			warning(notHttpsAddress(quoted[1] ?? ""));
 		}
 	}
 
@@ -244,7 +277,7 @@ export function textSegments(content: string): TextSegment[] {
 		if (match[1] !== undefined) {
 			segments.push({ kind: "bold", text: match[1] });
 		} else {
-			const href = /"(.+?)"/.exec(match[2] ?? "")?.[1] ?? "";
+			const href = linkAddressIn(match[2] ?? "");
 			segments.push({ kind: "link", text: match[3] ?? "", href });
 		}
 		last = start + match[0].length;

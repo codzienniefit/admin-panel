@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "@/data/api/errors";
 import { blankChallenge } from "@/data/schemas/challenge";
 import { blankWorkout } from "@/data/schemas/workout";
+import { memoryStorage } from "@/lib/storage";
 import { createStore } from "@/lib/store";
 import { defaultMockControls, type MockControls } from "./controls";
 import { UNKNOWN_FIELD } from "./fixtures";
 import { createMockApi } from "./index";
+import { SNAPSHOT_KEY } from "./persistence";
 
 // The start of the conformance suite: these expectations hold for ANY
 // ApiClient, and will run against the HTTP adapter's read side later.
@@ -348,15 +350,6 @@ describe("media contract", () => {
 });
 
 describe("sample data persistence", () => {
-	function memoryStorage() {
-		const data = new Map<string, string>();
-		return {
-			getItem: (key: string) => data.get(key) ?? null,
-			setItem: (key: string, value: string) => void data.set(key, value),
-			removeItem: (key: string) => void data.delete(key),
-			data,
-		};
-	}
 	const controls = () =>
 		createStore<MockControls>({
 			...defaultMockControls,
@@ -401,7 +394,7 @@ describe("sample data persistence", () => {
 
 	it("starts from the seed when the stored data is unreadable", async () => {
 		const storage = memoryStorage();
-		storage.setItem("cf.mock.v3", "{not json");
+		storage.setItem(SNAPSHOT_KEY, "{not json");
 		const api = open(storage);
 		expect((await api.workouts.list()).length).toBe(150);
 	});

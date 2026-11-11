@@ -1,6 +1,6 @@
 # Architecture
 
-How the panel is built today, 2026-11-10, after Phases 0 to 4. [PLAN.md](PLAN.md) says what is
+How the panel is built today, 2026-11-11, after Phases 0 to 7. [PLAN.md](PLAN.md) says what is
 intended; this says what exists. Where they differ, this document is right about the code.
 
 Related: [CODE-GUIDELINES.md](CODE-GUIDELINES.md), [DEFINITION-OF-DONE.md](DEFINITION-OF-DONE.md),
@@ -9,7 +9,8 @@ Related: [CODE-GUIDELINES.md](CODE-GUIDELINES.md), [DEFINITION-OF-DONE.md](DEFIN
 ## 1. In one paragraph
 
 A single-page React app, served as static files by Cloudflare. Every entity (challenge, workout,
-media file, badge) exists once in the browser, in a TanStack DB collection. Screens read from the
+planning document, message, badge, media file) exists once in the browser, in a TanStack DB
+collection. Screens read from the
 collections with live queries and write by describing a change. One module, the saver, turns every
 change into a save that is merged onto the latest server version. The server is behind one
 interface, `ApiClient`. Today its only implementation is a mock that runs in the browser and makes
@@ -62,7 +63,10 @@ tool (see [RISKS.md](RISKS.md)).
 | Validation | Zod 4 at the boundary |
 | Language | TypeScript 7, strict |
 | Lint and format | Biome 2 |
-| Tests | Vitest 5 |
+| Drag and drop | dnd-kit |
+| Calendar in date fields | react-day-picker, wrapped once in `ui/DateField.tsx` |
+| Bold and links in content text | Tiptap, wrapped once in `features/content/RichTextEditor.tsx`; loaded only on screens with a content editor |
+| Tests | Vitest 5 for logic, Playwright for the browser ([TESTING.md](TESTING.md)) |
 
 Why these: [STACK-OPTIONS.md](STACK-OPTIONS.md).
 
@@ -97,9 +101,26 @@ screen ──────► useLiveQuery(collection)        screen ──► co
 write to the collection only on save. They send only the fields that differ, so a form open for an
 hour does not overwrite a colleague's change to another field.
 
-**Autosaving editors** (the plan editor) write each edit to the collection through paced mutations
-(`createPacedMutations` with a 1.2 s debounce). Undo and redo are inverse operations
-(`domain/schedule.ts`), not snapshots.
+**One helper for explicit saves.** `features/saving/applyChange.ts` is the path every screen takes
+when a save is a deliberate click: it copies the entity, applies the change, runs the entity's rule
+function, saves only the fields that differ, and returns "saved" or the list of problems.
+Challenges, planning documents, settings, messages and badges all go through it.
+
+**The planner** (`features/planner/`) edits two documents of one challenge: the schedule (part of
+the challenge) and the planning document (notes, colours, scratchpad). Every edit is a small
+reversible operation (`domain/schedule.ts`, `domain/plannerOps.ts`); one user action is a list of
+them, applied together and undone together. Undo and redo are inverse operations, not snapshots.
+
+How a planner edit is saved depends on who can see it:
+
+| What changed | Saved |
+|---|---|
+| Planning data (never public) | paced mutation, 1.2 s after the last change |
+| Schedule of a draft | the same |
+| Schedule of a published or hidden challenge | staged in an open transaction; committed by "Zapisz zmiany" after a confirmation, rolled back by "Odrzuć zmiany" |
+
+**Collections are built one way.** `data/collections/versioned.ts` makes the collection, its saver
+and its change target for any entity that is saved with an etag.
 
 ## 5. Fields the panel does not know
 
@@ -115,8 +136,8 @@ Backend scope B2.10 ("an omitted field means keep") is the second line of defenc
 
 ## 6. Rules: one function per entity
 
-`workoutIssues`, `challengeIssues` and `contentIssues` in `domain/` return a list of
-`{ path, message }`. The same function is called by:
+`workoutIssues`, `challengeIssues`, `contentIssues`, `messageIssues`, `badgeIssues`,
+`planningIssues` and `plannerSettingsIssues` in `domain/` return a list of `{ path, message }`. The same function is called by:
 
 - the form, to put messages next to fields;
 - the status actions, to refuse publishing with reasons;
@@ -130,7 +151,8 @@ Statuses are `draft`, `published`, `hidden`, `deleted`. A draft needs only a nam
 
 ## 7. The server boundary
 
-`data/api/types.ts` defines `ApiClient`: config, challenges, workouts, media, badges. Errors are
+`data/api/types.ts` defines `ApiClient`: config, challenges, workouts, media, badges, planning,
+settings, messages, users. Errors are
 `ApiError` with a `kind`: validation, conflict, unauthorized, forbidden, notFound, network, server.
 
 `data/environment.ts` picks the implementation at start-up from the environment selector:
@@ -140,12 +162,21 @@ Statuses are `draft`, `published`, `hidden`, `deleted`. A draft needs only a nam
 | Test | mock, in the browser | mock, two made-up people | available |
 | Produkcja | HTTP adapter | Firebase | listed, not available yet |
 
-The mock (`data/api/mock/`) implements the **target** contract, including statuses, etags and
+The mock (`data/api/mock/`) is a small core (`kernel.ts`: clock, latency, forced failure and
+conflict, etags, persistence) with one module per area on top of it. It implements the **target**
+contract, including statuses, etags and
 conflicts the real backend does not have yet. It can be told to be slow, to fail the next save, or
 to make the next save meet someone else's change (account menu → "Dane testowe…"). Its data is
 generated from a fixed seed and kept in `localStorage`.
 
 Nothing outside `data/api/` knows which implementation is running.
+
+**Users are the exception to "one collection per entity".** They are personal data, so there is no
+collection of all users. A search and the accounts that were opened live in the query cache
+(`data/collections/users.ts`): in memory only, dropped a few minutes after the screen is left.
+
+**Sending a message is not a save.** It is its own request, tied to the version on screen by its
+etag and never merged or retried (`data/collections/messages.ts`, `features/messages/messageActions.ts`).
 
 ## 8. Sign-in
 
@@ -169,12 +200,16 @@ Everything that can be looked at has an address that can be sent to a colleague.
 | `/challenges/new` | new challenge |
 | `/challenges/$challengeId` | challenge, Przegląd tab |
 | `/challenges/$challengeId/content` | challenge, Treść tab |
-| `/challenges/$challengeId/plan/$pathId` | plan of one variant |
+| `/challenges/$challengeId/requirements` | challenge, Wymagania tab |
+| `/challenges/$challengeId/plan/$pathId?week=` | the planner for one variant |
+| `/challenges/calendar?view=&y=&m=` | challenge calendar, month or year |
+| `/settings/plan-types`, `/training-types`, `/folders` | planner settings |
 | `/workouts?…`, `/workouts/$workoutId`, `/workouts/new` | workout list; editor over the list |
 | `/media` | media library |
-| `/messages`, `/badges`, `/users` | placeholders until Phase 7 |
+| `/messages?…`, `/messages/new`, `/messages/$messageId` | messages |
+| `/badges?…`, `/badges/new`, `/badges/$badgeId` | badges |
+| `/users?q=`, `/users/$uid?tab=` | user lookup |
 | `/design` | every shared component in every state |
-| `/spike` | the Phase 0 plan editor with its test controls |
 | `/login`, `/forbidden` | sign-in and "no access" |
 
 Search parameters are validated with Zod; an unknown value is dropped, not an error.
@@ -188,7 +223,8 @@ Search parameters are validated with Zod; an unknown value is dropped, not an er
 | What is being typed in a form | React Hook Form |
 | Dialog open, hover, selection | `useState` in the component |
 | Toasts, the confirm dialog, save status, held edits, mock controls | small stores (`lib/store.ts`), read with `useStore` |
-| Environment, demo user, sample data | `localStorage` |
+| Planner: undo and redo, staged schedules, the copied workout | stores in `features/planner/plannerSession.ts` |
+| Environment, demo user, sample data, recently opened plans | `localStorage` |
 
 There is no global app store and no context for data.
 
@@ -196,13 +232,28 @@ There is no global app store and no context for data.
 
 Tokens (colours, radii, shadows) are Tailwind `@theme` values in `styles/app.css`, taken from
 Patryk's app. Ten tones are applied with `data-tone` and three CSS variables. `ui/enums.ts` is the
-only place that decides the label and tone of a status, training type or level, so the same thing
-has the same colour everywhere. `/design` shows every component; visual changes are checked there
+only place that decides the label and tone of a status, training type, level or preparation status,
+so the same thing has the same colour everywhere. Training-type colours and emoji come from the
+planner's settings and are applied when the panel loads; changing them reloads the panel.
+
+A second, separate palette of twelve colours (`domain/palette.ts`) is what people pick for a
+challenge on the calendar, a day and a workout card. It comes from Patryk's app. `/design` shows every component; visual changes are checked there
 first.
+
+## 11a. Shared screen pieces
+
+Screens are assembled from the same parts, listed with their jobs in
+[CODE-GUIDELINES.md §6](CODE-GUIDELINES.md): a list frame (`ListPage`), editor parts
+(`EditorParts`), problems next to fields or in a notice (`formIssues`), tabs, facts, the segmented
+switch, the popover. Two hooks belong with them: `useUnsavedGuard` (asks before unsaved input is
+lost by leaving) and `useDragSensors` (how a drag starts). `ui/tasks.ts` keeps `try` out of
+components, because the React Compiler does not compile a component that contains one.
 
 ## 12. Errors and loading
 
-- Loading shows skeletons, after a short delay so fast loads do not flash.
+- Loading is one spinner in the middle of the page, in the logo's colours, fading in and out
+  (`ui/Loading.tsx`); it appears after a short delay so fast loads do not flash. No placeholder
+  blocks.
 - A failed load shows `ErrorScreen`: a plain message, with the technical detail in small type.
   It is the router's default error component, so no raw error reaches the screen.
 - A failed save never loses input (section 4).
@@ -217,8 +268,7 @@ Forwarding to the backend and the two endpoints that need a secret arrive in sta
 
 | Thing | When |
 |---|---|
-| Planner: drag and drop, notes, scratchpad | Phase 5 |
-| Requirements, plan types, calendar, folders | Phase 6 |
-| Messages, badges, users | Phase 7 |
 | Firebase sign-in, HTTP adapter, Worker forwarding | stage 2, [ROADMAP.md](ROADMAP.md) |
-| Browser tests (Playwright) | not set up; see [RISKS.md](RISKS.md) |
+| AI descriptions, YouTube lookups, import of Patryk's local plans | stage 2, last slices |
+| Recording status and format on workouts, admins page | need the backend first |
+| Continuous integration | not set up; see [RISKS.md](RISKS.md). Browser tests exist: [TESTING.md](TESTING.md) |

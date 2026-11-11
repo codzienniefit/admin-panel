@@ -212,7 +212,10 @@ export function challengeIssues(
 			}
 			for (const id of day.workoutIds) {
 				if (!context.workoutStatus.has(id)) {
-					add(where, `Nieznany workoutId: ${id}`);
+					add(
+						where,
+						`Wariant ${variant}, dzień ${day.dayIndex}: trening ${id} nie istnieje`,
+					);
 				}
 			}
 		});

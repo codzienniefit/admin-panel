@@ -1,10 +1,9 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { mediaUrl } from "@/data/collections/media";
 import type { ContentBlock } from "@/data/schemas/workout";
 import {
 	BLOCK_LABELS,
 	type BlockType,
-	blocksToJson,
 	type ContentIssue,
 	contentIssues,
 	DEFAULT_TITLE_MAX,
@@ -13,18 +12,35 @@ import {
 	parseContentJson,
 	textToBlocks,
 } from "@/domain/contentBlocks";
+import { deepEqual } from "@/domain/rebase";
 import { plural } from "@/domain/text";
-import { MediaPicker } from "@/features/media/MediaPicker";
+import { MediaSlot } from "@/features/media/MediaSlot";
 import { Button } from "@/ui/Button";
 import { confirm } from "@/ui/confirm";
+import { JsonView } from "@/ui/JsonView";
+import { Segmented } from "@/ui/Segmented";
 import { toast } from "@/ui/toast";
+import { blockField as field } from "./blockField";
 import { ContentPreview } from "./ContentPreview";
+import { PhoneFrame } from "./PhoneFrame";
+import { RichTextEditor } from "./RichTextEditor";
 
 // The editor for "fancy content": descriptions of workouts and challenges,
-// and message bodies. Every block is an open editor; a preview shows what the
-// app will draw; a panel lists what is wrong and jumps to it. Text prepared
-// elsewhere can be pasted and turned into blocks, and so can the JSON the old
-// panel used.
+// and message bodies. It is one container that sits inside the form it
+// belongs to (ContentField puts it there): no window of its own, and no
+// "accept" step, so every change is the form's change at once and the form's
+// own save and "unsaved changes" question cover it.
+//
+// Inside: the blocks, each an open editor, with the buttons that add one;
+// a preview of what the app will draw, or of the JSON that will be saved;
+// and a list of what is wrong that jumps to the block. Text prepared
+// elsewhere (or JSON from the old panel) can be pasted and turned into
+// blocks, from a panel that stays folded away until asked for.
+//
+// Where the container is wide, blocks and preview sit side by side; where it
+// is narrow (a dialog, a phone) one of them shows at a time. That is decided
+// by the container's own width, not the window's, because the same editor
+// lives in a narrow dialog and on a wide page.
 
 /** A block plus an id that exists only while editing (for keys and focus). */
 interface Row {
@@ -37,50 +53,96 @@ const toRows = (blocks: readonly ContentBlock[]): Row[] =>
 	blocks.map((block) => ({ key: `row-${nextKey++}`, block }));
 
 interface ContentEditorProps {
+	/** Names the editor for screen readers: the field's label, e.g. "Opis". */
+	label: string;
 	value: readonly ContentBlock[];
+	/** Called with the whole list on every change, as it is typed. */
 	onChange: (blocks: ContentBlock[]) => void;
-	/** Media folder the image picker opens in. */
+	/** Media folder image blocks pick from and upload to. */
 	imageFolderId: string;
+	/** Id of the container, so the field's label has something to point at. */
+	id?: string;
+	/**
+	 * Nothing can be changed; the preview and the JSON still work. The blocks
+	 * stay where they are, locked, so a form that disables its fields for the
+	 * moment of saving does not make the editor jump.
+	 */
+	disabled?: boolean;
 }
 
-type Pane = "blocks" | "preview" | "source";
+type Pane = "blocks" | "preview";
 
 const PANES: Array<{ id: Pane; label: string }> = [
 	{ id: "blocks", label: "Bloki" },
 	{ id: "preview", label: "Podgląd" },
-	{ id: "source", label: "Wklej" },
 ];
 
-const panel = "min-w-0 rounded-card border border-line bg-surface";
-const panelHead =
-	"flex items-center gap-3 border-line border-b px-4 py-3 text-sm font-semibold";
-const field =
-	"w-full rounded-control border border-transparent bg-bg px-3 text-sm outline-none transition-colors placeholder:text-muted hover:border-line-input focus:border-primary focus:bg-surface focus:shadow-focus any-pointer-coarse:text-base";
+/** The preview as the app draws it, or as it is stored. */
+type PreviewKind = "look" | "json";
+
+const PREVIEW_KINDS: Array<{ value: PreviewKind; label: string }> = [
+	{ value: "look", label: "Wygląd" },
+	{ value: "json", label: "JSON" },
+];
+
+// One height for both, so the two titles sit on the same line whatever is
+// beside them.
+const paneHead =
+	"h-12 items-center gap-3 border-line border-b px-3 text-sm font-semibold";
 
 export function ContentEditor({
+	label,
 	value,
 	onChange,
 	imageFolderId,
+	id,
+	disabled = false,
 }: ContentEditorProps) {
-	// Rows are created once from the incoming blocks; after that the editor
-	// owns them and reports every change upwards.
+	// The editor owns its rows and reports every change upwards. The rows are
+	// not rebuilt from what comes back down: their keys must stay the same
+	// while someone types, or every keystroke would remount the block and
+	// drop the cursor.
 	const [rows, setRowsState] = useState<Row[]>(() => toRows(value));
 	const [selectedKey, setSelectedKey] = useState<string | null>(
 		() => rows[0]?.key ?? null,
 	);
-	const [pane, setPane] = useState<Pane>("blocks");
+	// The value the rows were last known to match. A different one that also
+	// says something else did not come from here (the form was reset, or took
+	// a colleague's change): then the rows start again from it.
+	const [inStep, setInStep] = useState(value);
+	if (value !== inStep) {
+		setInStep(value);
+		if (
+			!deepEqual(
+				value,
+				rows.map((row) => row.block),
+			)
+		) {
+			const fresh = toRows(value);
+			setRowsState(fresh);
+			setSelectedKey(fresh[0]?.key ?? null);
+		}
+	}
+	// Read-only content is there to be looked at, so it opens on the preview.
+	const [pane, setPane] = useState<Pane>(disabled ? "preview" : "blocks");
 	const [source, setSource] = useState("");
 	const [titleMax, setTitleMax] = useState(DEFAULT_TITLE_MAX);
-	const [pickerFor, setPickerFor] = useState<string | null>(null);
+	const [pasteOpen, setPasteOpen] = useState(false);
+	const [previewKind, setPreviewKind] = useState<PreviewKind>("look");
 	const [dragKey, setDragKey] = useState<string | null>(null);
 	const [dropAt, setDropAt] = useState<{ key: string; before: boolean } | null>(
 		null,
 	);
 	const elements = useRef(new Map<string, HTMLElement>());
+	const sourceBox = useRef<HTMLTextAreaElement>(null);
+	const pasteToggleId = useId();
+	const pastePanelId = useId();
 
 	const setRows = (next: Row[]) => {
+		const reported = next.map((row) => row.block);
 		setRowsState(next);
-		onChange(next.map((row) => row.block));
+		setInStep(reported);
+		onChange(reported);
 	};
 
 	const blocks = rows.map((row) => row.block);
@@ -103,7 +165,11 @@ export function ContentEditor({
 			const element = elements.current.get(key);
 			element?.scrollIntoView({ block: "center", behavior: "smooth" });
 			element
-				?.querySelector<HTMLElement>("input, textarea, button[data-primary]")
+				// Not the hidden file chooser of an image block: it cannot be focused.
+				// A text block's field is not an input but an editable element.
+				?.querySelector<HTMLElement>(
+					"input:not([type='file']), textarea, [contenteditable='true'], button[data-primary]",
+				)
 				?.focus();
 		}, 0);
 	};
@@ -211,6 +277,7 @@ export function ContentEditor({
 		const next = mode === "replace" ? added : [...rows, ...added];
 		setRows(next);
 		setSource("");
+		setPasteOpen(false);
 		toast({
 			title:
 				mode === "replace"
@@ -222,164 +289,75 @@ export function ContentEditor({
 		if (target) focusRow(target.key);
 	};
 
-	const copyJson = async () => {
-		try {
-			await navigator.clipboard.writeText(blocksToJson(blocks));
-			toast({ title: "Skopiowano JSON", tone: "green" });
-		} catch {
-			toast({ title: "Nie udało się skopiować", tone: "red" });
-		}
+	const showPaste = () => {
+		setPasteOpen(true);
+		// Once the panel is on screen: typing or Ctrl+V is the next thing done.
+		setTimeout(() => sourceBox.current?.focus(), 0);
 	};
 
-	const hiddenUnless = (id: Pane) => (pane === id ? "" : "hidden lg:block");
+	const hidePaste = () => {
+		setPasteOpen(false);
+		// The button that hid the panel is gone with it; the keyboard goes back
+		// to the one that opens it.
+		document.getElementById(pasteToggleId)?.focus();
+	};
+
+	const hiddenUnless = (which: Pane) =>
+		pane === which ? "" : "hidden @4xl:block";
 
 	return (
-		<div className="flex flex-col gap-4">
-			{/* Narrow screens show one pane at a time. */}
-			<div className="flex gap-1 rounded-control bg-hover p-1 lg:hidden">
-				{PANES.map((item) => (
-					<button
-						key={item.id}
-						type="button"
-						aria-pressed={pane === item.id}
-						onClick={() => setPane(item.id)}
-						className={`flex-1 rounded-chip px-3 py-1.5 text-sm ${pane === item.id ? "bg-surface font-semibold shadow-sm" : "text-subtle"}`}
-					>
-						{item.label}
-						{item.id === "blocks" && errorCount > 0 && (
-							<span className="ml-1.5 text-danger">({errorCount})</span>
-						)}
-					</button>
-				))}
+		// biome-ignore lint/a11y/useSemanticElements: a fieldset would add a legend and its own layout; the group only gives the editor its name
+		<div
+			id={id}
+			role="group"
+			aria-label={label}
+			// The editor sits inside a form now, and Enter in a one-line input
+			// would submit it: a title typed, Enter pressed, the workout saved.
+			onKeyDown={(event) => {
+				if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+					event.preventDefault();
+				}
+			}}
+			className="@container min-w-0 rounded-control border border-line bg-surface"
+		>
+			{/* A narrow container shows one pane at a time. */}
+			<div className="border-line border-b p-2 @4xl:hidden">
+				<Segmented
+					label="Część edytora"
+					stretch
+					options={PANES.map((item) => ({
+						value: item.id,
+						label: (
+							<>
+								{item.label}
+								{item.id === "blocks" && errorCount > 0 && (
+									<span className="ml-1.5 text-danger">({errorCount})</span>
+								)}
+							</>
+						),
+					}))}
+					value={pane}
+					onChange={setPane}
+				/>
 			</div>
 
-			<div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(260px,340px)_minmax(0,1fr)_400px]">
-				{/* 1. Paste text or JSON */}
-				<section
-					aria-label="Wklej tekst"
-					className={`${panel} ${hiddenUnless("source")} lg:col-span-2 2xl:col-span-1`}
-				>
-					<div className={panelHead}>
-						Wklej tekst
-						<span className="ml-auto text-xs font-normal text-muted">
-							zamienimy go na bloki
-						</span>
-					</div>
-					<div className="flex flex-col gap-3 p-4">
-						<textarea
-							aria-label="Tekst źródłowy"
-							value={source}
-							onChange={(event) => setSource(event.target.value)}
-							placeholder="Wklej tutaj gotowy tekst. Pusta linia oddziela bloki. Można też wkleić JSON ze starego panelu."
-							className={`${field} min-h-40 resize-y py-2 leading-relaxed 2xl:min-h-80`}
-						/>
-						{!asJson && (
-							<label className="flex flex-wrap items-center gap-2 text-xs text-subtle">
-								Tytuł: linia do
-								<input
-									type="number"
-									min={1}
-									max={200}
-									value={titleMax}
-									onChange={(event) =>
-										setTitleMax(
-											Math.max(1, Number.parseInt(event.target.value, 10) || 1),
-										)
-									}
-									style={{ width: "4.5rem" }}
-									className={`${field} h-8 text-center`}
-								/>
-								znaków
-							</label>
-						)}
-						<div className="flex flex-wrap gap-1.5 text-xs text-subtle">
-							{asJson && !asJson.ok ? (
-								<span role="alert" className="text-danger">
-									{asJson.problem}
-								</span>
-							) : incoming.length === 0 ? (
-								<span className="rounded-full border border-line px-2.5 py-0.5">
-									nic do zamiany
-								</span>
-							) : asJson ? (
-								<span className="rounded-full border border-line px-2.5 py-0.5">
-									JSON:{" "}
-									<b className="text-ink">
-										{plural(incoming.length, "blok", "bloki", "bloków")}
-									</b>
-								</span>
-							) : (
-								<>
-									<span className="rounded-full border border-line px-2.5 py-0.5">
-										<b className="text-primary">
-											{plural(incomingTitles, "tytuł", "tytuły", "tytułów")}
-										</b>
-									</span>
-									<span className="rounded-full border border-line px-2.5 py-0.5">
-										<b className="text-ink">
-											{plural(
-												incoming.length - incomingTitles,
-												"tekst",
-												"teksty",
-												"tekstów",
-											)}
-										</b>
-									</span>
-								</>
-							)}
-						</div>
-						<div className="flex flex-wrap gap-2">
-							<Button
-								variant="primary"
-								className="flex-1"
-								disabled={incoming.length === 0}
-								onClick={() => void applyIncoming("replace")}
-							>
-								Utwórz bloki
-							</Button>
-							<Button
-								className="flex-1"
-								disabled={incoming.length === 0}
-								onClick={() => void applyIncoming("append")}
-							>
-								Dopisz na końcu
-							</Button>
-						</div>
-						<p className="text-xs text-muted">
-							Bloki oddzielasz pustą linią. Jednolinijkowy akapit do podanej
-							liczby znaków staje się tytułem, pozostałe blokami tekstu.
-							Pojedynczy enter zostaje w tekście, a tagi <code>&lt;b&gt;</code>{" "}
-							i <code>&lt;a&gt;</code> zostają.
-						</p>
-						<div className="border-line border-t pt-3">
-							<Button
-								variant="ghost"
-								disabled={rows.length === 0}
-								onClick={() => void copyJson()}
-							>
-								Skopiuj obecną treść jako JSON
-							</Button>
-						</div>
-					</div>
-				</section>
-
-				{/* 2. Blocks */}
+			<div className="grid @4xl:grid-cols-2">
+				{/* 1. Blocks */}
 				<section
 					aria-label="Bloki"
-					className={`${panel} ${hiddenUnless("blocks")}`}
+					className={`min-w-0 ${hiddenUnless("blocks")}`}
 				>
-					<div className={panelHead}>
+					<div className={`hidden @4xl:flex ${paneHead}`}>
 						Bloki
 						<span className="ml-auto text-xs font-normal text-muted">
 							zmiany widać od razu w podglądzie
 						</span>
 					</div>
-					<div className="flex flex-col gap-3 p-4">
-						{rows.length === 0 && (
-							<div className="rounded-control border border-line-input border-dashed p-5 text-center text-sm text-muted">
-								Brak bloków. Dodaj pierwszy poniżej albo wklej gotowy tekst.
-							</div>
-						)}
+					{/* One switch locks every control inside, the browser's own way. */}
+					<fieldset
+						disabled={disabled}
+						className="flex min-w-0 flex-col gap-3 p-3"
+					>
 						{rows.map((row, index) => {
 							const rowIssues = issuesByIndex.get(index) ?? [];
 							const hasError = rowIssues.some((i) => i.severity === "error");
@@ -433,8 +411,9 @@ export function ContentEditor({
 										{/* biome-ignore lint/a11y/useSemanticElements: a draggable handle; a real button cannot be dragged in every browser */}
 										<span
 											role="button"
-											tabIndex={0}
-											draggable
+											tabIndex={disabled ? -1 : 0}
+											draggable={!disabled}
+											aria-disabled={disabled || undefined}
 											aria-label={`Przenieś blok ${index + 1}. Alt i strzałki zmieniają kolejność`}
 											onDragStart={(event) => {
 												setDragKey(row.key);
@@ -446,7 +425,7 @@ export function ContentEditor({
 												setDropAt(null);
 											}}
 											onKeyDown={(event) => {
-												if (!event.altKey) return;
+												if (!event.altKey || disabled) return;
 												if (event.key === "ArrowUp") {
 													event.preventDefault();
 													move(index, index - 1);
@@ -459,6 +438,10 @@ export function ContentEditor({
 											className="cursor-grab rounded-chip px-1 text-base leading-none tracking-[-2px] text-muted select-none hover:text-ink active:cursor-grabbing"
 										>
 											⋮⋮
+										</span>
+										{/* The number first: it is what the problems list refers to. */}
+										<span className="w-4 text-center text-xs font-semibold text-muted tabular-nums">
+											{index + 1}
 										</span>
 										{type === "Title" || type === "Text" ? (
 											<div className="inline-flex overflow-hidden rounded-chip border border-line-input">
@@ -481,9 +464,6 @@ export function ContentEditor({
 												{BLOCK_LABELS[type as BlockType] ?? type}
 											</span>
 										)}
-										<span className="text-[11px] font-semibold text-muted">
-											{index + 1}
-										</span>
 										<div className="ml-auto flex gap-0.5">
 											{(
 												[
@@ -535,45 +515,32 @@ export function ContentEditor({
 									)}
 
 									{type === "Text" && (
-										<TextBlockEditor
+										<RichTextEditor
 											index={index}
 											value={row.block.content}
 											onChange={(content) =>
 												update(row.key, (block) => ({ ...block, content }))
 											}
+											disabled={disabled}
 										/>
 									)}
 
 									{type === "Image" && (
-										<div className="flex flex-wrap items-center gap-3">
-											{row.block.metadata?.imageRelativePath ? (
-												<img
-													src={mediaUrl(row.block.metadata.imageRelativePath)}
-													alt=""
-													className="h-24 w-36 rounded-control border border-line object-cover"
-												/>
-											) : (
-												<div className="flex h-24 w-36 items-center justify-center rounded-control border border-line-input border-dashed text-xs text-muted">
-													brak zdjęcia
-												</div>
-											)}
-											<div className="flex min-w-0 flex-1 flex-col gap-2">
-												<span className="truncate font-mono text-xs text-subtle">
-													{row.block.metadata?.imageRelativePath ||
-														"nie wybrano"}
-												</span>
-												<div>
-													<Button
-														data-primary
-														onClick={() => setPickerFor(row.key)}
-													>
-														{row.block.metadata?.imageRelativePath
-															? "Zmień obraz"
-															: "Wybierz lub dodaj obraz"}
-													</Button>
-												</div>
-											</div>
-										</div>
+										<MediaSlot
+											label={`Obraz, blok ${index + 1}`}
+											kind="image"
+											folderId={imageFolderId}
+											disabled={disabled}
+											value={row.block.metadata?.imageRelativePath || null}
+											onChange={(path) => {
+												if (path) pickImage(row.key, path);
+											}}
+											thumbnailClassName="h-24 w-36"
+											// A block without a picture is an error; the way to
+											// drop the picture is to remove the block.
+											clearable={false}
+											primary
+										/>
 									)}
 
 									{rowIssues.length > 0 && (
@@ -597,14 +564,28 @@ export function ContentEditor({
 							);
 						})}
 
-						<div className="flex flex-col gap-2 rounded-control border border-line-input border-dashed p-2.5">
-							<span className="text-[11px] font-semibold tracking-wider text-muted uppercase">
-								Dodaj blok
-							</span>
+						{/* How content is made: one block at a time. With no blocks yet
+						    this box is also the empty state, so its buttons stand out. */}
+						<div
+							className={`flex flex-col gap-2 rounded-control border border-line-input border-dashed ${rows.length === 0 ? "p-5" : "p-2.5"}`}
+						>
+							{rows.length === 0 ? (
+								<p className="text-center text-sm text-subtle">
+									<b className="block font-semibold text-ink">
+										Treść jest pusta
+									</b>
+									Zacznij od pierwszego bloku: tytułu, tekstu albo obrazu.
+								</p>
+							) : (
+								<span className="text-[11px] font-semibold tracking-wider text-muted uppercase">
+									Dodaj blok
+								</span>
+							)}
 							<div className="flex flex-wrap gap-1.5">
 								{(["Title", "Text", "Image"] as const).map((type) => (
 									<Button
 										key={type}
+										variant={rows.length === 0 ? "primary" : "secondary"}
 										className="min-w-20 flex-1"
 										onClick={() => add(type)}
 									>
@@ -612,37 +593,201 @@ export function ContentEditor({
 									</Button>
 								))}
 							</div>
+							<div className={rows.length === 0 ? "text-center" : ""}>
+								<Button
+									id={pasteToggleId}
+									variant="ghost"
+									aria-expanded={pasteOpen}
+									aria-controls={pasteOpen ? pastePanelId : undefined}
+									onClick={() =>
+										pasteOpen ? setPasteOpen(false) : showPaste()
+									}
+								>
+									Wklej gotowy tekst…
+								</Button>
+							</div>
 						</div>
-						<p className="text-xs text-muted">
-							Kolejność: strzałki ↑ ↓ przy bloku, przeciągnięcie za uchwyt ⋮⋮
-							albo Alt + strzałki na uchwycie. Nowy blok trafia pod zaznaczony.
-						</p>
-					</div>
+
+						{/* The other way: paste ready text or JSON. Folded until asked for. */}
+						{pasteOpen && (
+							<section
+								id={pastePanelId}
+								aria-label="Wklej tekst"
+								className="rounded-control border border-line"
+							>
+								<div className="flex flex-wrap items-center gap-x-3 border-line border-b py-1.5 pr-1.5 pl-3 text-sm font-semibold">
+									Wklej tekst
+									<span className="text-xs font-normal text-muted">
+										zwykły tekst albo JSON, zamienimy go na bloki
+									</span>
+									<Button
+										variant="ghost"
+										className="ml-auto"
+										onClick={hidePaste}
+									>
+										Ukryj
+									</Button>
+								</div>
+								<div className="flex flex-col gap-3 p-3">
+									<textarea
+										ref={sourceBox}
+										aria-label="Tekst źródłowy"
+										value={source}
+										onChange={(event) => setSource(event.target.value)}
+										placeholder="Wklej tutaj gotowy tekst. Pusta linia oddziela bloki. Można też wkleić JSON ze starego panelu."
+										className={`${field} min-h-40 resize-y py-2 leading-relaxed`}
+									/>
+									{!asJson && (
+										<label className="flex flex-wrap items-center gap-2 text-xs text-subtle">
+											Tytuł: linia do
+											<input
+												type="number"
+												min={1}
+												max={200}
+												value={titleMax}
+												onChange={(event) =>
+													setTitleMax(
+														Math.max(
+															1,
+															Number.parseInt(event.target.value, 10) || 1,
+														),
+													)
+												}
+												style={{ width: "4.5rem" }}
+												className={`${field} h-8 text-center`}
+											/>
+											znaków
+										</label>
+									)}
+									<div className="flex flex-wrap gap-1.5 text-xs text-subtle">
+										{asJson && !asJson.ok ? (
+											<span role="alert" className="text-danger">
+												{asJson.problem}
+											</span>
+										) : incoming.length === 0 ? (
+											<span className="rounded-full border border-line px-2.5 py-0.5">
+												nic do zamiany
+											</span>
+										) : asJson ? (
+											<span className="rounded-full border border-line px-2.5 py-0.5">
+												JSON:{" "}
+												<b className="text-ink">
+													{plural(incoming.length, "blok", "bloki", "bloków")}
+												</b>
+											</span>
+										) : (
+											<>
+												<span className="rounded-full border border-line px-2.5 py-0.5">
+													<b className="text-primary">
+														{plural(
+															incomingTitles,
+															"tytuł",
+															"tytuły",
+															"tytułów",
+														)}
+													</b>
+												</span>
+												<span className="rounded-full border border-line px-2.5 py-0.5">
+													<b className="text-ink">
+														{plural(
+															incoming.length - incomingTitles,
+															"tekst",
+															"teksty",
+															"tekstów",
+														)}
+													</b>
+												</span>
+											</>
+										)}
+									</div>
+									<div className="flex flex-wrap gap-2">
+										<Button
+											variant="primary"
+											className="flex-1"
+											disabled={incoming.length === 0}
+											onClick={() => void applyIncoming("replace")}
+										>
+											Utwórz bloki
+										</Button>
+										<Button
+											className="flex-1"
+											disabled={incoming.length === 0}
+											onClick={() => void applyIncoming("append")}
+										>
+											Dopisz na końcu
+										</Button>
+									</div>
+									<p className="text-xs text-muted">
+										Bloki oddzielasz pustą linią. Jednolinijkowy akapit do
+										podanej liczby znaków staje się tytułem, pozostałe blokami
+										tekstu. Pojedynczy enter zostaje w tekście, a tagi{" "}
+										<code>&lt;b&gt;</code> i <code>&lt;a&gt;</code> zostają.
+										JSON skopiowany ze starego panelu (albo z podglądu „JSON”)
+										też można wkleić: rozpoznamy go sami.
+									</p>
+								</div>
+							</section>
+						)}
+						{rows.length > 0 && (
+							<p className="text-xs text-muted">
+								Kolejność: strzałki ↑ ↓ przy bloku, przeciągnięcie za uchwyt ⋮⋮
+								albo Alt + strzałki na uchwycie. Nowy blok trafia pod
+								zaznaczony.
+							</p>
+						)}
+					</fieldset>
 				</section>
 
-				{/* 3. Preview */}
+				{/* 2. Preview */}
 				<section
 					aria-label="Podgląd"
-					className={`${panel} ${hiddenUnless("preview")} lg:sticky lg:top-0`}
+					className={`min-w-0 border-line @4xl:border-l ${hiddenUnless("preview")}`}
 				>
-					<div className={panelHead}>
-						Podgląd
-						<span className="ml-auto text-xs font-normal text-muted">
-							widok poglądowy
-						</span>
-					</div>
-					<div className="p-4">
-						<div className="mx-auto min-h-96 w-full max-w-[375px] rounded-chip border border-line-input bg-white py-5">
-							<ContentPreview blocks={blocks} />
+					{/* Beside a long list of blocks the preview stays in view, below
+					    the panel's top bar when the page itself is what scrolls. */}
+					<div className="@4xl:sticky @4xl:top-16">
+						<div className={`flex ${paneHead}`}>
+							Podgląd
+							<Segmented
+								label="Rodzaj podglądu"
+								className="ml-auto font-normal"
+								options={PREVIEW_KINDS}
+								value={previewKind}
+								onChange={setPreviewKind}
+							/>
+						</div>
+						<div className="flex flex-col gap-2 p-3">
+							{previewKind === "look" ? (
+								<>
+									<PhoneFrame>
+										<ContentPreview blocks={blocks} />
+									</PhoneFrame>
+									<p className="text-center text-xs text-muted">
+										widok poglądowy
+									</p>
+								</>
+							) : (
+								<>
+									{/* The very list handed to onChange: what the form saves. */}
+									<JsonView
+										value={blocks}
+										label="Treść jako JSON"
+										height="h-72"
+									/>
+									<p className="text-xs text-muted">
+										Dokładnie w tej postaci treść zapisze się razem z
+										formularzem.
+									</p>
+								</>
+							)}
 						</div>
 					</div>
 				</section>
 			</div>
 
 			{/* Validation */}
-			<section aria-label="Walidacja" className={panel}>
-				<div className={panelHead}>Walidacja</div>
-				<div className="p-4 text-sm">
+			<section aria-label="Walidacja" className="border-line border-t">
+				<div className="p-3 text-sm">
 					{issues.length === 0 ? (
 						<p className="font-semibold text-(--tone-ink)" data-tone="green">
 							{rows.length === 0
@@ -689,82 +834,6 @@ export function ContentEditor({
 					)}
 				</div>
 			</section>
-
-			<MediaPicker
-				open={pickerFor !== null}
-				onOpenChange={(open) => {
-					if (!open) setPickerFor(null);
-				}}
-				kind="image"
-				folderId={imageFolderId}
-				value={
-					rows.find((row) => row.key === pickerFor)?.block.metadata
-						?.imageRelativePath ?? null
-				}
-				onPick={(path) => {
-					if (pickerFor) pickImage(pickerFor, path);
-				}}
-			/>
-		</div>
-	);
-}
-
-function TextBlockEditor({
-	index,
-	value,
-	onChange,
-}: {
-	index: number;
-	value: string;
-	onChange: (content: string) => void;
-}) {
-	const textarea = useRef<HTMLTextAreaElement>(null);
-
-	/** Wraps the selection in a tag, or inserts a placeholder to type over. */
-	const wrap = (open: string, close: string) => {
-		const element = textarea.current;
-		if (!element) return;
-		const start = element.selectionStart;
-		const end = element.selectionEnd;
-		const middle = value.slice(start, end) || "tekst";
-		onChange(value.slice(0, start) + open + middle + close + value.slice(end));
-		setTimeout(() => {
-			element.focus();
-			element.setSelectionRange(
-				start + open.length,
-				start + open.length + middle.length,
-			);
-		}, 0);
-	};
-
-	return (
-		<div className="flex flex-col gap-2">
-			<div className="flex gap-1.5">
-				<button
-					type="button"
-					title="Pogrub zaznaczenie"
-					onClick={() => wrap("<b>", "</b>")}
-					className="rounded-chip border border-line-input px-2.5 py-0.5 text-xs font-bold hover:border-primary"
-				>
-					B
-				</button>
-				<button
-					type="button"
-					title="Zamień zaznaczenie w link"
-					onClick={() => wrap('<a href="https://">', "</a>")}
-					className="rounded-chip border border-line-input px-2.5 py-0.5 text-xs hover:border-primary"
-				>
-					Link
-				</button>
-			</div>
-			<textarea
-				ref={textarea}
-				aria-label={`Tekst, blok ${index + 1}`}
-				placeholder="Wpisz tekst"
-				value={value}
-				onChange={(event) => onChange(event.target.value)}
-				className={`${field} min-h-28 resize-y py-2 leading-normal`}
-			/>
 		</div>
 	);
 }

@@ -1,6 +1,6 @@
-import { mediaUrl } from "@/data/collections/media";
 import type { ContentBlock } from "@/data/schemas/workout";
 import { textSegments } from "@/domain/contentBlocks";
+import { MediaImage } from "@/features/media/MediaImage";
 
 // The colours and proportions of the mobile app, not of the panel: this is a
 // picture of what a user will see. System fonts stand in for the app's own.
@@ -83,7 +83,7 @@ export function ContentPreview({
 				}
 
 				if (block.type === "Image") {
-					const path = block.metadata?.imageRelativePath;
+					const path = block.metadata?.imageRelativePath ?? null;
 					const ratio = block.metadata?.heightToWidthRatio;
 					return (
 						<div
@@ -93,17 +93,13 @@ export function ContentPreview({
 								aspectRatio: `1 / ${ratio && ratio > 0 ? ratio : 0.6}`,
 							}}
 						>
-							{path ? (
-								<img
-									src={mediaUrl(path)}
-									alt=""
-									className="size-full object-contain"
-								/>
-							) : (
-								<span className="p-2 text-center font-mono text-[11px] text-[#8b8aa3]">
-									brak obrazu
-								</span>
-							)}
+							<MediaImage
+								path={path}
+								placeholder="brak obrazu"
+								className="size-full"
+								imageClassName="object-contain"
+								placeholderClassName="p-2 text-center font-mono text-[11px] text-[#8b8aa3]"
+							/>
 						</div>
 					);
 				}

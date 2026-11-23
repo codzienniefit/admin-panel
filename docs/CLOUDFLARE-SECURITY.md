@@ -1,7 +1,7 @@
 # Cloudflare settings that make the panel harder to find and to attack
 
 Written 2026-11-23: the reasoning behind the Cloudflare settings. **The steps for v1 are in
-[DEPLOY-RUNBOOK.md](DEPLOY-RUNBOOK.md) Part 7**; this file explains them and keeps what comes
+[DEPLOY-RUNBOOK.md](DEPLOY-RUNBOOK.md) Part 6**; this file explains them and keeps what comes
 later. **v1 does not use Cloudflare Access** (§1 is for later); everything from §2 on is part of v1.
 
 Below, `PANEL` stands for the panel's hostname, **`panel.codzienniefitapp.com`**: paste the rules
@@ -52,9 +52,8 @@ Who tried and was refused: Zero Trust → **Logs → Access**.
 - Keep it one level under the zone (`x.codzienniefitapp.com`, not `a.b.codzienniefitapp.com`).
 - Do not link to it from anywhere public. Hostnames turn up in public certificate logs anyway, so
   the name hides little; the WAF rules, the panel's own sign-in and (later) Access do the work.
-- In `wrangler.json` set `"workers_dev": false` and keep `"preview_urls": false` (DEPLOY-RUNBOOK
-  5.2), so the Worker has no second, guessable address. Until then its sign-in page is reachable
-  at `admin-panel.marta-100.workers.dev` (no data before a real sign-in).
+- `wrangler.json` has `"workers_dev": false` and `"preview_urls": false` (DEPLOY-RUNBOOK 1.4), so
+  the Worker has no second, guessable address; `admin-panel.marta-100.workers.dev` is off.
 - In the Worker's Git build (Settings → Build), build only `main`: no branch or pull request
   builds.
 
@@ -139,7 +138,7 @@ On the panel's zone, **SSL/TLS → Edge Certificates**:
 What is there (export of 2026-11-23): `api` → `fitfunctions.azurewebsites.net` and `blobs` →
 `superfitstorage.blob.core.windows.net`, both proxied; the `asuid.api` TXT record Azure uses to
 prove the API's domain. The panel's record is created by Cloudflare from `wrangler.json`
-(DEPLOY-RUNBOOK 5.2); never add one by hand.
+(DEPLOY-RUNBOOK 5.1); never add one by hand.
 
 - **DNSSEC**: DNS → Settings → **Enable DNSSEC**, then add the DS record it shows at the domain's
   registrar. It stops anyone answering for `codzienniefitapp.com` in Cloudflare's place.

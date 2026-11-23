@@ -1,165 +1,205 @@
 # Deploying the backend and the admin panel (v1)
 
-Written 2026-11-23. Everything needed to put the backend's panel routes and the panel itself into
-production: every setting with its value or how to make it, DNS, Google and Firebase, the
-Cloudflare Worker and its build, the Cloudflare security settings, checks and rollback.
+Everything needed to put the backend's panel routes and the panel itself into production, with
+what is done already. Marks: ✅ done (checked), ⬜ to do, ❓ done by hand, cannot be checked from
+outside (confirm it yourself).
 
-Two deploys, in this order:
+**Status on 2026-11-23, 17:10:** the panel is live at `https://panel.codzienniefitapp.com`, fully
+configured, and offers Google sign-in. **Sign-in does not work yet because the backend's panel
+routes are not deployed** (`/api/panel/…` answers 404; the PR is not merged). Production runs the
+backend's `main` (`31cc84c`); the deploy adds only the panel work on top of it.
 
-1. **Backend** (Azure Function App `fitfunctions`, API at `https://api.codzienniefitapp.com`).
-2. **Panel** (Cloudflare Worker `admin-panel`, at `https://panel.codzienniefitapp.com`).
-
-Both launch **read-only**: in Produkcja only "Wyczyść cache backendu" writes. Retool keeps working
-(Part 2). **v1 does not use Cloudflare Access**; it is in Part 10 for later.
+Both launch **read-only**: in Produkcja only "Wyczyść cache backendu" writes. Retool keeps working.
+**v1 does not use Cloudflare Access** (Part 10, later).
 
 You create and paste every secret yourself. None goes in a file, a commit or a chat.
 
-Time: about 1.5 hours the first time.
+---
+
+## Status board
+
+| # | Step | Status | Where |
+| --- | --- | --- | --- |
+| 1 | Panel admin `6bt7loE8cCgfvRTeir9pdlXSETN2` in the backend's code; Wrapped testers in code | ✅ | 1.2 |
+| 2 | Panel code on `admin-panel` `main`, deployed by Cloudflare on every push | ✅ (`dc7d76e`) | 4 |
+| 3 | `wrangler.json`: custom domain, `workers_dev` off, `keep_vars`, logs and traces at 100% | ✅ | 1.4 |
+| 4 | DNS record and certificate for `panel.codzienniefitapp.com` (made by Cloudflare) | ✅ | 5.1 |
+| 5 | `admin-panel.marta-100.workers.dev` switched off | ✅ (404) | 5.1 |
+| 6 | Google OAuth client, redirect `https://panel.codzienniefitapp.com/auth/google/callback` | ✅ (sign-in reaches Google and returns) | 3 |
+| 7 | Worker's eight values set and valid | ✅ (no value reported missing) | 5.2 |
+| 8 | `PANEL_SIGNING_SECRET` and `SIGN_IN_COOKIE_KEY` are type **Secret**, and were regenerated after being plain Variables | ❓ | 5.2 |
+| 9 | Build settings: production branch `main`, deploy command `npx wrangler deploy`, no branch builds | ❓ | 1.5 |
+| 10 | Merge backend PR "Feat/admin panel backend" | ⬜ | 2.1 |
+| 11 | Run all backend tests on `main` | ⬜ | 2.2 |
+| 12 | Azure: `PANEL_SIGNING_SECRET` = the **same** value as in the Worker; table 1.1 checked | ⬜ | 2.3 |
+| 13 | Build, dry run, deploy the backend; purge Cloudflare | ⬜ | 2.4 |
+| 14 | Backend checks (panel route 401, app, Wrapped closed, recommendations) and Retool check | ⬜ | 2.5 |
+| 15 | First sign-in to the panel and the panel checks | ⬜ | 5.3 |
+| 16 | Application Insights alert on `[SECURITY_ALERT]` | ⬜ | 2.6 |
+| 17 | Cloudflare security settings (AI bots, WAF, rate limit) | ⬜ | 6.1–6.3 |
+| 18 | HSTS and TLS settings | ⬜ (no HSTS header yet) | 6.4 |
+| 19 | DNSSEC | ⬜ (no DS record yet) | 6.5 |
+| 20 | E-mail anti-spoofing records (null MX, SPF, DMARC, DKIM) | ⬜ (none yet) | 6.6 |
+| 21 | Two-factor sign-in on every account; GitHub branch protection | ❓ | 6.7 |
+| — | After Retool is retired: remove its routes, renew the master key | later | 9 |
 
 ---
 
-## Part 0. What you need
+## Why it is built this way
 
-| Thing | Check |
-| --- | --- |
-| Azure CLI signed in to the subscription with `codzienniefitgroup` | `az account show -o table` |
-| Cloudflare account with the zone `codzienniefitapp.com` (name servers `naomi`/`tadeo.ns.cloudflare.com`) | `npx wrangler whoami` in the admin-panel repo (`npx wrangler login` first) |
-| Node 22, `zip`, `openssl` | `node -v`, `which zip openssl` |
-| Google Cloud console for the Firebase project, and the Firebase console | console.cloud.google.com, console.firebase.google.com |
-| GitHub: `codzienniefit/backend`, `codzienniefit/admin-panel` | the backend PR "Feat/admin panel backend" |
+**Why the panel does not reuse Retool's endpoints.** Retool's `manageX` routes are
+`authLevel: 'admin'`: the Azure host lets through only calls carrying the Function App's **master
+key**, which unlocks every function and the host's management API, never expires and says nothing
+about who is calling. The panel must never hold it. So the panel calls **the same handlers** on
+`panel/<same route>`: open to the host, guarded by our code on every call (the Worker's signature,
+a Firebase session of someone on `PANEL_ADMIN_UIDS`, Google sign-in only, 48 hours at most,
+sign-out honoured at once). The two doors also behave differently: the panel gets versions
+(409/428), statuses, strict Polish validation (422) and saves that keep what they do not send;
+Retool keeps its old behaviour, which you chose not to change. Only the 32 routes in
+`PANEL_ROUTES` exist for the panel; Retool-only operations (regenerating milestone badges, usage,
+YouTube sync, Retool's upload) stay out of a panel session's reach. Every panel call is logged with
+the admin's user id; a Retool call can only be logged as "the functions key".
 
-The panel admin is already in the backend's code: user id `6bt7loE8cCgfvRTeir9pdlXSETN2` in
-`src/config/panelAdmins.ts`. In Firebase → Authentication → Users, check that this account signs in
-**only with Google** (no password provider), and that 2-Step Verification is on for that Google
-account.
+**Why 32 registrations.** One per panel route: an explicit allow-list (anything else is the host's
+404 before our code runs), a test that every one is guarded, and per-route names in the audit and
+in Application Insights. They live in the same Function App and process; they cost nothing at cold
+start or in billing.
 
-## Part 1. Every setting at a glance
+**What the deploy creates.**
+
+| Where | What | Created by | Why |
+| --- | --- | --- | --- |
+| Azure, the existing general data storage account | Table `PanelAudit` | the code, on first write | Permanent, append-only record of who changed what through the panel (logs expire and can be sampled) |
+| same | Table `PanelSignOuts` | the code, on first sign-out | Firebase cannot end one session without signing the person out of the mobile app; the sign-out time is kept and older panel sessions are refused. Also the emergency cut-off |
+| same | Table `PanelDocs` | the code, on first save | The planner's documents and settings, which the app must never see; kept out of `Challenges` |
+| Azure Function App | Setting `PANEL_SIGNING_SECRET` | you | Proves a call came from the panel's Worker |
+| Cloudflare | Worker `admin-panel`, custom domain and DNS, eight values, Git build | done | The panel and its gate to the backend |
+| Google / Firebase | OAuth client; Google provider; the existing `FIREBASE_KEY` creates session cookies | done / existing | Sign-in and sessions |
+
+Not needed: a new storage account, database, migration, queue, blob container or Function App.
+The Worker has no KV, D1 or R2: the session is a Firebase session cookie in an encrypted HttpOnly
+cookie in the browser, checked by the backend on every call.
+
+**What changes for app users and Retool when the backend is deployed.** App users: practically
+nothing. Public endpoints refuse drafts and deleted items (none exist; no production row has a
+`Status` column, so status still comes from `Hidden`); challenge progress updates make one extra
+table read; **every admin save now really purges the CDN** (the old purge never worked), so after a
+save the app's requests reach Functions until the cache refills. Nothing is migrated or deleted.
+Retool: same routes, key and rules; it writes `Status`/`WasPublic` next to `Hidden`; a workout's
+equipment or duration change also updates the challenges using it; a message send claims the draft
+for 10 minutes and a half-failed send locks it; `.mp4`/`.ogg` uploads work; account reads no longer
+include the password hash; every call is logged as `[ADMIN_ACTION] functions-key (Retool)`. Retool
+still saves without versions: **never edit the same item in Retool and in the panel**.
+
+---
+
+## Part 1. Every setting
 
 ### 1.1 Azure: Function App `fitfunctions` → Settings → Environment variables
 
-| Name | What to do | Value |
-| --- | --- | --- |
-| `PANEL_SIGNING_SECRET` | **Add** (Part 3.3) | generated: `openssl rand -base64 48 \| tr -d '\n' \| pbcopy`. At least 32 characters. **The same value goes into the Worker** (1.3) |
-| `PANEL_SIGNING_SECRET_NEXT` | leave unset | only while rotating the secret (Part 9) |
-| `CLOUDFLARE_API_TOKEN` | keep, **check** | must have *Zone → Cache Purge → Purge* on `codzienniefitapp.com`: from this deploy on every admin save purges the CDN |
-| `CLOUDFLARE_ZONE_ID` | keep | the zone id of `codzienniefitapp.com` (Cloudflare → the zone → Overview, right column) |
-| `ADMIN_FUNCTIONS_KEY` | keep | Retool's key; unchanged |
-| `FIREBASE_KEY`, `DATA_STORAGE_ACCOUNT_NAME`, `DATA_STORAGE_ACCOUNT_KEY`, `BLOBS_PUBLIC_LINK`, `API_PUBLIC_LINK`, the other existing settings | keep | unchanged |
-| `WRAPPED_ENABLED` | **must not be set** (or not `true`) | Wrapped stays closed until you open it |
-| `WRAPPED_NOW_UTC` | **must not be set** | tests only |
-| `WRAPPED_TESTER_UIDS` | optional | extra Wrapped testers on top of the three in code |
-| `WRAPPED_VIDEO_THUMBNAIL_URL`, `WRAPPED_VIDEO_URL`, `WRAPPED_VIDEO_TOP_URL` | optional | the 2026 video assets once they exist (https URLs) |
-| `WRAPPED_2025_START_UTC`, `WRAPPED_2025_END_UTC` | **delete** | no longer read |
+| Name | What to do | Value | Status |
+| --- | --- | --- | --- |
+| `PANEL_SIGNING_SECRET` | **Add** (2.3) | the same value as in the Worker (5.2); at least 32 characters | ⬜ |
+| `PANEL_SIGNING_SECRET_NEXT` | leave unset | only while rotating (Part 8) | — |
+| `CLOUDFLARE_API_TOKEN` | keep, **check** | needs *Zone → Cache Purge → Purge* on `codzienniefitapp.com` | ❓ |
+| `CLOUDFLARE_ZONE_ID` | keep | the zone id of `codzienniefitapp.com` | — |
+| `ADMIN_FUNCTIONS_KEY`, `FIREBASE_KEY`, `DATA_STORAGE_ACCOUNT_*`, `BLOBS_PUBLIC_LINK`, `API_PUBLIC_LINK`, the rest | keep | unchanged | — |
+| `WRAPPED_ENABLED` | **must not be set** (or not `true`) | Wrapped stays closed | ❓ |
+| `WRAPPED_NOW_UTC` | **must not be set** | tests only | ❓ |
+| `WRAPPED_TESTER_UIDS`, `WRAPPED_VIDEO_*` | optional | extra testers; 2026 video assets | — |
+| `WRAPPED_2025_START_UTC`, `WRAPPED_2025_END_UTC` | **delete** | no longer read | ❓ |
 
-### 1.2 In the backend's code (already done)
+### 1.2 In the backend's code ✅
 
 | Where | What |
 | --- | --- |
-| `src/config/panelAdmins.ts` → `PANEL_ADMIN_UIDS` | the one panel admin (above). Adding or removing someone: Part 9 |
+| `src/config/panelAdmins.ts` → `PANEL_ADMIN_UIDS` | the one panel admin, `6bt7loE8cCgfvRTeir9pdlXSETN2`. Adding or removing someone: Part 8 |
 | `src/modules/services/helpers/wrappedSettings.ts` → `WRAPPED_TESTERS` | three Wrapped test accounts; empty it after Wrapped opens |
 
-### 1.3 Cloudflare: Worker `admin-panel` → Settings → Variables and Secrets
+### 1.3 Cloudflare: Worker `admin-panel` → Settings → Variables and Secrets ✅
 
-Text (type **Text**):
+| Name | Type | Value |
+| --- | --- | --- |
+| `PANEL_ORIGIN` | Text | `https://panel.codzienniefitapp.com` |
+| `API_ORIGIN` | Text | `https://api.codzienniefitapp.com` |
+| `MEDIA_ORIGINS` | Text | `https://superfitstorage.blob.core.windows.net,https://blobs.codzienniefitapp.com` |
+| `FIREBASE_API_KEY` | Text | Firebase → Project settings → General → Web API Key (not a secret) |
+| `GOOGLE_CLIENT_ID` | Text | the OAuth client id |
+| `GOOGLE_CLIENT_SECRET` | **Secret** | the OAuth client secret |
+| `PANEL_SIGNING_SECRET` | **Secret** | the same value as in Azure |
+| `SIGN_IN_COOKIE_KEY` | **Secret** | exactly 32 random bytes, base64 (44 characters) |
 
-| Name | Value |
-| --- | --- |
-| `PANEL_ORIGIN` | `https://panel.codzienniefitapp.com` |
-| `API_ORIGIN` | `https://api.codzienniefitapp.com` |
-| `MEDIA_ORIGINS` | `https://superfitstorage.blob.core.windows.net,https://blobs.codzienniefitapp.com` |
-| `FIREBASE_API_KEY` | Firebase console → Project settings → General → **Web API Key** (not a secret; it ships in the app) |
-| `GOOGLE_CLIENT_ID` | the OAuth client id from Part 4.2 |
+While any value is missing or invalid, the sign-in page lists the names; once all are valid it
+shows nothing about the settings. Secrets and text variables survive deploys (`keep_vars`). Never
+copy these into `wrangler.json`, even when Cloudflare's banner suggests it.
 
-Secrets (type **Secret**, or with Wrangler as in Part 6.3):
+### 1.4 In the panel's repository ✅
 
-| Name | Value |
-| --- | --- |
-| `PANEL_SIGNING_SECRET` | the same value as in Azure (1.1) |
-| `SIGN_IN_COOKIE_KEY` | generated: `openssl rand -base64 32` (exactly 32 bytes, base64) |
-| `GOOGLE_CLIENT_SECRET` | the OAuth client secret from Part 4.2 |
+`wrangler.json`: `"workers_dev": false`, `"preview_urls": false`, `"keep_vars": true`,
+`"routes": [{ "pattern": "panel.codzienniefitapp.com", "custom_domain": true }]`, observability
+with logs (including request logs) and traces at 100%.
 
-Until all eight are valid, the sign-in page says sign-in is not configured and lists the names still
-missing; once they are, it shows nothing about the settings.
-
-### 1.4 In the panel's repository (already done)
-
-`wrangler.json`: `"workers_dev": false`, `"preview_urls": false`, `"keep_vars": true` (text variables
-set in the dashboard survive deploys), and the custom domain:
-
-```json
-"routes": [{ "pattern": "panel.codzienniefitapp.com", "custom_domain": true }]
-```
-
-### 1.5 Cloudflare: Worker `admin-panel` → Settings → Build
+### 1.5 Cloudflare: Worker `admin-panel` → Settings → Build ❓
 
 | Setting | Value |
 | --- | --- |
-| Git repository | `codzienniefit/admin-panel` |
-| Production branch | `main` |
+| Git repository / production branch | `codzienniefit/admin-panel` / `main` |
 | Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy` (`npm run deploy` would build a second time) |
+| Deploy command | `npx wrangler deploy` (`npm run deploy` builds a second time) |
 | Builds for other branches / pull requests | off |
 
-### 1.6 Google and Firebase
-
-| Where | Setting |
-| --- | --- |
-| Google Cloud → APIs & Services → Credentials → OAuth client "Admin panel" (Web application) | Authorised redirect URI: **`https://panel.codzienniefitapp.com/auth/google/callback`** only; no JavaScript origins |
-| Firebase → Authentication → Sign-in method → Google | enabled; if refused, the client id under "Safelist client IDs from external projects" |
-
-### 1.7 DNS: zone `codzienniefitapp.com`
+### 1.6 DNS: zone `codzienniefitapp.com`
 
 | Record | Status |
 | --- | --- |
-| `api` CNAME → `fitfunctions.azurewebsites.net`, proxied | exists, keep |
-| `blobs` CNAME → `superfitstorage.blob.core.windows.net`, proxied | exists, keep |
-| `asuid.api` TXT | exists, keep (Azure's proof of the API's domain) |
-| `panel` | **created by Cloudflare** when the Worker is deployed with its custom domain. Do not add it by hand |
-| null MX, SPF, DMARC, DKIM | add (Part 7.6) once you have checked nothing sends mail as @codzienniefitapp.com |
-| DNSSEC | enable (Part 7.5) |
+| `api` CNAME → `fitfunctions.azurewebsites.net`, proxied | ✅ keep |
+| `blobs` CNAME → `superfitstorage.blob.core.windows.net`, proxied | ✅ keep |
+| `asuid.api` TXT (Azure's proof of the API's domain) | ✅ keep |
+| `panel` (Worker custom domain, made by Cloudflare; never add it by hand) | ✅ |
+| DNSSEC | ⬜ 6.5 |
+| null MX, SPF, DMARC, DKIM | ⬜ 6.6 |
 
 ---
 
-## Part 2. Retool and the app: what to know first
+## Part 2. Backend ⬜
 
-Retool calls the backend's `manageX` routes with its functions key. The panel's routes are only
-under `panel/…`; **no route, method or key check Retool uses has changed**, and the backend's
-tests pin Retool's answers. The mobile app sees no change until Wrapped is opened, except that
-plans now recommend the content team's pairs.
+### 2.1 Merge
 
-## Part 3. Backend
-
-### 3.1 Merge
-
-Merge the PR **"Feat/admin panel backend"** (`main` ← `feat/admin-panel-backend`):
+Merge **"Feat/admin panel backend"** (`main` ← `feat/admin-panel-backend`, 6 commits, 150 files):
 
 https://github.com/codzienniefit/backend/compare/main...feat/admin-panel-backend?expand=1
 
-The GitHub workflow runs the tests and publishes the DTO package; its Azure deploy job is red
-(Kudu) and stays red. Ignore it.
+The workflow's Azure deploy job stays red (Kudu); ignore it.
 
-### 3.2 Run all tests on `main`
+### 2.2 Run all tests on `main`
 
 ```bash
 cd /Users/mzolnieruk/github/backend && git switch main && git pull --ff-only && npm ci && npx jest --no-coverage --testPathIgnorePatterns /.claude/
 ```
 
-### 3.3 `PANEL_SIGNING_SECRET` into Azure
+### 2.3 `PANEL_SIGNING_SECRET` in Azure
 
-Generate it onto the clipboard (nothing is printed):
+It must be the value that is in the Worker now. If you do not have it any more, make a new one and
+set it in **both** places:
 
 ```bash
 openssl rand -base64 48 | tr -d '\n' | pbcopy
 ```
 
-Azure portal → Function App **fitfunctions** → Settings → **Environment variables** → App settings →
-**+ Add** → Name `PANEL_SIGNING_SECRET`, Value: paste → Apply → Apply → Confirm (the app restarts
-for a few seconds). **Keep the value on the clipboard** (or in your password manager) for Part 6.3.
+Azure portal → Function App **fitfunctions** → Settings → Environment variables → App settings →
+`PANEL_SIGNING_SECRET` (add or edit) → paste → Apply → Apply → Confirm. If it is a new value, also:
 
-On the same page, go through table 1.1: check `CLOUDFLARE_API_TOKEN`, make sure `WRAPPED_ENABLED`
-and `WRAPPED_NOW_UTC` are not set, delete `WRAPPED_2025_*`.
+```bash
+cd /Users/mzolnieruk/github/admin-panel && pbpaste | npx wrangler secret put PANEL_SIGNING_SECRET
+```
 
-### 3.4 Build, dry run, deploy
+```bash
+pbcopy < /dev/null
+```
+
+Then go through table 1.1 on the same page.
+
+### 2.4 Build, dry run, deploy
 
 ```bash
 cd /Users/mzolnieruk/github/backend && scripts/build-package.sh main
@@ -174,9 +214,9 @@ cd /Users/mzolnieruk/github/backend && scripts/deploy-run-from-package-blob.sh /
 ```
 
 Answer `y` at each prompt; expect "Deploy looks healthy". Then Cloudflare → `codzienniefitapp.com` →
-Caching → Configuration → **Purge Everything**.
+Caching → Configuration → **Purge Everything**. Deploy at a quiet hour.
 
-### 3.5 Check the backend
+### 2.5 Check the backend and Retool
 
 App up (expect `200`):
 
@@ -184,8 +224,8 @@ App up (expect `200`):
 curl -s -o /dev/null -w '%{http_code}\n' https://api.codzienniefitapp.com/api/appConfig
 ```
 
-Panel routes there, secret set (expect `401` and `BAD_SIGNATURE`; `503` = secret missing, `404` =
-routes missing):
+Panel routes there and the secret set (expect `401` and `BAD_SIGNATURE`; `503` = secret missing,
+`404` = not deployed):
 
 ```bash
 curl -s -w '\n%{http_code}\n' https://api.codzienniefitapp.com/api/panel/manageChallenges
@@ -204,284 +244,288 @@ curl -s "https://api.codzienniefitapp.com/api/workoutPlans" | python3 -c "import
 ```
 
 Open the mobile app (plans, a workout, profile and badges). In Retool, **without saving any
-existing item**: open Treningi, Wyzwania, Wiadomości, Odznaki (lists load), open one form and close
-it, open Użytkownicy with your own user id.
+existing item**: open Treningi, Wyzwania, Wiadomości, Odznaki, one form (close it), Użytkownicy with
+your own user id. For the first hour, watch Functions load after admin saves (CDN refills).
 
-What Retool will notice from now on: every save purges the CDN (changes show at once); drafts made
-in the panel show as hidden; a message send that fails half-way locks that draft; `.mp4`/`.ogg`
-uploads work. Rule: **never edit the same item in Retool and in the panel**.
+### 2.6 Alert and admin log
 
-### 3.6 Alerts and the admin log
-
-Azure portal → the Function App's **Application Insights** → Alerts → Create → Alert rule →
-Condition **Custom log search**:
+Application Insights → Alerts → Create → Alert rule → Custom log search:
 
 ```
 traces | where message has "[SECURITY_ALERT]"
 ```
 
-Table rows, count, greater than 0, every 5 minutes over 5 minutes; action group: e-mail to you.
-Name: "Panel security alert". The check in 3.5 (unsigned call) must show up:
+Count of rows, **greater than 20** over 5 minutes (bots probing the API's admin routes each log
+one; look at the volume for a day and adjust), action group: e-mail to you. The unsigned check in
+2.5 must appear:
 
 ```
 traces | where timestamp > ago(15m) | where message has "[SECURITY_ALERT]" | project timestamp, message
 ```
 
-Who did what, any time:
+Who did what:
 
 ```
 traces | where message has "[ADMIN_ACTION]" | project timestamp, message | order by timestamp desc
 ```
 
-## Part 4. Google sign-in and Firebase
+---
 
-1. Google Cloud console, the project of the Firebase project → APIs & Services → **OAuth consent
-   screen**: if not set up yet, Internal (Workspace accounts) or External; app name neutral (e.g.
-   "Codziennie Fit"); your e-mail as support and developer contact; default scopes only.
-2. APIs & Services → **Credentials** → Create credentials → **OAuth client ID** → **Web
-   application**, name "Admin panel". Authorised JavaScript origins: none. Authorised redirect URIs:
-   exactly `https://panel.codzienniefitapp.com/auth/google/callback`. Create, then copy the **Client
-   ID** (→ `GOOGLE_CLIENT_ID`) and the **Client secret** (→ `GOOGLE_CLIENT_SECRET`, Part 6.3; Google
-   shows it in this dialog).
-3. Firebase console → Authentication → Sign-in method → **Google**: enabled.
-4. Firebase console → Project settings → General → **Web API Key** (→ `FIREBASE_API_KEY`).
+## Part 3. Google sign-in and Firebase ✅
 
-## Part 5. The panel's code and build
+Done: OAuth client "Admin panel" (Web application) with exactly
+`https://panel.codzienniefitapp.com/auth/google/callback` as redirect and no JavaScript origins;
+Google provider enabled in Firebase. Confirmed for good by the first sign-in (5.3). If Firebase
+refuses it ("Logowanie nie jest poprawnie skonfigurowane"), add the client id under Firebase →
+Authentication → Sign-in method → Google → "Safelist client IDs from external projects".
 
-Every push to `main` of `codzienniefit/admin-panel` is built and deployed by Cloudflare (Workers
-Builds). Pushing is deploying: run the checks first.
+Your admin account: in Firebase → Authentication → Users it must sign in **only with Google** (no
+password provider), with 2-Step Verification on for the Google account. ❓
+
+## Part 4. The panel's code and build ✅
+
+Every push to `admin-panel` `main` is built and deployed by Cloudflare; pushing is deploying. Before
+every push:
 
 ```bash
 cd /Users/mzolnieruk/github/admin-panel && npm ci && npm run test:all
 ```
 
-Set the build as in table 1.5 (Workers & Pages → admin-panel → Settings → Build). The code is on
-`main` already, including `wrangler.json` with the custom domain (1.4).
+## Part 5. The panel on Cloudflare
 
-## Part 6. The panel on Cloudflare
+### 5.1 Address and DNS ✅
 
-### 6.1 Address and DNS
-
-Deploying `main` with `wrangler.json` as in 1.4 makes Cloudflare create the `panel` DNS record and
-its certificate, and switches the `workers.dev` address off. Check in Workers & Pages →
-admin-panel → Settings → **Domains & Routes** that `panel.codzienniefitapp.com` is listed.
-
-If the build failed with a permission error on the custom domain, add it once by hand there (Add →
-Custom domain → `panel.codzienniefitapp.com`) and retry the build. Never add a DNS record for
-`panel` yourself.
+`panel.codzienniefitapp.com` is the Worker's custom domain; Cloudflare made the DNS record and the
+certificate; `workers.dev` is off. Check any time (expect `{"ok":true}`):
 
 ```bash
 curl -s https://panel.codzienniefitapp.com/api/health
 ```
 
-Expect `{"ok":true}`.
+### 5.2 Values and secrets ✅ / ❓
 
-### 6.2 Text variables
+All eight are set and valid. **Check** that `PANEL_SIGNING_SECRET` and `SIGN_IN_COOKIE_KEY` show as
+type **Secret** ("Value encrypted"). They were added as plain Variables at first, so their values
+were visible; if they still are, delete the two Variables and set new values as secrets:
 
-Workers & Pages → admin-panel → Settings → Variables and Secrets → **+ Add**, type **Text**, the
-five from table 1.3.
+```bash
+openssl rand -base64 48 | tr -d '\n' | pbcopy
+```
 
-### 6.3 Secrets
-
-In the admin-panel repo (each reads stdin; nothing is printed).
-
-`PANEL_SIGNING_SECRET`, the same value as in Azure, from the clipboard (3.3):
+(paste into Azure's `PANEL_SIGNING_SECRET` too, 2.3), then:
 
 ```bash
 cd /Users/mzolnieruk/github/admin-panel && pbpaste | npx wrangler secret put PANEL_SIGNING_SECRET
 ```
 
-`SIGN_IN_COOKIE_KEY`, generated straight into Cloudflare:
-
 ```bash
 cd /Users/mzolnieruk/github/admin-panel && openssl rand -base64 32 | npx wrangler secret put SIGN_IN_COOKIE_KEY
 ```
-
-`GOOGLE_CLIENT_SECRET`: copy it from the Google dialog (4.2), then:
-
-```bash
-cd /Users/mzolnieruk/github/admin-panel && pbpaste | npx wrangler secret put GOOGLE_CLIENT_SECRET
-```
-
-Clear the clipboard:
 
 ```bash
 pbcopy < /dev/null
 ```
 
-(The same three can be added as type **Secret** in the dashboard instead.) Secrets and text
-variables apply at once; no redeploy needed.
+### 5.3 First sign-in and checks ⬜ (after Part 2)
 
-### 6.4 Check the panel
-
-1. `https://panel.codzienniefitapp.com/api/health` answers `{"ok":true}`.
-2. `https://admin-panel.marta-100.workers.dev` no longer answers.
-3. The sign-in page shows only "Zaloguj się przez Google", no environment switch, and no list of
-   missing values.
-4. A Google account **not** on the list: refused, its user id shown; Application Insights shows
+1. The sign-in page shows only "Zaloguj się przez Google", no environment switch, no missing list.
+2. A Google account **not** on the list: refused, its user id shown; Application Insights:
    `[SECURITY_ALERT] … NOT_PANEL_ADMIN … uid=…`.
-5. Your Google account (the admin): the panel opens; challenges, workouts, badges, offers,
-   messages and users load; pictures show.
-6. Any save: refused with "Produkcja jest tylko do odczytu". Ustawienia → Aplikacja → "Wyczyść
-   cache backendu": works.
-7. The environment switch (top bar) → Test: sample data, only now that you are signed in.
-8. Application Insights shows your reads as `[ADMIN_ACTION] panel uid=6bt7… GET …`.
-9. Sign out, then the browser's back button: still signed out.
+3. Your admin account: the panel opens; challenges, workouts, badges, offers, messages and users
+   load; pictures show.
+4. Any save: refused with "Produkcja jest tylko do odczytu". Ustawienia → Aplikacja → "Wyczyść
+   cache backendu" works.
+5. The environment switch (top bar) → Test: sample data, only now that you are signed in.
+6. Application Insights: `[ADMIN_ACTION] panel uid=6bt7… GET …`; Cloudflare → admin-panel →
+   Observability: `[ADMIN_ACTION] Signed in: uid=…`.
+7. Sign out, then the browser's back button: still signed out.
 
-## Part 7. Cloudflare security settings (v1)
+If sign-in fails: the page says why ("Logowanie jest chwilowo niedostępne" = the backend has no
+panel routes or cannot be reached); Cloudflare Observability shows the error, e.g. the backend
+refusing the Worker (then `PANEL_SIGNING_SECRET` differs between Azure and the Worker).
 
-All on the zone `codzienniefitapp.com`. **The API shares this zone**: the mobile app is not a
-browser and cannot pass a challenge, so every rule below is limited to `panel.codzienniefitapp.com`,
-and nothing zone-wide that challenges traffic is switched on.
+---
 
-### 7.1 AI crawlers and bots
+## Part 6. Cloudflare security settings (v1) ⬜
 
-- Security → Bots → **Block AI bots**: on, all pages (matches known AI crawlers only; safe for
-  the app).
-- **Bot Fight Mode / Super Bot Fight Mode: leave off.** It cannot be limited to one hostname on
-  the Free plan and can challenge the app's requests. Rule 7.2a covers the panel.
+On the zone `codzienniefitapp.com`. **The API shares this zone**: the app cannot pass a challenge,
+so every rule is limited to `panel.codzienniefitapp.com` and nothing zone-wide challenges traffic.
 
-The panel itself already sends `noindex, nofollow, noarchive, nosnippet, noimageindex, noai,
-noimageai` on every page and answer, and its `robots.txt` turns every crawler away.
+### 6.1 AI crawlers and bots ⬜
 
-### 7.2 WAF custom rules (Security → WAF → Custom rules)
+- Security → Bots → **Block AI bots**: on, all pages (known AI crawlers only; safe for the app).
+- **Bot Fight Mode / Super Bot Fight Mode: leave off** (cannot be limited to one hostname on the Free
+  plan; could challenge the app). Rule 6.2a covers the panel.
 
-The Free plan allows 5. Add them in this order with "Edit expression".
+The panel already sends `noindex, nofollow, noarchive, nosnippet, noimageindex, noai, noimageai`
+everywhere and its `robots.txt` turns every crawler away ✅.
 
-a. **Block every bot** (no search engine or monitor needs the panel). Action **Block**:
+### 6.2 WAF custom rules (Security → WAF → Custom rules) ⬜
+
+Five on the Free plan, in this order, with "Edit expression".
+
+a. Block every bot. **Block**:
 
 ```
 (http.host eq "panel.codzienniefitapp.com" and cf.client.bot)
 ```
 
-b. **Block scanners' favourite paths**. Action **Block**:
+b. Block scanners' favourite paths. **Block**:
 
 ```
 (http.host eq "panel.codzienniefitapp.com" and (http.request.uri.path contains ".php" or http.request.uri.path contains "wp-" or http.request.uri.path contains "/.env" or http.request.uri.path contains "/.git" or http.request.uri.path contains "xmlrpc" or http.request.uri.path contains "phpmyadmin"))
 ```
 
-c. **Only the methods the panel uses**. Action **Block**:
+c. Only the panel's methods. **Block**:
 
 ```
 (http.host eq "panel.codzienniefitapp.com" and not http.request.method in {"GET" "HEAD" "POST" "PUT" "DELETE"})
 ```
 
-d. **Only from Poland** (optional; add countries you work from). Action **Managed Challenge** (or
-**Block**):
+d. Only from Poland (optional; add countries you work from). **Managed Challenge** (or Block):
 
 ```
 (http.host eq "panel.codzienniefitapp.com" and not ip.src.country in {"PL"})
 ```
 
-e. **Scripts**. Action **Managed Challenge**:
+e. Scripts. **Managed Challenge** (it also catches your own `curl` checks; use a browser after):
 
 ```
 (http.host eq "panel.codzienniefitapp.com" and (http.user_agent eq "" or http.user_agent contains "curl" or http.user_agent contains "python" or http.user_agent contains "Go-http-client" or http.user_agent contains "wget"))
 ```
 
-(Rule e also catches your own `curl` checks in 6.4 step 1; run them before adding it, or use a
-browser.)
-
-### 7.3 Rate limiting (Security → WAF → Rate limiting rules)
-
-One rule on the Free plan, on sign-in:
+### 6.3 Rate limiting (Security → WAF → Rate limiting rules) ⬜
 
 ```
 (http.host eq "panel.codzienniefitapp.com" and starts_with(http.request.uri.path, "/auth/"))
 ```
 
-Characteristics: IP; **20 requests per 10 seconds**; Action **Block**, the longest duration offered.
+Characteristics: IP; 20 requests per 10 seconds; **Block**, the longest duration offered.
 
-### 7.4 TLS (SSL/TLS → Edge Certificates)
+### 6.4 TLS (SSL/TLS → Edge Certificates) ⬜
 
-- **Always Use HTTPS**: on.
-- **HSTS**: on, max-age 6 months, preload off; "include subdomains" only if every subdomain is
-  https (`api` and `blobs` are).
-- **Minimum TLS Version**: 1.2 (zone-wide; modern phones are fine; Analytics → Traffic shows TLS
-  1.0/1.1 use if in doubt).
-- **TLS 1.3**: on.
+Always Use HTTPS on; **HSTS** on (6 months, no preload; include subdomains only if every subdomain
+is https, which `api` and `blobs` are); Minimum TLS 1.2; TLS 1.3 on.
 
-### 7.5 DNS hardening
+### 6.5 DNSSEC ⬜
 
-- DNS → Settings → **Enable DNSSEC**, then add the DS record it shows at the domain's registrar.
-- **No CAA record** for now: the API's own certificate on Azure may come from another authority,
-  and a CAA record that leaves it out would stop it renewing.
-- No wildcard records; nothing pointing at retired services.
+DNS → Settings → **Enable DNSSEC**, then add the DS record it shows at the domain's registrar. No
+CAA record for now (the API's Azure certificate may come from another authority); no wildcard
+records; nothing pointing at retired services.
 
-### 7.6 Nobody may send e-mail as @codzienniefitapp.com
+### 6.6 Nobody may send e-mail as @codzienniefitapp.com ⬜
 
-The zone has no MX, so the domain receives no mail, but without these records anyone can send mail
-that claims to come from it. **First check nothing sends mail as @codzienniefitapp.com** (a
-newsletter tool, Firebase's custom e-mail domain, receipts); if something does, use its SPF include
-instead of `-all` and skip the null MX. DNS → Records → Add, each **DNS only** (grey cloud):
+**First check nothing sends mail as @codzienniefitapp.com** (newsletter, Firebase's custom e-mail
+domain, receipts); if something does, use its SPF include instead of `-all` and skip the null MX.
+DNS → Records → Add, each **DNS only**:
 
 | Type | Name | Content |
 | --- | --- | --- |
-| `MX` | `@` | `.` priority `0` (null MX: takes no mail) |
+| `MX` | `@` | `.` priority `0` |
 | `TXT` | `@` | `v=spf1 -all` |
 | `TXT` | `_dmarc` | `v=DMARC1; p=reject; adkim=s; aspf=s` |
 | `TXT` | `*._domainkey` | `v=DKIM1; p=` |
 
-### 7.7 The accounts that control all this
+### 6.7 Accounts ❓
 
-Two-factor sign-in (a security key or an authenticator app) on Cloudflare, Azure, Google Cloud /
-Firebase, GitHub and the admin's Google account. Cloudflare: no members you do not need; login
-notifications on; API tokens with the least access. GitHub: protect `main` in both repositories
-(require a pull request): pushing to the panel's `main` deploys it.
+Two-factor sign-in on Cloudflare, Azure, Google Cloud / Firebase, GitHub and the admin's Google
+account; no Cloudflare members you do not need; login notifications on; least-privilege API tokens.
+GitHub: protect `main` in both repositories (pushing to the panel's `main` deploys it).
 
-### 7.8 Where to look
+### 6.8 Where to look
 
-- Application Insights: `[SECURITY_ALERT]` (alert from 3.6) and `[ADMIN_ACTION]`.
+- Application Insights: `[SECURITY_ALERT]` (alert 2.6), `[ADMIN_ACTION]`.
+- Cloudflare → admin-panel → **Observability**: every request (with its address; a user search's
+  query is part of it) and the Worker's lines with a readable message and level; filter by
+  `[SECURITY_ALERT]` or `[ADMIN_ACTION]`.
 - Cloudflare → Security → **Events**: what the WAF rules and the rate limit blocked.
-- Workers & Pages → admin-panel → **Observability**: every request (100%, with its address; a user
-  search's query is part of it) and the Worker's own lines, each with a readable message and a
-  level. Filter by `[SECURITY_ALERT]` (another host, a request not from the panel's page, a Google
-  return the panel did not start, an unknown API path, a non-admin signing in) or `[ADMIN_ACTION]`
-  (sign-ins and calls, with the uid); errors include the backend refusing the Worker (check
-  `PANEL_SIGNING_SECRET` in both places) and sign-ins failing because the backend is unreachable.
 
-## Part 8. Rollback
+---
 
-**Backend** (safe right after this deploy; no drafts or deleted items exist yet):
+## Part 7. Rollback
+
+**Backend** (safe right after the deploy: no drafts or deleted items exist yet; once the panel
+writes, empty the bin and publish or remove drafts first):
 
 ```bash
 az functionapp config appsettings set -g codzienniefitgroup -n fitfunctions --settings WEBSITE_RUN_FROM_PACKAGE=1 -o none && az functionapp restart -g codzienniefitgroup -n fitfunctions
 ```
 
-**Panel**:
+**Panel** (then `git revert` the bad commit and push, or the next push deploys it again):
 
 ```bash
 cd /Users/mzolnieruk/github/admin-panel && npx wrangler rollback
 ```
 
-(or Workers & Pages → admin-panel → Deployments → previous → Rollback). The next push to `main`
-deploys again, so also `git revert` the bad commit and push. Rolling the panel back never affects
-the app or Retool.
+**Emergency**: remove the panel's custom domain (Workers & Pages → admin-panel → Domains & Routes;
+the panel disappears at once); remove the admin's line from `panelAdmins.ts` and deploy the
+backend, or sign everyone out (AUTH-HARDENING.md §8); rotate `PANEL_SIGNING_SECRET` (Part 8).
 
-**In an emergency**: remove the admin's line from `panelAdmins.ts` and deploy the backend, or sign
-everyone out (AUTH-HARDENING.md §8); rotate `PANEL_SIGNING_SECRET` (Part 9); remove the panel's
-custom domain in Workers & Pages → admin-panel → Domains & Routes (the panel disappears at once).
-
-## Part 9. After launch
+## Part 8. After launch
 
 - **Opening a section for writing**: its line in `src/data/api/capabilities.ts` (`"test-only"`
   first: only items whose stored internal comment starts with `[TEST]`) and its name in
-  `OPEN_FOR_WRITING` in `worker/proxy.ts`, together; push to `main`. `"on"` only once accepted.
-- **Messages and accounts** (`sendMessage`, `messages`, `users`): first build the rate limit and
-  the second confirmation step (AUTH-HARDENING.md rules 17 and 18) in the backend.
-- **Adding an admin**: they sign in and are refused (the page shows their user id); check their
-  Firebase account signs in only with Google; add the id to `src/config/panelAdmins.ts` with a
-  comment saying who it is; deploy the backend. **Removing one**: take the line out and deploy.
+  `OPEN_FOR_WRITING` in `worker/proxy.ts`, together; push to `main`. `"on"` once accepted.
+- **Messages and accounts** (`sendMessage`, `messages`, `users`): first the rate limit and the second
+  confirmation step (AUTH-HARDENING.md rules 17 and 18) in the backend.
+- **Adding an admin**: they sign in and are refused (the page shows their user id); check they sign
+  in only with Google; add the id to `src/config/panelAdmins.ts` with a comment; deploy the backend.
+  **Removing**: take the line out and deploy.
 - **Rotating `PANEL_SIGNING_SECRET`** without downtime: new value in Azure as
-  `PANEL_SIGNING_SECRET_NEXT`; the same value in the Worker as `PANEL_SIGNING_SECRET`; in Azure move
-  it to `PANEL_SIGNING_SECRET` and delete `…_NEXT`.
-- **Not part of this deploy**: the mobile app's Wrapped wiring and switching Wrapped on
-  (`WRAPPED_ENABLED=true`).
+  `PANEL_SIGNING_SECRET_NEXT`; the same in the Worker as `PANEL_SIGNING_SECRET`; in Azure move it to
+  `PANEL_SIGNING_SECRET` and delete `…_NEXT`.
+- **Not part of this deploy**: the mobile app's Wrapped wiring and switching Wrapped on.
+
+## Part 9. After Retool is retired (only the panel is used)
+
+Do this only once every job Retool did is done in the panel and its sections are open for writing
+(`"on"`). Until then Retool's routes must stay exactly as they are.
+
+**Retool itself**
+- [ ] Export the Retool app for the archive, then delete it and its resource "Fit Azure HTTP".
+- [ ] **Renew the Function App's master key** (Azure portal → Function App → App keys → `_master` →
+  Renew): Retool's routes are `authLevel: 'admin'`, so Retool has held the master key. After the
+  renewal nothing outside Azure has it.
+- [ ] Remove the app setting `ADMIN_FUNCTIONS_KEY` (Retool's second way in, `x-functions-key`).
+
+**Backend routes used only by Retool** (`authLevel: 'admin'`, or admin-checked without `panel/`):
+
+| Folder in `functions/` | Routes | Note |
+| --- | --- | --- |
+| `manageChallenges` | `manageChallenges`, `manageChallenges/{id}`, `manageChallenges/promotedChallenge` | the panel uses `panel/…` |
+| `manageWorkouts` (and the `manageWorkouts` base registration) | `manageWorkouts`, `manageWorkouts/{id}` | |
+| `manageBadges` | base, **`createRepeatBadges`** (hard-deletes milestone badges), `grantManual`, `revokeManual` | remove `createRepeatBadges` first; the panel never had it |
+| `manageMessageDrafts` | `list`, `upsert`, `publish`, `archive`, `unsend` | `unsend` has no panel equivalent yet: build it in the panel first if still needed |
+| `manageMedia` | `manageMedia/files` | Retool's upload: any folder, no size or content check |
+| `adminUserBadges`, `adminUserProgress`, `adminUsers`, `adminOffers` | user badges and grants, user progress, user search, offers | |
+| `users` | `accounts/{userId}` (GET, PUT) | |
+| `wrapped` | `manage/wrapped` | Retool's Wrapped preview; the panel could show it instead |
+| `usage`, `youTubeSync` | `usage/*`, `youTubeSync/{action}` | **check first** whether anything else (a script, a schedule) calls them |
+
+**Backend code that exists only for Retool**
+- [ ] In the handlers and `contentEditing.ts`: every branch for a call without a panel admin
+  (`panelAdminOf(request) == null`): Retool's old error texts and status codes, forgiving trims,
+  saves without versions, "keep the stored status when `hidden` is not sent", the
+  `overrideAlreadySent` flag, Retool's own `validateAdminChallenge`/`validateAdminOffer` paths.
+- [ ] `requestedEtag`'s "null for non-panel callers"; then every save requires a version.
+- [ ] `AccountService.isAdmin`: the functions-key branch, `LEGACY_ADMIN_UID` and the custom-claims
+  branch; only the panel guard remains.
+- [ ] The tests that pin Retool's behaviour ("Retool keeps…", "Retool unchanged"), and the rule in
+  the backend's `CLAUDE.md` that Retool's routes keep today's rules.
+- [ ] The rule "never edit the same item in Retool and in the panel" (this guide, Part 2).
+
+**Keep**
+- The `Hidden` column next to `Status`: old mobile builds read it.
+- Every public endpoint the app uses (`internalConfig`, `workoutsConfig`, challenges, workouts, …).
+- The panel's `panel/…` routes, its guard, the audit and the logs.
+
+**In the panel**
+- [ ] Nothing has to go. Optionally the `etag: false` fallback in `src/data/api/capabilities.ts`
+  (a way back for a backend without the editing contract).
 
 ## Part 10. Later (not in v1): Cloudflare Access
 
 A second gate in front of the whole panel: Cloudflare asks for an e-mail on a list before any page,
-code or API of the panel is served, so scanners and bots see only Cloudflare's sign-in. Free for up
-to 50 users. Steps: Zero Trust → Access → Applications → Self-hosted → domain
-`panel.codzienniefitapp.com` → policy Allow, Include → Emails → the admin's address; session 24
-hours; One-time PIN or Google as login method. Details and reasoning: CLOUDFLARE-SECURITY.md §1.
+code or API is served. Free for up to 50 users. Zero Trust → Access → Applications → Self-hosted →
+domain `panel.codzienniefitapp.com` → policy Allow, Include → Emails → the admin's address; session
+24 hours; One-time PIN or Google. Reasoning: CLOUDFLARE-SECURITY.md §1.

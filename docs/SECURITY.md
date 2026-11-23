@@ -5,7 +5,9 @@ is connected to real data. Reviewed 2026-11-10, after Phase 4, and again 2026-11
 tree.
 
 Related: [RISKS.md](RISKS.md), [BACKEND-SCOPE.md](BACKEND-SCOPE.md) (B0 is the backend's side of
-sign-in), [research/backend-audit.md](research/backend-audit.md).
+sign-in), [research/backend-audit.md](research/backend-audit.md),
+[ACCESS-MODES.md](ACCESS-MODES.md) (what can be downloaded signed out and signed in, and the rules
+that keep it so).
 
 ## 1. Where things stand
 
@@ -197,19 +199,20 @@ Here the browser holds nothing readable, and the backend decides.
 | Property | How |
 |---|---|
 | The page holds no credential | The session is one cookie the page cannot read. The page asks `/auth/session` who is signed in and gets a name, never a token |
+| The panel's code only after sign-in | Signed out, only the Worker's own sign-in page (no JavaScript), `robots.txt`, the icons, `/api/health` and `/auth/*`; every other file is 404. A sign-in sets a sealed pass cookie (`__Host-cf_pass`, Lax, as long as the session) that lets the browser download the code and opens no data. Details and rules: [ACCESS-MODES.md](ACCESS-MODES.md) |
 | The backend decides who is an admin | Its own list of Firebase user ids, in its code. Checked when the session is created and again on every call. The Worker has no list |
 | One way in | Google, through Firebase. No password route, no Apple route. The backend refuses a session that was not made by signing in with Google |
 | The session ends | 48 hours after sign-in, signed into the session by Firebase. Sooner when the person signs out (the backend records the time and refuses older sessions; the mobile app stays signed in), is taken off the list (next call), or the account is disabled |
 | The Worker cannot be walked around | The backend accepts a panel call only with the Worker's signature (HMAC-SHA256 over the time, method, path, query and session). A Firebase token from the mobile app opens nothing |
 | A mistake in the Worker is not fatal | The backend checks session, list and signature itself. The Worker holds no key that opens the admin routes by itself |
 | Cookies cannot be read or planted | `HttpOnly`, `Secure`, and the `__Host-` name, which makes the browser refuse them from a subdomain, from plain http, or with a wider path |
-| Cookies are not sent for another site | `SameSite=Strict` |
+| Cookies are not sent for another site | `SameSite=Strict` for the session. Lax only where the page that ends Google's redirects needs it: the sign-in under way, the refusal note, and the pass, none of which opens data |
 | A request from another site is refused even if a cookie were sent | `/auth/*` and `/api/*` need the header `x-cf-panel`, a matching `Origin` when the browser sends one, and `Sec-Fetch-Site: same-origin`; a request that changes something without `Sec-Fetch-Site` is refused. Exceptions, each safe by itself: starting a sign-in (only from the panel or the address bar), finishing one (needs the state from an encrypted cookie), loading a picture (only from the panel's own page) |
 | One address | Any host other than `PANEL_ORIGIN` gets 404, including `workers.dev` and old versions' addresses |
 | Read-only is decided by the server | The Worker forwards only the calls in its table (`ROUTES` in `worker/proxy.ts`), and a call that writes only when its area is in `OPEN_FOR_WRITING`, which holds only `cache`: clearing the app's CDN cache changes no data, and the backend refuses a second purge within 30 seconds |
 | Google | Authorization-code flow with PKCE, a random `state` and `nonce` kept for ten minutes in an encrypted cookie and compared on return. Google's token is checked in the Worker (audience, issuer, expiry, nonce, verified e-mail) before it goes to Firebase. The return address is built from `PANEL_ORIGIN` |
 | The Worker forwards to one place | The backend's origin is a setting; only `accept`, `content-type`, `if-match`, `if-none-match` go out and only `content-type`, `etag` come back; the query is rebuilt from its parts. Cookies never leave; redirects are not followed |
-| Nothing admin is cached | `cache-control: no-store` on every answer except pictures (`private`) |
+| Nothing admin is cached | `cache-control: no-store` on every answer except pictures (`private`); the panel's files, served with a pass, are `private` too |
 | Files cannot run as the panel | `/api/files` takes one path inside the container, fetches only from `MEDIA_ORIGINS`, and serves only pictures, sound, video and PDF; anything else is 415 |
 | Every answer of the Worker carries security headers | `nosniff`, `Cross-Origin-Resource-Policy: same-origin`, `Referrer-Policy: no-referrer`, and a policy that lets a data answer load nothing |
 | There is a record | The Worker logs every refusal, sign-in outcome and forwarded write, without addresses' queries, bodies, cookies or tokens. The backend records every change made through the panel |
@@ -222,7 +225,6 @@ Accepted, with the reason:
 | No second factor that code can require | Google does not say whether 2-Step Verification was used. It is a rule for the two to four admins, checked by asking | AUTH-HARDENING.md section 4.5: Firebase's own second factor, or Cloudflare Access in front |
 | No idle limit | A session is 48 hours whatever happens in between | If the panel is used on shared computers |
 | The Worker does not check the signature of Google's token | It receives it from Google's own endpoint over TLS, checks its claims, and Firebase checks the signature | If a token ever arrives from the browser |
-| The Test environment is open to anyone with the address | Sample data only | Cloudflare Access in front of the panel closes it |
 | Signing in with Google creates an app account for a stranger who has none | Firebase does this; the same person could install the app. The account gets no session here. It is not deleted, because being wrong about "new" would delete a customer | Never, unless accounts pile up |
 | A script that got into the panel's own bundle can do what the signed-in admin can do | No sign-in design prevents it. The Worker's table, the read-only switch and the record bound it | Limits per admin and a second step for "send to all" and "change e-mail" before those are opened (AUTH-HARDENING.md rules 17, 18) |
 | `workers.dev` is still switched on in `wrangler.json` | The custom domain is not known in the repository yet. The host check makes Produkcja unreachable there | When the domain is set ([SIGN-IN-SETUP.md](SIGN-IN-SETUP.md) §3) |
@@ -250,7 +252,7 @@ The short list used by [DEFINITION-OF-DONE.md §5](DEFINITION-OF-DONE.md).
 
 | Item | Why it is acceptable now | Revisit |
 |---|---|---|
-| The demo is open to anyone with the address | Sample data only, kept in the visitor's own browser; `noindex`. Produkcja can now be picked by anyone too, and that gives them a sign-in page and nothing else: the Worker's session and the backend are the protection, not the selector | If the demo should be private: Cloudflare Access |
+| The demo is open to anyone with the address | Only where sign-in is not configured (this machine, the UI tests). On the deployed panel the code, the demo included, is downloaded only after sign-in ([ACCESS-MODES.md](ACCESS-MODES.md)) | If the panel should be hidden even from its sign-in page: Cloudflare Access |
 | `style-src 'unsafe-inline'` | Needed by React style attributes and the component library; does not permit script | If the libraries gain nonce support |
 | Entitlement and offering ids are typed by hand and not checked against RevenueCat | Same as Retool; a wrong id means a purchase unlocks nothing, which is visible, not a leak | Phase 6 or stage 2 |
 | The sample-data mock trusts the browser | It is not a security boundary; it exists to be manipulated for testing | Never: it is removed from the path when Produkcja is selected |

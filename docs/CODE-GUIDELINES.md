@@ -237,6 +237,9 @@ Short form; the reasons are in [SECURITY.md](SECURITY.md).
 - No token or personal data in `localStorage`, in an address, or in a log.
 - File uploads are checked by `uploadProblem` and named by `uploadPath`. Never use a file's own
   name as a path.
+- Before sign-in only the Worker's sign-in page, `robots.txt`, the icons, `/api/health` and
+  `/auth/*` are downloadable. Before touching `public/`, `wrangler.json` `assets`, `worker/gate.ts`
+  or `worker/loginPage.ts`, read the rules in [ACCESS-MODES.md](ACCESS-MODES.md) §7.
 
 ## 13. Git and deployment
 

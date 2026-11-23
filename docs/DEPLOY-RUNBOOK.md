@@ -4,44 +4,75 @@ Everything needed to put the backend's panel routes and the panel itself into pr
 what is done already. Marks: ✅ done (checked), ⬜ to do, ❓ done by hand, cannot be checked from
 outside (confirm it yourself).
 
-**Status on 2026-11-23, 17:10:** the panel is live at `https://panel.codzienniefitapp.com`, fully
-configured, and offers Google sign-in. **Sign-in does not work yet because the backend's panel
-routes are not deployed** (`/api/panel/…` answers 404; the PR is not merged). Production runs the
-backend's `main` (`31cc84c`); the deploy adds only the panel work on top of it.
+**Where we are (2026-11-23, evening):** the panel is live at `https://panel.codzienniefitapp.com`,
+fully configured, and its code is served only after sign-in. **Sign-in does not work yet because
+the backend's panel routes are not deployed** (`/api/panel/…` answers 404; the PR is not merged).
+Production runs the backend's `main` (`31cc84c`); the backend deploy adds only the panel work.
 
 Both launch **read-only**: in Produkcja only "Wyczyść cache backendu" writes. Retool keeps working.
 **v1 does not use Cloudflare Access** (Part 10, later).
+
+**Before changing the panel's Worker, read [ACCESS-MODES.md](ACCESS-MODES.md)**: what a signed-out
+visitor may download, the pass, and the rules (with their tests) that keep the panel's code and data
+from leaking.
 
 You create and paste every secret yourself. None goes in a file, a commit or a chat.
 
 ---
 
-## Status board
+## A. Done ✅
 
-| # | Step | Status | Where |
-| --- | --- | --- | --- |
-| 1 | Panel admin `6bt7loE8cCgfvRTeir9pdlXSETN2` in the backend's code; Wrapped testers in code | ✅ | 1.2 |
-| 2 | Panel code on `admin-panel` `main`, deployed by Cloudflare on every push | ✅ (`dc7d76e`) | 4 |
-| 3 | `wrangler.json`: custom domain, `workers_dev` off, `keep_vars`, logs and traces at 100% | ✅ | 1.4 |
-| 4 | DNS record and certificate for `panel.codzienniefitapp.com` (made by Cloudflare) | ✅ | 5.1 |
-| 5 | `admin-panel.marta-100.workers.dev` switched off | ✅ (404) | 5.1 |
-| 6 | Google OAuth client, redirect `https://panel.codzienniefitapp.com/auth/google/callback` | ✅ (sign-in reaches Google and returns) | 3 |
-| 7 | Worker's eight values set and valid | ✅ (no value reported missing) | 5.2 |
-| 8 | `PANEL_SIGNING_SECRET` and `SIGN_IN_COOKIE_KEY` are type **Secret**, and were regenerated after being plain Variables | ❓ | 5.2 |
-| 9 | Build settings: production branch `main`, deploy command `npx wrangler deploy`, no branch builds | ❓ | 1.5 |
-| 10 | Merge backend PR "Feat/admin panel backend" | ⬜ | 2.1 |
-| 11 | Run all backend tests on `main` | ⬜ | 2.2 |
-| 12 | Azure: `PANEL_SIGNING_SECRET` = the **same** value as in the Worker; table 1.1 checked | ⬜ | 2.3 |
-| 13 | Build, dry run, deploy the backend; purge Cloudflare | ⬜ | 2.4 |
-| 14 | Backend checks (panel route 401, app, Wrapped closed, recommendations) and Retool check | ⬜ | 2.5 |
-| 15 | First sign-in to the panel and the panel checks | ⬜ | 5.3 |
-| 16 | Application Insights alert on `[SECURITY_ALERT]` | ⬜ | 2.6 |
-| 17 | Cloudflare security settings (AI bots, WAF, rate limit) | ⬜ | 6.1–6.3 |
-| 18 | HSTS and TLS settings | ⬜ (no HSTS header yet) | 6.4 |
-| 19 | DNSSEC | ⬜ (no DS record yet) | 6.5 |
-| 20 | E-mail anti-spoofing records (null MX, SPF, DMARC, DKIM) | ⬜ (none yet) | 6.6 |
-| 21 | Two-factor sign-in on every account; GitHub branch protection | ❓ | 6.7 |
-| — | After Retool is retired: remove its routes, renew the master key | later | 9 |
+1. ✅ Panel admin `6bt7loE8cCgfvRTeir9pdlXSETN2` in the backend's code; three Wrapped testers in
+   code (1.2).
+2. ✅ The panel's code on `admin-panel` `main`; Cloudflare deploys every push (Part 4).
+3. ✅ `wrangler.json`: custom domain, `workers_dev` off, `keep_vars`, logs and traces at 100%, the
+   `ASSETS` binding and `run_worker_first: true` (1.4).
+4. ✅ DNS record and certificate for `panel.codzienniefitapp.com`, made by Cloudflare (5.1).
+5. ✅ `admin-panel.marta-100.workers.dev` switched off (404).
+6. ✅ Google OAuth client with the redirect `https://panel.codzienniefitapp.com/auth/google/callback`
+   (Part 3); sign-in reaches Google and comes back.
+7. ✅ The Worker's eight values set and valid (5.2).
+8. ✅ Search engines and AI crawlers turned away (`robots.txt`, `noindex`/`noai` everywhere); the
+   sign-in page says nothing about what is behind it.
+9. ✅ **The panel's code only after sign-in**: without a pass, every page is the Worker's own
+   sign-in page and every file of the panel answers 404; a deployed Worker with a setting missing
+   stays closed (ACCESS-MODES.md). Live once its push is deployed.
+10. ✅ Readable logs: `[ADMIN_ACTION]` and `[SECURITY_ALERT]` in the Worker (Cloudflare Observability)
+    and in the backend (Application Insights, after the backend deploy).
+
+**Confirm yourself** (cannot be checked from outside) ❓
+
+- ❓ `PANEL_SIGNING_SECRET` and `SIGN_IN_COOKIE_KEY` show as type **Secret** in the Worker, and were
+  regenerated after being plain Variables at first (5.2).
+- ❓ Worker build settings: production branch `main`, deploy command `npx wrangler deploy`, no
+  branch builds (1.5).
+- ❓ Your admin account signs in to Firebase **only with Google**, 2-Step Verification on (Part 3).
+- ❓ Two-factor sign-in on Cloudflare, Azure, Google Cloud / Firebase and GitHub; branch protection
+  on `main` in both repositories (6.7).
+
+## B. To do now, in this order ⬜
+
+1. ⬜ **Merge** the backend PR "Feat/admin panel backend" (2.1).
+2. ⬜ **Run all backend tests** on `main` (2.2).
+3. ⬜ **Azure**: `PANEL_SIGNING_SECRET` = the same value as in the Worker; go through table 1.1 (2.3).
+4. ⬜ **Deploy the backend** at a quiet hour: build, dry run, deploy, purge Cloudflare (2.4).
+5. ⬜ **Check the backend and Retool** (2.5): panel route `401`, app `200`, Wrapped `401`,
+   recommendations; the mobile app; Retool's lists without saving anything.
+6. ⬜ **First sign-in** and the panel checks (5.3). Everyone signs in once more after the gate's
+   deploy (sessions from before have no pass).
+7. ⬜ **Alert** on `[SECURITY_ALERT]` in Application Insights (2.6).
+8. ⬜ **Cloudflare security**: Block AI bots, five WAF rules, the sign-in rate limit (6.1–6.3).
+9. ⬜ **HSTS and TLS** settings (6.4). No HSTS header yet.
+10. ⬜ **DNSSEC** (6.5). No DS record yet.
+11. ⬜ **E-mail anti-spoofing records** after checking nothing sends mail as the domain (6.6).
+
+## C. Later
+
+- **Opening sections for writing**, one at a time, `[TEST]` items first (Part 8).
+- **Before opening messages and accounts**: the rate limit and second confirmation step in the
+  backend (Part 8).
+- **After Retool is retired**: the numbered steps in Part 9.
+- **Cloudflare Access** in front of the panel, if wanted (Part 10).
 
 ---
 
@@ -137,7 +168,9 @@ copy these into `wrangler.json`, even when Cloudflare's banner suggests it.
 
 `wrangler.json`: `"workers_dev": false`, `"preview_urls": false`, `"keep_vars": true`,
 `"routes": [{ "pattern": "panel.codzienniefitapp.com", "custom_domain": true }]`, observability
-with logs (including request logs) and traces at 100%.
+with logs (including request logs) and traces at 100%, and `assets` with `"binding": "ASSETS"` and
+`"run_worker_first": true`, so the panel's code is served only after sign-in
+([ACCESS-MODES.md](ACCESS-MODES.md)).
 
 ### 1.5 Cloudflare: Worker `admin-panel` → Settings → Build ❓
 
@@ -328,6 +361,18 @@ pbcopy < /dev/null
 
 ### 5.3 First sign-in and checks ⬜ (after Part 2)
 
+0. Before signing in, only the sign-in page, `robots.txt` and the icons can be downloaded
+   ([ACCESS-MODES.md](ACCESS-MODES.md)). In a private window, View Source of
+   `https://panel.codzienniefitapp.com/challenges`: a short page with no `<script>`. From a terminal
+   (expect `404`, `200`, `200`):
+
+   ```bash
+   for p in /assets/index.js /favicon.ico /robots.txt; do curl -s -o /dev/null -w "%{http_code} $p\n" -A "Mozilla/5.0" "https://panel.codzienniefitapp.com$p"; done
+   ```
+
+   Once rule 6.2e is on, plain `curl` (its own user agent) is challenged (403) instead; `-A` above
+   avoids that. Any `/assets/…js` address answers 404 until you sign in.
+   If you were signed in before this version, you see the sign-in page once and sign in again.
 1. The sign-in page shows only "Zaloguj się przez Google", no environment switch, no missing list.
 2. A Google account **not** on the list: refused, its user id shown; Application Insights:
    `[SECURITY_ALERT] … NOT_PANEL_ADMIN … uid=…`.
@@ -478,50 +523,46 @@ backend, or sign everyone out (AUTH-HARDENING.md §8); rotate `PANEL_SIGNING_SEC
 
 ## Part 9. After Retool is retired (only the panel is used)
 
-Do this only once every job Retool did is done in the panel and its sections are open for writing
-(`"on"`). Until then Retool's routes must stay exactly as they are.
+Start only when every job Retool did is done in the panel and those sections are open for writing
+(`"on"`). Until then Retool's routes must stay exactly as they are. Do the steps in order; each
+backend change is a normal deploy (Part 2) with all tests passing.
 
-**Retool itself**
-- [ ] Export the Retool app for the archive, then delete it and its resource "Fit Azure HTTP".
-- [ ] **Renew the Function App's master key** (Azure portal → Function App → App keys → `_master` →
-  Renew): Retool's routes are `authLevel: 'admin'`, so Retool has held the master key. After the
-  renewal nothing outside Azure has it.
-- [ ] Remove the app setting `ADMIN_FUNCTIONS_KEY` (Retool's second way in, `x-functions-key`).
+1. ⬜ **Check nothing is lost.** Message "unsend" has no panel equivalent yet: build it in the panel
+   first if it is still needed. Check whether anything besides Retool calls `usage/*` or
+   `youTubeSync/{action}` (a script, a schedule).
+2. ⬜ **Export the Retool app** for the archive, then delete it and its resource "Fit Azure HTTP".
+3. ⬜ **Renew the Function App's master key** (Azure portal → Function App → App keys → `_master` →
+   Renew). Retool's routes are `authLevel: 'admin'`, so Retool has held the master key.
+4. ⬜ **Remove the app setting `ADMIN_FUNCTIONS_KEY`** (Retool's second way in, `x-functions-key`).
+5. ⬜ **Remove `createRepeatBadges`** first (it hard-deletes milestone badges; the panel never had
+   it). Deploy.
+6. ⬜ **Remove the rest of Retool's routes** and deploy:
 
-**Backend routes used only by Retool** (`authLevel: 'admin'`, or admin-checked without `panel/`):
+   | Folder in `functions/` | Routes |
+   | --- | --- |
+   | `manageChallenges` | `manageChallenges`, `manageChallenges/{id}`, `manageChallenges/promotedChallenge` |
+   | `manageWorkouts` (and the `manageWorkouts` base registration) | `manageWorkouts`, `manageWorkouts/{id}` |
+   | `manageBadges` | base, `grantManual`, `revokeManual` |
+   | `manageMessageDrafts` | `list`, `upsert`, `publish`, `archive`, `unsend` |
+   | `manageMedia` | `manageMedia/files` (Retool's upload: any folder, no checks) |
+   | `adminUserBadges`, `adminUserProgress`, `adminUsers`, `adminOffers` | user badges and grants, progress, search, offers |
+   | `users` | `accounts/{userId}` (GET, PUT) |
+   | `wrapped` | `manage/wrapped` (Retool's Wrapped preview) |
+   | `usage`, `youTubeSync` | only if step 1 found nothing else calling them |
 
-| Folder in `functions/` | Routes | Note |
-| --- | --- | --- |
-| `manageChallenges` | `manageChallenges`, `manageChallenges/{id}`, `manageChallenges/promotedChallenge` | the panel uses `panel/…` |
-| `manageWorkouts` (and the `manageWorkouts` base registration) | `manageWorkouts`, `manageWorkouts/{id}` | |
-| `manageBadges` | base, **`createRepeatBadges`** (hard-deletes milestone badges), `grantManual`, `revokeManual` | remove `createRepeatBadges` first; the panel never had it |
-| `manageMessageDrafts` | `list`, `upsert`, `publish`, `archive`, `unsend` | `unsend` has no panel equivalent yet: build it in the panel first if still needed |
-| `manageMedia` | `manageMedia/files` | Retool's upload: any folder, no size or content check |
-| `adminUserBadges`, `adminUserProgress`, `adminUsers`, `adminOffers` | user badges and grants, user progress, user search, offers | |
-| `users` | `accounts/{userId}` (GET, PUT) | |
-| `wrapped` | `manage/wrapped` | Retool's Wrapped preview; the panel could show it instead |
-| `usage`, `youTubeSync` | `usage/*`, `youTubeSync/{action}` | **check first** whether anything else (a script, a schedule) calls them |
+7. ⬜ **Remove the code that exists only for Retool** and deploy: every branch for a call without a
+   panel admin (`panelAdminOf(request) == null`) in the handlers and `contentEditing.ts` (old error
+   texts, forgiving trims, saves without versions, "keep the stored status when `hidden` is not
+   sent", `overrideAlreadySent`, Retool's own validation paths); `requestedEtag`'s "null for
+   non-panel callers", so every save requires a version; in `AccountService.isAdmin` the
+   functions-key branch, `LEGACY_ADMIN_UID` and the custom-claims branch.
+8. ⬜ **Remove the tests that pin Retool's behaviour** and the rule in the backend's `CLAUDE.md` that
+   Retool's routes keep today's rules; drop the "never edit in Retool and the panel" rule here
+   (Part 2).
+9. ⬜ Optional, in the panel: the `etag: false` fallback in `src/data/api/capabilities.ts`.
 
-**Backend code that exists only for Retool**
-- [ ] In the handlers and `contentEditing.ts`: every branch for a call without a panel admin
-  (`panelAdminOf(request) == null`): Retool's old error texts and status codes, forgiving trims,
-  saves without versions, "keep the stored status when `hidden` is not sent", the
-  `overrideAlreadySent` flag, Retool's own `validateAdminChallenge`/`validateAdminOffer` paths.
-- [ ] `requestedEtag`'s "null for non-panel callers"; then every save requires a version.
-- [ ] `AccountService.isAdmin`: the functions-key branch, `LEGACY_ADMIN_UID` and the custom-claims
-  branch; only the panel guard remains.
-- [ ] The tests that pin Retool's behaviour ("Retool keeps…", "Retool unchanged"), and the rule in
-  the backend's `CLAUDE.md` that Retool's routes keep today's rules.
-- [ ] The rule "never edit the same item in Retool and in the panel" (this guide, Part 2).
-
-**Keep**
-- The `Hidden` column next to `Status`: old mobile builds read it.
-- Every public endpoint the app uses (`internalConfig`, `workoutsConfig`, challenges, workouts, …).
-- The panel's `panel/…` routes, its guard, the audit and the logs.
-
-**In the panel**
-- [ ] Nothing has to go. Optionally the `etag: false` fallback in `src/data/api/capabilities.ts`
-  (a way back for a backend without the editing contract).
+**Keep:** the `Hidden` column next to `Status` (old mobile builds read it); every public endpoint the
+app uses; the panel's `panel/…` routes, its guard, the audit and the logs.
 
 ## Part 10. Later (not in v1): Cloudflare Access
 

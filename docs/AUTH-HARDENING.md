@@ -246,7 +246,9 @@ not to.
 11. The page's code MUST never receive the session or any token. It learns who is signed in from
     `/auth/session`, which the Worker answers by asking the backend.
 12. The sign-in attempt cookie (state, PKCE value, nonce; ten minutes) MUST be sealed with a key
-    used for nothing else. *It is the last sealed cookie; its key no longer protects any session.*
+    used for nothing else. *Its key no longer protects any session. The refusal note and the pass
+    to the panel's code ([ACCESS-MODES.md](ACCESS-MODES.md)) are sealed with the same key, each
+    with its own purpose bound in; none of them opens data.*
 13. The Worker MUST check Google's token itself before passing it to Firebase: audience, issuer,
     expiry, nonce and a verified e-mail. *Ten lines that remove the dependence on Firebase
     catching a wrong token.*

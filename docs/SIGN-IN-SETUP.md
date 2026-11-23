@@ -46,7 +46,7 @@ is what you need to add them.
 | `FIREBASE_API_KEY`     | Text       | The Firebase project's Web API key. Not a secret: it ships in the mobile app           | Firebase console    |
 | `GOOGLE_CLIENT_ID`     | Text       | Google OAuth client id                                                                 | Section 5           |
 | `GOOGLE_CLIENT_SECRET` | **Secret** | Its secret                                                                             | Section 5           |
-| `SIGN_IN_COOKIE_KEY`   | **Secret** | 32 random bytes. Protects a sign-in on its way to Google and back, and nothing else    | Section 6           |
+| `SIGN_IN_COOKIE_KEY`   | **Secret** | 32 random bytes. Seals a sign-in on its way to Google and back, the refusal note and the pass to the panel's code; no session | Section 6           |
 | `PANEL_SIGNING_SECRET` | **Secret** | Shared with the backend. Signs every forwarded call                                    | Section 6           |
 
 Add the "Text" ones as type Text so they can be read back and reviewed; only the three marked
@@ -172,6 +172,6 @@ signed in.
 | Value                  | How                                                                                                                                                  | Effect                                        |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `PANEL_SIGNING_SECRET` | Azure: add the new value as `PANEL_SIGNING_SECRET_NEXT`. Cloudflare: set the new value. Azure: move it to `PANEL_SIGNING_SECRET` and delete `…_NEXT` | No interruption                               |
-| `SIGN_IN_COOKIE_KEY`   | Set a new one                                                                                                                                        | A sign-in under way at that moment fails once |
+| `SIGN_IN_COOKIE_KEY`   | Set a new one                                                                                                                                        | A sign-in under way at that moment fails once, and everyone signed in sees the sign-in page at the next page load and signs in once more (the pass to the panel's code no longer opens) |
 | `GOOGLE_CLIENT_SECRET` | New secret in the Google console, set it in Cloudflare, delete the old one in Google                                                                 | None                                          |
 | Sign everyone out      | [AUTH-HARDENING.md](AUTH-HARDENING.md) section 8                                                                                                     |                                               |

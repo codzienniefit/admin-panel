@@ -42,8 +42,14 @@ import {
 export const SESSION_COOKIE = "__Host-cf_session";
 /** A sign-in on its way to Google and back. */
 const ATTEMPT_COOKIE = "__Host-cf_oauth";
-/** For ten minutes after the backend refused someone: their own user id, for the login page. */
+/** For ten minutes after the backend refused someone: their own user id, for the sign-in page. */
 const REFUSED_COOKIE = "__Host-cf_refused";
+/**
+ * Set with the session: lets the browser download the panel's own code (gate.ts). It opens no data;
+ * every /api call still needs the session, which the backend checks. Lax, unlike the session: the
+ * first page after Google's redirects is a navigation another site started.
+ */
+export const PASS_COOKIE = "__Host-cf_pass";
 
 /** How long someone has to finish signing in at Google. */
 const ATTEMPT_MAX_AGE_S = 10 * 60;
@@ -65,6 +71,12 @@ interface Attempt {
 }
 
 interface Refused {
+	v: 1;
+	uid: string;
+	exp: number;
+}
+
+interface Pass {
 	v: 1;
 	uid: string;
 	exp: number;
@@ -101,7 +113,11 @@ const TEXT = {
 	foreign: "Odrzucono żądanie z innej strony.",
 };
 
-export const clearSession = (): string[] => [clearCookie(SESSION_COOKIE)];
+/** Forgets the session and, with it, the pass to the panel's code. */
+export const clearSession = (): string[] => [
+	clearCookie(SESSION_COOKIE),
+	clearCookie(PASS_COOKIE, "Lax"),
+];
 
 const random = (deps: Deps) => toBase64Url(deps.randomBytes(32));
 
@@ -116,7 +132,8 @@ const backToLogin = (reason: string, cookies: string[]) =>
 
 // ─── Session ────────────────────────────────────────────────────────────────
 
-async function refusedUid(
+/** The user id of the refusal this browser just had, or null. */
+export async function refusedUid(
 	request: Request,
 	env: PanelEnv,
 	deps: Deps,
@@ -130,6 +147,25 @@ async function refusedUid(
 	if (data.v !== 1 || typeof data.uid !== "string") return null;
 	if (typeof data.exp !== "number" || nowSeconds(deps) >= data.exp) return null;
 	return data.uid;
+}
+
+/**
+ * True when the browser holds a pass this Worker sealed that has not expired. It decides only who
+ * may download the panel's code; it is no session and opens no data.
+ */
+export async function hasPass(
+	request: Request,
+	env: PanelEnv,
+	deps: Deps,
+): Promise<boolean> {
+	const sealed = readCookies(request).get(PASS_COOKIE);
+	const key = await cookieKey(env.SIGN_IN_COOKIE_KEY);
+	if (!sealed || !key) return false;
+	const value = await open(key, PASS_COOKIE, sealed);
+	if (typeof value !== "object" || value === null) return false;
+	const data = value as Partial<Pass>;
+	if (data.v !== 1 || typeof data.uid !== "string") return false;
+	return typeof data.exp === "number" && nowSeconds(deps) < data.exp;
 }
 
 async function sessionStatus(
@@ -178,7 +214,7 @@ async function signOut(
 	return json({ status: "signedOut", ended }, 200, [
 		...clearSession(),
 		clearCookie(ATTEMPT_COOKIE, "Lax"),
-		clearCookie(REFUSED_COOKIE),
+		clearCookie(REFUSED_COOKIE, "Lax"),
 	]);
 }
 
@@ -227,7 +263,10 @@ async function startGoogle(
 	params.set("code_challenge", await sha256Base64Url(attempt.verifier));
 	params.set("code_challenge_method", "S256");
 	params.set("prompt", "select_account");
-	return redirect(target.toString(), [remembered, clearCookie(REFUSED_COOKIE)]);
+	return redirect(target.toString(), [
+		remembered,
+		clearCookie(REFUSED_COOKIE, "Lax"),
+	]);
 }
 
 /** The attempt this answer belongs to, or null when it belongs to none. */
@@ -408,14 +447,32 @@ async function finishGoogle(
 			uid: started.user.uid,
 			ray: rayOf(request),
 		});
-		return redirect(attempt.redirect, [
+		const cookies = [
 			...done,
-			clearCookie(REFUSED_COOKIE),
+			clearCookie(REFUSED_COOKIE, "Lax"),
 			cookie(SESSION_COOKIE, started.session, {
 				maxAge: started.maxAge,
 				sameSite: "Strict",
 			}),
-		]);
+		];
+		// canSignIn above means the key is there.
+		const key = await cookieKey(env.SIGN_IN_COOKIE_KEY);
+		if (key) {
+			const pass: Pass = {
+				v: 1,
+				uid: started.user.uid,
+				exp: nowSeconds(deps) + started.maxAge,
+			};
+			cookies.push(
+				cookie(
+					PASS_COOKIE,
+					await seal(key, PASS_COOKIE, pass, deps.randomBytes),
+					// Sent with the navigation that ends Google's chain of redirects.
+					{ maxAge: started.maxAge, sameSite: "Lax" },
+				),
+			);
+		}
+		return redirect(attempt.redirect, cookies);
 	}
 	if (started.reason === "notAdmin") {
 		const key = await cookieKey(env.SIGN_IN_COOKIE_KEY);
@@ -430,7 +487,9 @@ async function finishGoogle(
 				cookie(
 					REFUSED_COOKIE,
 					await seal(key, REFUSED_COOKIE, refused, deps.randomBytes),
-					{ maxAge: REFUSED_MAX_AGE_S, sameSite: "Strict" },
+					// Lax: the sign-in page that shows it (gate.ts) is the end of
+					// Google's redirects, a navigation another site started.
+					{ maxAge: REFUSED_MAX_AGE_S, sameSite: "Lax" },
 				),
 			);
 		}

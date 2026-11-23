@@ -8,7 +8,17 @@ import { fromBase64 } from "./codec";
 // Worker. Until every value below is set, Produkcja is switched off: nobody
 // can sign in and nothing is forwarded.
 
+/** Cloudflare's static assets: the built panel (wrangler.json, `assets.binding`). */
+export interface AssetsBinding {
+	fetch(request: Request): Promise<Response>;
+}
+
 export interface PanelEnv {
+	/**
+	 * The built panel's files, from wrangler.json rather than a setting. Absent only in tests that
+	 * leave it out on purpose.
+	 */
+	ASSETS?: AssetsBinding;
 	/**
 	 * The one address the panel is used at, e.g. "https://panel.example.com".
 	 * A request for any other host is refused before anything else.
@@ -27,8 +37,9 @@ export interface PanelEnv {
 	GOOGLE_CLIENT_ID?: string;
 	GOOGLE_CLIENT_SECRET?: string;
 	/**
-	 * 32 random bytes, base64. Encrypts the cookie that carries a sign-in
-	 * attempt to Google and back, and nothing else. Secret.
+	 * 32 random bytes, base64. Seals the Worker's own cookies: the sign-in
+	 * attempt to Google and back, the refusal note, and the pass to the
+	 * panel's code. None of them is a session. Secret.
 	 */
 	SIGN_IN_COOKIE_KEY?: string;
 	/**
@@ -51,6 +62,11 @@ export interface LogEntry {
 }
 
 export type LogLevel = "info" | "warn" | "error";
+
+/** Refusals that are part of normal use, worded for what they mean. */
+const EXPECTED_REASONS: Record<string, string> = {
+	noPass: "Not served the panel's code: the browser has not signed in",
+};
 
 /** Refusals only someone outside the panel causes: tagged like the backend's alerts. */
 const SECURITY_REASONS: Record<string, string> = {
@@ -82,6 +98,8 @@ export function describeLog(entry: LogEntry): {
 	const reason = text(entry.reason);
 	switch (entry.event) {
 		case "refused": {
+			const expected = EXPECTED_REASONS[reason];
+			if (expected) return { level: "info", message: `${expected}${where}` };
 			const security = SECURITY_REASONS[reason];
 			if (security) {
 				return {

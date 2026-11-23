@@ -16,8 +16,10 @@ and why "Bot Fight Mode" is on the do-not list.
 What the code already does (no setting needed): `robots.txt` turns every crawler away and names
 the AI ones; every page, file and Worker answer says `noindex, nofollow, noarchive, nosnippet,
 noimageindex, noai, noimageai`; the page is titled "Logowanie" and says nothing about what it is
-until you are signed in; the Worker answers only on `PANEL_ORIGIN`; every call to the backend is
-signed; the backend logs every non-admin attempt as `[SECURITY_ALERT]`.
+until you are signed in; before sign-in nothing of the panel's code is downloadable at all, only
+the Worker's own sign-in page (no JavaScript), `robots.txt` and the icons; every `/assets/…` file
+answers 404 ([ACCESS-MODES.md](ACCESS-MODES.md)); the Worker answers only on `PANEL_ORIGIN`; every
+call to the backend is signed; the backend logs every non-admin attempt as `[SECURITY_ALERT]`.
 
 ## 1. Later (not in v1): Cloudflare Access in front of the whole panel
 

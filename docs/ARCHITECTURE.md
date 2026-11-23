@@ -29,7 +29,7 @@ data/
   collections/ one collection per entity, the saver
 auth/          AuthProvider interface, the mock provider
 lib/           the small store for state that is not server data
-worker/        Cloudflare Worker behind /api/* (only /api/health today)
+worker/        Cloudflare Worker: sign-in, /api/* to the backend, the panel's files only after sign-in
 ```
 
 **Allowed imports** go one way:
@@ -274,12 +274,18 @@ components, because the React Compiler does not compile a component that contain
 ## 13. The Worker
 
 Static files are served by Cloudflare, with `index.html` as the fallback for client-side routes and
-`public/_headers` for the security headers. Two prefixes reach the Worker (`wrangler.json`):
+`public/_headers` for the security headers. Every request reaches the Worker first (`wrangler.json`,
+`run_worker_first: true`; the static files are its `ASSETS` binding):
 
-| Prefix | File | Does |
+| Address | File | Does |
 |---|---|---|
-| `/auth/*` | `worker/auth.ts`, `session.ts`, `firebase.ts` | sign-in, the session cookies, sign-out |
+| `/auth/*` | `worker/auth.ts`, `backend.ts`, `firebase.ts` | sign-in, the session cookies and the pass, sign-out |
 | `/api/*` | `worker/proxy.ts` | forwards to the backend for a signed-in admin: one host, a fixed list of endpoints and headers |
+| everything else | `worker/gate.ts`, `loginPage.ts` | the panel's files with a pass; without one the Worker's own sign-in page or 404; the icons and `robots.txt` for anyone |
+
+What each mode of access can download, and the rules for changing it:
+[ACCESS-MODES.md](ACCESS-MODES.md). Until sign-in is configured the files are served to anyone, as
+before (local development, the UI tests).
 
 Its settings (`worker/env.ts`) are Cloudflare secrets; with none set it signs nobody in and forwards
 nothing. Handlers take their `fetch`, clock and random bytes as arguments, so the tests call them

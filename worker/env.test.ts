@@ -445,4 +445,19 @@ describe("describeLog", () => {
 			message: "Refused (READ_ONLY, 403) POST manageWorkouts",
 		});
 	});
+
+	it("words a browser that has not signed in as normal use, not an alert", () => {
+		expect(
+			describeLog({
+				event: "refused",
+				method: "GET",
+				route: "/assets/*",
+				reason: "noPass",
+			}),
+		).toEqual({
+			level: "info",
+			message:
+				"Not served the panel's code: the browser has not signed in GET /assets/*",
+		});
+	});
 });

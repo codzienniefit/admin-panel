@@ -1,14 +1,16 @@
 import { handleAuth } from "./auth";
 import { type Deps, type PanelEnv, panelOrigin, realDeps } from "./env";
+import { fromAssets, handleStatic } from "./gate";
 import { failure, json } from "./http";
 import { handleApi } from "./proxy";
 
 // The panel is a static single-page app. Cloudflare serves the built files
-// and falls back to index.html for the app's own routes; only /api/* and
-// /auth/* reach this Worker (see wrangler.json).
+// and falls back to index.html for the app's own routes. Every request
+// reaches this Worker first (see wrangler.json):
 //
 //   /auth/*  sign-in with Google and the session: auth.ts
 //   /api/*   forwarded to the backend, signed: proxy.ts
+//   the rest the built files, only after sign-in: gate.ts
 //
 // The Test environment of the panel uses neither: it runs on sample data
 // inside the browser.
@@ -22,6 +24,13 @@ export async function handle(
 ): Promise<Response> {
 	const url = new URL(request.url);
 	if (url.pathname === "/api/health") return json({ ok: true });
+	const own =
+		url.pathname.startsWith("/auth/") || url.pathname.startsWith("/api/");
+
+	// Only a Worker without its own address (this machine, the UI tests) serves the files as they
+	// always were. A deployed one (PANEL_ORIGIN set) is closed whatever else is missing: a broken
+	// or deleted setting must never open the panel's code to everyone (docs/ACCESS-MODES.md).
+	if (!own && panelOrigin(env) === null) return fromAssets(request, env);
 
 	// One address only. The Worker also answers on its workers.dev address
 	// and on the address of every old version; there it does nothing.
@@ -41,7 +50,10 @@ export async function handle(
 	if (url.pathname.startsWith("/api/")) {
 		return handleApi(request, env, deps, origin);
 	}
-	return failure(404, "Not found", "NOT_FOUND");
+	// PANEL_ORIGIN is set here.
+	return origin === null
+		? failure(404, "Not found", "NOT_FOUND")
+		: handleStatic(request, env, deps, origin);
 }
 
 export default {

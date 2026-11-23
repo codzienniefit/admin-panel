@@ -121,14 +121,12 @@ describe("GET /api/health", () => {
 
 	it("is that address exactly", async () => {
 		const world = makeWorld();
-		for (const path of [
-			"/api/health/",
-			"/api/health/x",
-			"/api/healthz",
-			"/health",
-		]) {
+		for (const path of ["/api/health/", "/api/health/x", "/api/healthz"]) {
 			expect((await world.send(fromPanel(path))).status, path).toBe(404);
 		}
+		// A page address like any other: the sign-in page, not the answer.
+		const page = await world.send(fromPanel("/health"));
+		expect(await page.text()).not.toContain('"ok"');
 	});
 });
 
@@ -330,7 +328,7 @@ describe("while PANEL_ORIGIN is not set", () => {
 });
 
 describe("addresses that are neither /auth/ nor /api/", () => {
-	it("are 404: the Worker serves no pages", async () => {
+	it("reach neither the sign-in code, the proxy nor, without a pass, the panel's files", async () => {
 		const world = makeWorld();
 		for (const path of [
 			"/",
@@ -345,12 +343,22 @@ describe("addresses that are neither /auth/ nor /api/", () => {
 			"/x/api/manageUsers",
 			"/x/auth/session",
 			"//api/manageUsers",
-			"/index.html",
 		]) {
 			const response = await world.send(fromPanel(path));
-			await expectFailure(response, 404, "NOT_FOUND", path);
+			// The Worker's own sign-in page.
+			expect(response.status, path).toBe(200);
+			expect(response.headers.get("content-type"), path).toBe(
+				"text/html; charset=utf-8",
+			);
+			expect(await response.text(), path).toContain("/auth/google/start");
 		}
+		await expectFailure(
+			await world.send(fromPanel("/index.html")),
+			404,
+			"NOT_FOUND",
+		);
 		expect(world.calls).toEqual([]);
+		expect(world.assets.requests).toEqual([]);
 	});
 });
 

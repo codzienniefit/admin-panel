@@ -79,8 +79,9 @@ export interface CookieOptions {
 	maxAge: number;
 	/**
 	 * Strict: never sent on a request another site started. Lax is only for
-	 * the few minutes of a sign-in that passes through Google and has to come
-	 * back.
+	 * what the first page after Google's redirects needs: the sign-in under
+	 * way, a refusal's user id, and the pass to the panel's code. Never for
+	 * the session.
 	 */
 	sameSite: "Strict" | "Lax";
 }

@@ -10,21 +10,11 @@ import { Logo } from "@/ui/Logo";
 import { Notice } from "@/ui/Notice";
 import { SIGNED_OUT_TITLE, usePageTitle } from "@/ui/pageTitle";
 import { attempt } from "@/ui/tasks";
-
-/** Why a sign-in at Google came back without a session. */
-const RETURN_PROBLEMS: Record<string, string> = {
-	forbidden: "To konto nie ma dostępu.",
-	cancelled: "Logowanie zostało przerwane.",
-	disabled: "To konto jest zablokowane.",
-	tooManyAttempts: "Za dużo prób. Spróbuj ponownie za kilka minut.",
-	unavailable: "Logowanie jest chwilowo niedostępne. Spróbuj za chwilę.",
-	misconfigured:
-		"Logowanie nie jest poprawnie skonfigurowane. Daj znać administratorowi.",
-};
-const FALLBACK = "Nie udało się zalogować";
-
-export const returnProblem = (code: string | undefined): string | null =>
-	code ? (RETURN_PROBLEMS[code] ?? `${FALLBACK}.`) : null;
+import {
+	REFUSED_UID_HINT,
+	returnProblem,
+	SIGN_IN_FAILED,
+} from "./returnProblems";
 
 interface LoginPageProps {
 	/** Where the person was heading when they were stopped. */
@@ -49,7 +39,7 @@ export function LoginPage({ redirect, problem }: LoginPageProps) {
 		setError(null);
 		const signedIn = await attempt(() => auth.signIn(method.id, { redirect }));
 		if (!signedIn.ok) {
-			setError(errorMessage(signedIn.error, FALLBACK));
+			setError(errorMessage(signedIn.error, SIGN_IN_FAILED));
 			setBusy(null);
 			return;
 		}
@@ -71,12 +61,11 @@ export function LoginPage({ redirect, problem }: LoginPageProps) {
 
 				{error && (
 					<div className="mt-5">
-						<Notice tone="red" role="alert" title="Nie udało się zalogować">
+						<Notice tone="red" role="alert" title={SIGN_IN_FAILED}>
 							{error}
 							{refusedUid && (
 								<span className="mt-2 block">
-									Żeby dostać dostęp, przekaż ten identyfikator osobie, która go
-									nadaje:{" "}
+									{REFUSED_UID_HINT}{" "}
 									<span className="select-all break-all font-mono">
 										{refusedUid}
 									</span>

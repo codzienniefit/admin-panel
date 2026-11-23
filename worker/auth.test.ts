@@ -32,6 +32,7 @@ import {
 	makeWorld,
 	navigation,
 	ORIGIN,
+	PASS_COOKIE,
 	pkceChallengeOf,
 	REFUSED_COOKIE,
 	randomKey,
@@ -348,7 +349,7 @@ describe("GET /auth/google/start", () => {
 // ─── The whole way ──────────────────────────────────────────────────────────
 
 describe("signing in with Google, start to cookie", () => {
-	it("ends on the panel with the backend's session in one cookie", async () => {
+	it("ends on the panel with the backend's session in one cookie, and the pass to the panel's code", async () => {
 		const world = makeWorld();
 		const run = await signInWithGoogle(world, ADMIN);
 		expect(run.end.status).toBe(303);
@@ -357,7 +358,11 @@ describe("signing in with Google, start to cookie", () => {
 		// The session is what the backend made, as it made it.
 		const session = sessionOf(run.cookies);
 		expect([...world.backend.sessions.keys()]).toEqual([session]);
-		expect(run.cookies).toBe(`${SESSION_COOKIE}=${session}`);
+		const pass = inJar(run.cookies, PASS_COOKIE);
+		expect(pass).not.toBeNull();
+		expect(run.cookies).toBe(
+			`${SESSION_COOKIE}=${session}; ${PASS_COOKIE}=${pass}`,
+		);
 		expect(world.logs).toEqual([
 			{ event: "signIn", outcome: "admin", uid: ADMIN.uid, ray: null },
 		]);
@@ -397,12 +402,71 @@ describe("signing in with Google, start to cookie", () => {
 			ATTEMPT_COOKIE,
 			REFUSED_COOKIE,
 			SESSION_COOKIE,
+			PASS_COOKIE,
 		]);
 		expect(clears(end, ATTEMPT_COOKIE)).toBe(true);
 		expect(cookieNamed(end, ATTEMPT_COOKIE)?.attributes.get("samesite")).toBe(
 			"Lax",
 		);
 		expect(clears(end, REFUSED_COOKIE)).toBe(true);
+	});
+
+	it("sets the pass HttpOnly, Secure, SameSite=Lax, for as long as the session, sealed with the admin's uid and its end", async () => {
+		for (const [stated, kept] of [
+			[3600, 3600],
+			[SESSION_S, SESSION_S],
+			[30 * 24 * 3600, SESSION_S],
+		] as const) {
+			const world = makeWorld();
+			world.backend.sessionSeconds = stated;
+			const { end } = await signInWithGoogle(world, ADMIN);
+			const pass = cookieNamed(end, PASS_COOKIE);
+			const session = cookieNamed(end, SESSION_COOKIE);
+			expect(PASS_COOKIE).toBe("__Host-cf_pass");
+			expect(pass?.raw, String(stated)).toBe(
+				`__Host-cf_pass=${pass?.value}; Path=/; Max-Age=${kept}; HttpOnly; Secure; SameSite=Lax`,
+			);
+			expect(pass?.attributes.get("max-age")).toBe(
+				session?.attributes.get("max-age"),
+			);
+			// Sealed: nothing of it is readable, and it opens only as a pass.
+			expect(pass?.value).not.toContain(ADMIN.uid);
+			expect(
+				await opened(PASS_COOKIE, pass?.value ?? ""),
+				String(stated),
+			).toEqual({ v: 1, uid: ADMIN.uid, exp: world.nowS() + kept });
+			expect(await opened(REFUSED_COOKIE, pass?.value ?? "")).toBeNull();
+			expect(await opened(ATTEMPT_COOKIE, pass?.value ?? "")).toBeNull();
+		}
+	});
+
+	it("gives no pass to anyone the sign-in did not let in", async () => {
+		const runs: [string, (world: World) => Promise<Response>][] = [
+			[
+				"not on the list",
+				async (world) => (await signInWithGoogle(world, STRANGER)).end,
+			],
+			[
+				"backend down",
+				async (world) => {
+					world.backend.down = true;
+					return (await signInWithGoogle(world, ADMIN)).end;
+				},
+			],
+			[
+				"cancelled at Google",
+				async (world) => {
+					const start = await world.send(navigation("/auth/google/start"));
+					const back = world.google.decline(start.headers.get("location"));
+					return world.send(fromGoogle(back, { cookies: jar("", start) }));
+				},
+			],
+		];
+		for (const [label, run] of runs) {
+			const end = await run(makeWorld());
+			expect(cookieNamed(end, PASS_COOKIE), label).toBeUndefined();
+			expect(cookieNamed(end, SESSION_COOKIE), label).toBeUndefined();
+		}
 	});
 
 	it("keeps the cookie no longer than the backend says, and never past 48 hours", async () => {
@@ -1179,7 +1243,7 @@ describe("GET /auth/google/callback: the backend refuses", () => {
 		]);
 	});
 
-	it("and a sealed note of their own user id, for ten minutes", async () => {
+	it("and a sealed note of their own user id, for ten minutes, sent with the page Google's redirects end on", async () => {
 		const world = makeWorld();
 		const run = await signInWithGoogle(world, STRANGER);
 		expect(setCookies(run.end).map((cookie) => cookie.name)).toEqual([
@@ -1188,7 +1252,7 @@ describe("GET /auth/google/callback: the backend refuses", () => {
 		]);
 		const note = cookieNamed(run.end, REFUSED_COOKIE);
 		expect(note?.raw).toBe(
-			`${REFUSED_COOKIE}=${note?.value}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Strict`,
+			`${REFUSED_COOKIE}=${note?.value}; Path=/; Max-Age=600; HttpOnly; Secure; SameSite=Lax`,
 		);
 		expect(note?.value).not.toContain(STRANGER.uid);
 		expect(await opened(REFUSED_COOKIE, note?.value ?? "")).toEqual({
@@ -1515,7 +1579,9 @@ describe("GET /auth/session", () => {
 				label,
 			).toEqual([
 				`${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`,
+				`${PASS_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
 			]);
+			expect(jar(cookies, response), label).toBe("");
 		}
 	});
 
@@ -1734,8 +1800,9 @@ describe("POST /auth/signout", () => {
 		});
 		expect(setCookies(response).map((cookie) => cookie.raw)).toEqual([
 			`${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`,
+			`${PASS_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
 			`${ATTEMPT_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
-			`${REFUSED_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`,
+			`${REFUSED_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
 		]);
 		expect(jar(cookies, response)).toBe("");
 
@@ -1827,7 +1894,7 @@ describe("POST /auth/signout", () => {
 			status: "signedOut",
 			ended: true,
 		});
-		expect(setCookies(response)).toHaveLength(3);
+		expect(setCookies(response)).toHaveLength(4);
 		expect(world.calls).toEqual([]);
 	});
 

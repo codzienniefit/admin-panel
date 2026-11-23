@@ -26,6 +26,8 @@ import {
 	MEDIA,
 	makeWorld,
 	navigation,
+	ORIGIN,
+	PASS_COOKIE,
 	SESSION_COOKIE,
 	SESSION_S,
 	SIGNING_SECRET,
@@ -1078,7 +1080,6 @@ describe("a call that is not in the table", () => {
 		const { world, cookies } = await withAdmin();
 		for (const path of [
 			"/api/accounts/..",
-			"/api/accounts/../..",
 			"/api/accounts/%2e%2e",
 			"/api/accounts/.%2E/panel/me",
 			"/api/accounts/abc-123/../../panel/session",
@@ -1093,6 +1094,20 @@ describe("a call that is not in the table", () => {
 				path,
 			);
 		}
+		expect(world.calls).toEqual([]);
+	});
+
+	it("a dot segment that leads out of /api/ altogether is the panel's own page, never the backend", async () => {
+		const { world, cookies } = await withAdmin();
+		const response = await world.send(
+			fromPanel("/api/accounts/../..", { cookies }),
+		);
+		// Resolved to "/" before it arrives: the panel, served to the signed-in admin.
+		expect(response.status).toBe(200);
+		expect(response.headers.get("content-type")).toBe("text/html");
+		expect(world.assets.requests.map((request) => request.url)).toEqual([
+			`${ORIGIN}/`,
+		]);
 		expect(world.calls).toEqual([]);
 	});
 
@@ -1761,6 +1776,7 @@ describe("the backend's refusals", () => {
 				code,
 			).toEqual([
 				`${SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`,
+				`${PASS_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
 			]);
 			// The Worker's own words, not the backend's.
 			expect(await response.text(), code).not.toContain("uid-in-the-backends");

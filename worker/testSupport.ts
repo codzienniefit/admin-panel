@@ -31,6 +31,7 @@ export const IDP_URL =
 export const SESSION_COOKIE = "__Host-cf_session";
 export const ATTEMPT_COOKIE = "__Host-cf_oauth";
 export const REFUSED_COOKIE = "__Host-cf_refused";
+export const PASS_COOKIE = "__Host-cf_pass";
 
 export const HOUR_S = 60 * 60;
 export const SESSION_S = 48 * HOUR_S;
@@ -299,8 +300,15 @@ export interface FakeMedia {
 	put(path: string, type: string | null, body?: string): void;
 }
 
+export interface FakeAssets {
+	/** Every request handed to Cloudflare's static assets, in order. */
+	requests: Request[];
+}
+
 export interface World {
 	env: PanelEnv;
+	/** Cloudflare's static assets (`env.ASSETS`), unless a test left it out. */
+	assets: FakeAssets;
 	deps: Deps;
 	/** Every outbound request, in order. */
 	calls: Call[];
@@ -717,7 +725,47 @@ export function makeWorld(overrides: Partial<PanelEnv> = {}): World {
 		return match.route(call);
 	};
 
+	// ── Static assets ──
+	// As Cloudflare answers: the built file, index.html for any other page
+	// (single-page-application), and a public cache header.
+	const assets: FakeAssets = { requests: [] };
+	const assetsBinding: NonNullable<PanelEnv["ASSETS"]> = {
+		fetch: async (request) => {
+			assets.requests.push(request);
+			const { pathname } = new URL(request.url);
+			const script =
+				pathname.startsWith("/assets/") && pathname.endsWith(".js");
+			const icon = pathname.startsWith("/favicon") || pathname.endsWith(".png");
+			const text = pathname === "/robots.txt";
+			return new Response(
+				script
+					? `/* the panel's code: ${pathname} */`
+					: icon
+						? "icon bytes"
+						: text
+							? "User-agent: *\nDisallow: /\n"
+							: '<!doctype html><title>Logowanie</title><script type="module" src="/assets/index-fake.js"></script>',
+				{
+					status: 200,
+					headers: {
+						"content-type": script
+							? "text/javascript"
+							: icon
+								? "image/png"
+								: text
+									? "text/plain"
+									: "text/html",
+						"cache-control": "public, max-age=0, must-revalidate",
+						etag: '"fake-asset"',
+						"x-robots-tag": "noindex",
+					},
+				},
+			);
+		},
+	};
+
 	const env: PanelEnv = {
+		ASSETS: assetsBinding,
 		PANEL_ORIGIN: ORIGIN,
 		API_ORIGIN: API,
 		MEDIA_ORIGINS: MEDIA,
@@ -738,6 +786,7 @@ export function makeWorld(overrides: Partial<PanelEnv> = {}): World {
 	};
 	return {
 		env,
+		assets,
 		deps,
 		calls,
 		logs,
@@ -759,6 +808,7 @@ export function makeWorld(overrides: Partial<PanelEnv> = {}): World {
 		forget: () => {
 			calls.length = 0;
 			logs.length = 0;
+			assets.requests.length = 0;
 			backend.accepted.length = 0;
 			backend.refused.length = 0;
 		},

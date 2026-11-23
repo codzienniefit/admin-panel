@@ -60,7 +60,7 @@ describe("failureFrom", () => {
 				const failure = failureFrom(403, { error: "Nie", errorCode });
 				expect(failure.kind).toBe("forbidden");
 				expect(failure.message).toBe(
-					`To konto nie ma dostępu do panelu. (Szczegóły: ${details})`,
+					`To konto nie ma dostępu. (Szczegóły: ${details})`,
 				);
 				expect(failure.details).toBe(details);
 				expect(failure.status).toBe(403);
@@ -69,7 +69,7 @@ describe("failureFrom", () => {
 			const codeOnly = failureFrom(403, { errorCode: "READ_ONLY" });
 			expect(codeOnly.kind).toBe("forbidden");
 			expect(codeOnly.message).toBe(
-				"To konto nie ma dostępu do panelu. (Szczegóły: HTTP 403, kod READ_ONLY, odpowiedź bez treści)",
+				"To konto nie ma dostępu. (Szczegóły: HTTP 403, kod READ_ONLY, odpowiedź bez treści)",
 			);
 		});
 	});

@@ -14,6 +14,9 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
 	"cross-origin-resource-policy": "same-origin",
 	"referrer-policy": "no-referrer",
 	"x-frame-options": "DENY",
+	// a private site: no search engine, archive or AI may index or use what it answers
+	"x-robots-tag":
+		"noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai",
 };
 
 /** For answers that are data, never a page: nothing in them may load or run. */

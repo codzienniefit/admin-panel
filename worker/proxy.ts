@@ -209,7 +209,7 @@ export function isFilePath(path: string | null): path is string {
 
 const TEXT = {
 	notFound: "Not found",
-	foreign: "Odrzucono żądanie spoza panelu.",
+	foreign: "Odrzucono żądanie z innej strony.",
 	signedOut: "Sesja wygasła. Zaloguj się ponownie.",
 	readOnly:
 		"Produkcja jest tylko do odczytu: ta część panelu nie jest jeszcze otwarta do zapisu.",

@@ -26,7 +26,7 @@ Time: about 1.5 hours the first time, most of it Google and Cloudflare setup.
 | Node 22, `zip`, `openssl` | `node -v`, `which zip openssl` |
 | Google Cloud console for the Firebase project | console.cloud.google.com |
 | Firebase console | console.firebase.google.com |
-| The panel's address, e.g. `https://panel.codzienniefitapp.com` | a hostname on that Cloudflare zone, not in use |
+| The panel's address: a meaningless name, not `panel` or `admin`, e.g. `https://studio-x7k2.codzienniefitapp.com` ([CLOUDFLARE-SECURITY.md](CLOUDFLARE-SECURITY.md) §2) | a hostname on that Cloudflare zone, not in use |
 
 Your user id `6bt7loE8cCgfvRTeir9pdlXSETN2` (gierekg@gmail.com) is already the one panel admin
 in the backend's code. In Firebase → Authentication → Users, check that this account signs in
@@ -243,13 +243,13 @@ says so; the Test environment (sample data in the browser) works on the `workers
 ### 5.2 The panel's address
 
 1. Cloudflare dashboard → **Workers & Pages → admin-panel → Settings → Domains & Routes → Add →
-   Custom domain** → the panel's hostname (e.g. `panel.codzienniefitapp.com`). Cloudflare creates
+   Custom domain** → the panel's hostname (e.g. `studio-x7k2.codzienniefitapp.com`). Cloudflare creates
    the DNS record and the certificate.
 2. Make it last across deploys and switch the `workers.dev` address off: in `wrangler.json`, add
 
    ```json
    "workers_dev": false,
-   "routes": [{ "pattern": "panel.codzienniefitapp.com", "custom_domain": true }],
+   "routes": [{ "pattern": "studio-x7k2.codzienniefitapp.com", "custom_domain": true }],
    ```
 
    (with your hostname), commit, push. (Switching `workers.dev` off only in the dashboard does not
@@ -321,7 +321,14 @@ cd /Users/mzolnieruk/github/admin-panel && npm run deploy
 7. Application Insights shows your reads as `[ADMIN_ACTION] panel uid=6bt7… (gierekg@gmail.com) GET …`.
 8. Sign out, then the browser's back button: still signed out.
 
-### 5.6 Panel rollback (if needed)
+### 5.6 Hide it and harden it
+
+Follow [CLOUDFLARE-SECURITY.md](CLOUDFLARE-SECURITY.md): Cloudflare Access in front of the panel
+(only your e-mail gets as far as the page), AI crawlers blocked, WAF rules and a rate limit scoped
+to the panel's hostname (never zone-wide: the app's API shares the zone), TLS settings, and
+two-factor sign-in on every account that controls it. About 30 minutes.
+
+### 5.7 Panel rollback (if needed)
 
 ```bash
 cd /Users/mzolnieruk/github/admin-panel && npx wrangler rollback

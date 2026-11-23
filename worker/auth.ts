@@ -84,7 +84,7 @@ const TEXT = {
 	unavailable: "Logowanie jest chwilowo niedostępne. Spróbuj za chwilę.",
 	misconfigured:
 		"Logowanie nie jest poprawnie skonfigurowane. Daj znać administratorowi.",
-	foreign: "Odrzucono żądanie spoza panelu.",
+	foreign: "Odrzucono żądanie z innej strony.",
 };
 
 export const clearSession = (): string[] => [clearCookie(SESSION_COOKIE)];

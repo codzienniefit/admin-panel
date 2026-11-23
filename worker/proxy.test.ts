@@ -64,6 +64,7 @@ function expectDataHeaders(response: Response, label = ""): void {
 		DATA_POLICY,
 	);
 	expect(response.headers.get("x-frame-options"), label).toBe("DENY");
+	expect(response.headers.get("x-robots-tag"), label).toContain("noindex");
 }
 
 async function expectFailure(
@@ -469,6 +470,8 @@ describe("a read by a signed-in admin", () => {
 			"cross-origin-resource-policy": "same-origin",
 			"referrer-policy": "no-referrer",
 			"x-frame-options": "DENY",
+			"x-robots-tag":
+				"noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai",
 		});
 	});
 
@@ -1971,6 +1974,8 @@ describe("GET /api/files", () => {
 			"cross-origin-resource-policy": "same-origin",
 			"referrer-policy": "no-referrer",
 			"x-frame-options": "DENY",
+			"x-robots-tag":
+				"noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai",
 		});
 		expect(world.logs).toEqual([]);
 	});
@@ -2518,6 +2523,8 @@ describe("GET /api/files", () => {
 			"cross-origin-resource-policy": "same-origin",
 			"referrer-policy": "no-referrer",
 			"x-frame-options": "DENY",
+			"x-robots-tag":
+				"noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai",
 		});
 		expect(world.logs).toEqual([]);
 	});

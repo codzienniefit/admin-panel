@@ -39,7 +39,7 @@ const METHODS: readonly SignInMethod[] = [
 		id: "admin",
 		kind: "button",
 		label: "Wejdź jako administratorka",
-		description: "Konto przykładowe z dostępem do panelu.",
+		description: "Konto przykładowe z dostępem.",
 	},
 	{
 		id: "noAccess",

@@ -33,6 +33,8 @@ describe("answers", () => {
 			"cross-origin-resource-policy": "same-origin",
 			"referrer-policy": "no-referrer",
 			"x-frame-options": "DENY",
+			"x-robots-tag":
+				"noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai",
 		});
 	});
 
@@ -78,6 +80,8 @@ describe("answers", () => {
 			"cross-origin-resource-policy": "same-origin",
 			"referrer-policy": "no-referrer",
 			"x-frame-options": "DENY",
+			"x-robots-tag":
+				"noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai",
 			"set-cookie": "__Host-a=1; Path=/",
 		});
 	});
@@ -88,6 +92,8 @@ describe("answers", () => {
 			"cross-origin-resource-policy": "same-origin",
 			"referrer-policy": "no-referrer",
 			"x-frame-options": "DENY",
+			"x-robots-tag":
+				"noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate, noai, noimageai",
 		});
 	});
 });

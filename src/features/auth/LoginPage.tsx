@@ -7,11 +7,12 @@ import { Button } from "@/ui/Button";
 import { EnvironmentSelect } from "@/ui/EnvironmentSelect";
 import { Logo } from "@/ui/Logo";
 import { Notice } from "@/ui/Notice";
+import { SIGNED_OUT_TITLE, usePageTitle } from "@/ui/pageTitle";
 import { attempt } from "@/ui/tasks";
 
 /** Why a sign-in at Google came back without a session. */
 const RETURN_PROBLEMS: Record<string, string> = {
-	forbidden: "To konto nie ma dostępu do panelu.",
+	forbidden: "To konto nie ma dostępu.",
 	cancelled: "Logowanie zostało przerwane.",
 	disabled: "To konto jest zablokowane.",
 	tooManyAttempts: "Za dużo prób. Spróbuj ponownie za kilka minut.",
@@ -33,6 +34,7 @@ interface LoginPageProps {
 
 /** Sign-in: the first thing anyone sees. */
 export function LoginPage({ redirect, problem }: LoginPageProps) {
+	usePageTitle(SIGNED_OUT_TITLE);
 	const router = useRouter();
 	const [busy, setBusy] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(returnProblem(problem));
@@ -64,7 +66,6 @@ export function LoginPage({ redirect, problem }: LoginPageProps) {
 					</h1>
 					<EnvironmentSelect />
 				</div>
-				<p className="mt-1 text-sm text-muted">Panel administracyjny</p>
 
 				{error && (
 					<div className="mt-5">
@@ -72,8 +73,8 @@ export function LoginPage({ redirect, problem }: LoginPageProps) {
 							{error}
 							{refusedUid && (
 								<span className="mt-2 block">
-									Żeby dostać dostęp, przekaż ten identyfikator osobie, która
-									prowadzi listę administratorów:{" "}
+									Żeby dostać dostęp, przekaż ten identyfikator osobie, która go
+									nadaje:{" "}
 									<span className="select-all break-all font-mono">
 										{refusedUid}
 									</span>

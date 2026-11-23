@@ -4,6 +4,7 @@ import { currentEnvironment, ENVIRONMENTS } from "@/data/environment";
 import { CallLogButton } from "@/features/devtools/CallLog";
 import { EnvironmentSelect } from "@/ui/EnvironmentSelect";
 import { Logo, LogoMark } from "@/ui/Logo";
+import { SIGNED_IN_TITLE, usePageTitle } from "@/ui/pageTitle";
 import { Tag } from "@/ui/Tag";
 import { UserMenu } from "./UserMenu";
 
@@ -77,6 +78,7 @@ function ReadOnlyBar() {
 
 /** The frame around every screen behind sign-in. */
 export function Shell() {
+	usePageTitle(SIGNED_IN_TITLE);
 	return (
 		<div className="flex min-h-full flex-col">
 			<TopBar>

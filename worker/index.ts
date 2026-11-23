@@ -54,7 +54,11 @@ export default {
 				event: "error",
 				name: error instanceof Error ? error.name : "unknown",
 			});
-			return failure(500, "Błąd panelu.", "WORKER_ERROR");
+			return failure(
+				500,
+				"Błąd serwera. Spróbuj ponownie za chwilę.",
+				"WORKER_ERROR",
+			);
 		}
 	},
 } satisfies ExportedHandler;

@@ -31,7 +31,7 @@ import { ApiError, type ApiIssue } from "@/data/api/errors";
 
 const TEXT = {
 	unauthorized: "Sesja wygasła albo nie masz logowania. Zaloguj się ponownie.",
-	forbidden: "To konto nie ma dostępu do panelu.",
+	forbidden: "To konto nie ma dostępu.",
 	notFound: "Nie znaleziono tego w backendzie.",
 	conflict: "Ktoś zmienił to w międzyczasie.",
 	validation: "Backend odrzucił zapis.",

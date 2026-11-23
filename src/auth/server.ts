@@ -42,7 +42,7 @@ const METHODS: Record<string, SignInMethod> = {
 };
 
 const NOT_CONFIGURED =
-	"Logowanie do Produkcji nie jest jeszcze skonfigurowane. Do czasu ustawienia kluczy panel działa w środowisku Test.";
+	"Logowanie do Produkcji nie jest jeszcze skonfigurowane.";
 /** Only names that look like a setting: anything else the Worker might send is left out. */
 const SETTING_NAME = /^[A-Z][A-Z0-9_]{1,63}$/;
 

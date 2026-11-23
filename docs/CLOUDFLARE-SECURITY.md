@@ -1,10 +1,11 @@
 # Cloudflare settings that make the panel harder to find and to attack
 
-Written 2026-11-23, to go with [DEPLOY-RUNBOOK.md](DEPLOY-RUNBOOK.md) Part 5. Everything here is a
-dashboard setting; nothing needs code. Do them in this order: the first one alone hides the panel
-from everyone who is not on your list.
+Written 2026-11-23: the reasoning behind the Cloudflare settings. **The steps for v1 are in
+[DEPLOY-RUNBOOK.md](DEPLOY-RUNBOOK.md) Part 7**; this file explains them and keeps what comes
+later. **v1 does not use Cloudflare Access** (§1 is for later); everything from §2 on is part of v1.
 
-Below, `PANEL` stands for the panel's hostname (e.g. `studio-x7k2.codzienniefitapp.com`).
+Below, `PANEL` stands for the panel's hostname, **`panel.codzienniefitapp.com`**: paste the rules
+exactly as written, with that name in place of `PANEL`.
 
 **Read this first.** If the panel lives on the same zone as the API
 (`api.codzienniefitapp.com`), every **zone-wide** switch also hits the mobile app's traffic. The
@@ -18,7 +19,7 @@ noimageindex, noai, noimageai`; the page is titled "Logowanie" and says nothing 
 until you are signed in; the Worker answers only on `PANEL_ORIGIN`; every call to the backend is
 signed; the backend logs every non-admin attempt as `[SECURITY_ALERT]`.
 
-## 1. Cloudflare Access in front of the whole panel (the big one)
+## 1. Later (not in v1): Cloudflare Access in front of the whole panel
 
 With Access, Cloudflare itself asks for an e-mail on your list before anything of the panel is
 served: no page, no JavaScript, no API, not even `robots.txt`. Bots, scanners and AI crawlers see
@@ -45,11 +46,12 @@ Who tried and was refused: Zero Trust → **Logs → Access**.
 
 ## 2. A hostname that does not invite attacks
 
-- Do not use `panel`, `admin`, `cms`, `backoffice` or similar: those are the first names scanners
-  try. Use something meaningless, e.g. `studio-x7k2.codzienniefitapp.com`.
+- `panel.codzienniefitapp.com` was chosen (2026-11-23). It is among the first names scanners try,
+  so in v1 the WAF rules (§4) and the rate limit (§5) are what keep it quiet; Access (§1) is the
+  next step when wanted.
 - Keep it one level under the zone (`x.codzienniefitapp.com`, not `a.b.codzienniefitapp.com`).
-- Do not link to it from anywhere public. Hostnames can still turn up in public certificate logs;
-  that is why Access (1) matters more than the name.
+- Do not link to it from anywhere public. Hostnames turn up in public certificate logs anyway, so
+  the name hides little; the WAF rules, the panel's own sign-in and (later) Access do the work.
 - In `wrangler.json` set `"workers_dev": false` and keep `"preview_urls": false` (DEPLOY-RUNBOOK
   5.2), so the Worker has no second, guessable address. Until then its sign-in page is reachable
   at `admin-panel.marta-100.workers.dev` (no data before a real sign-in).
@@ -132,6 +134,36 @@ On the panel's zone, **SSL/TLS → Edge Certificates**:
 
 **DNS → Settings → DNSSEC**: enable it, then add the DS record at the domain's registrar.
 
+## 6a. DNS (the zone `codzienniefitapp.com`)
+
+What is there (export of 2026-11-23): `api` → `fitfunctions.azurewebsites.net` and `blobs` →
+`superfitstorage.blob.core.windows.net`, both proxied; the `asuid.api` TXT record Azure uses to
+prove the API's domain. The panel's record is created by Cloudflare from `wrangler.json`
+(DEPLOY-RUNBOOK 5.2); never add one by hand.
+
+- **DNSSEC**: DNS → Settings → **Enable DNSSEC**, then add the DS record it shows at the domain's
+  registrar. It stops anyone answering for `codzienniefitapp.com` in Cloudflare's place.
+- **Nobody may send e-mail as @codzienniefitapp.com.** The zone has no MX record, so the domain
+  receives no mail; without the records below, anyone can still *send* mail that claims to come
+  from it (phishing your users "from Codziennie Fit"). **First check that nothing sends mail as
+  @codzienniefitapp.com** (a newsletter tool, Firebase's custom e-mail domain, receipts): if
+  something does, use its SPF include instead of `-all` and do not add the null MX. Then DNS →
+  Records → Add, each **DNS only** (grey cloud):
+
+  | Type | Name | Content | Why |
+  | --- | --- | --- | --- |
+  | `MX` | `@` | `.` with priority `0` | "This domain takes no mail" (null MX) |
+  | `TXT` | `@` | `v=spf1 -all` | No server may send mail as it |
+  | `TXT` | `_dmarc` | `v=DMARC1; p=reject; adkim=s; aspf=s` | Receivers reject mail claiming to be from it |
+  | `TXT` | `*._domainkey` | `v=DKIM1; p=` | No DKIM key is valid |
+
+- **No CAA record for now.** The API's own certificate on Azure (`asuid.api`) may come from a
+  certificate authority other than Cloudflare's; a CAA record that leaves it out would stop that
+  certificate from renewing. Add CAA only after checking which authority issued it (Azure portal
+  → the Function App → Certificates).
+- **No wildcard records**, and nothing else pointing at retired services (a CNAME to a deleted
+  Azure app can be taken over by whoever recreates that name).
+
 ## 7. The accounts that can change all of this
 
 Whoever controls these controls the panel, whatever the settings above say.
@@ -155,7 +187,8 @@ Whoever controls these controls the panel, whatever the settings above say.
 
 If something looks wrong:
 
-1. Zero Trust → Access → the application → policy: remove everyone (nobody gets in, at once).
+1. Workers & Pages → admin-panel → Domains & Routes: remove `panel.codzienniefitapp.com` (the panel
+   disappears at once). Once Access is set up: remove everyone from its policy instead.
 2. Take the uid out of `panelAdmins.ts` in the backend and deploy, or sign everyone out
    (AUTH-HARDENING §8).
 3. Rotate `PANEL_SIGNING_SECRET` (SIGN-IN-SETUP §9).

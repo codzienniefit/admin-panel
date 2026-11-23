@@ -274,6 +274,7 @@ describe("while PANEL_ORIGIN is not set", () => {
 				expect(await bodyOf(response)).toEqual({
 					status: "signedOut",
 					methods: [],
+					missing: ["PANEL_ORIGIN"],
 				});
 				expect(setCookies(response)).toEqual([]);
 			}
@@ -309,6 +310,16 @@ describe("while PANEL_ORIGIN is not set", () => {
 				expect(await bodyOf(response)).toEqual({
 					status: "signedOut",
 					methods: [],
+					missing: [
+						"PANEL_ORIGIN",
+						"API_ORIGIN",
+						"MEDIA_ORIGINS",
+						"FIREBASE_API_KEY",
+						"GOOGLE_CLIENT_ID",
+						"GOOGLE_CLIENT_SECRET",
+						"SIGN_IN_COOKIE_KEY",
+						"PANEL_SIGNING_SECRET",
+					],
 				});
 			} else {
 				await expectFailure(response, 503, "NOT_CONFIGURED", label);
@@ -379,7 +390,20 @@ describe("the Worker as Cloudflare calls it", () => {
 		const response = await fetchOf(bare("/api/health"), {});
 		expect(await bodyOf(response)).toEqual({ ok: true });
 		const status = await fetchOf(bare("/auth/session"), {});
-		expect(await bodyOf(status)).toEqual({ status: "signedOut", methods: [] });
+		expect(await bodyOf(status)).toEqual({
+			status: "signedOut",
+			methods: [],
+			missing: [
+				"PANEL_ORIGIN",
+				"API_ORIGIN",
+				"MEDIA_ORIGINS",
+				"FIREBASE_API_KEY",
+				"GOOGLE_CLIENT_ID",
+				"GOOGLE_CLIENT_SECRET",
+				"SIGN_IN_COOKIE_KEY",
+				"PANEL_SIGNING_SECRET",
+			],
+		});
 	});
 
 	it("logs a refusal as one line of JSON", async () => {

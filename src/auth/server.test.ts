@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createServerAuth } from "./server";
+import { createServerAuth, notConfigured } from "./server";
 
 // The Produkcja sign-in talks to the panel's Worker and to nothing else. Here
 // the Worker is a function that answers; no request leaves the test.
@@ -123,6 +123,30 @@ describe("asking the Worker who is signed in", () => {
 		await auth.ready();
 		expect(auth.methods).toEqual([]);
 		expect(auth.notice?.()).toMatch(/nie jest jeszcze skonfigurowane/);
+		expect(auth.notice?.()).not.toMatch(/Brakuje/);
+	});
+
+	it("names the Worker's values that are missing, when it says which", async () => {
+		const { auth } = setup(() =>
+			answer({
+				status: "signedOut",
+				methods: [],
+				missing: ["PANEL_ORIGIN", "GOOGLE_CLIENT_SECRET"],
+			}),
+		);
+		await auth.ready();
+		expect(auth.notice?.()).toMatch(/nie jest jeszcze skonfigurowane/);
+		expect(auth.notice?.()).toMatch(
+			/Brakuje ustawień Workera \(Cloudflare → Workers & Pages → admin-panel → Settings → Variables and Secrets\): PANEL_ORIGIN, GOOGLE_CLIENT_SECRET\.$/,
+		);
+	});
+
+	it("shows only names that look like a setting", () => {
+		expect(notConfigured(["API_ORIGIN", "<script>", "x", "a b", ""])).toMatch(
+			/: API_ORIGIN\.$/,
+		);
+		expect(notConfigured(["<b>bold</b>"])).not.toMatch(/Brakuje/);
+		expect(notConfigured(undefined)).not.toMatch(/Brakuje/);
 	});
 
 	it.each([

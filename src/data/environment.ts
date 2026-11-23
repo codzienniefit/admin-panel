@@ -37,8 +37,31 @@ export const ENVIRONMENTS: readonly EnvironmentInfo[] = [
 ];
 
 export const STORAGE_KEY = "cf.environment";
-/** Where the panel starts, and where the automated UI tests always run. */
+/** Where the panel starts on this computer, and where the automated UI tests always run. */
 export const DEFAULT_ENVIRONMENT: Environment = "test";
+
+/**
+ * True when the panel runs on this computer (`npm run dev`, the UI tests), false on its deployed
+ * address. On the deployed panel nothing before sign-in shows the Test environment: the panel
+ * starts in Produkcja, the sign-in page has no environment switch, and Test opens only after a
+ * real sign-in (src/auth/testGate.ts).
+ */
+export function onThisComputer(): boolean {
+	const host = globalThis.location?.hostname;
+	if (host === undefined) return true;
+	return (
+		host === "localhost" ||
+		host === "127.0.0.1" ||
+		host === "[::1]" ||
+		host === "::1" ||
+		host.endsWith(".localhost")
+	);
+}
+
+/** Where the panel starts: Test on this computer, Produkcja on its deployed address. */
+export function defaultEnvironment(): Environment {
+	return onThisComputer() ? DEFAULT_ENVIRONMENT : "production";
+}
 
 function isAvailable(value: string | null): value is Environment {
 	return ENVIRONMENTS.some((e) => e.value === value && e.available);
@@ -46,7 +69,7 @@ function isAvailable(value: string | null): value is Environment {
 
 export function currentEnvironment(): Environment {
 	const stored = readStored(STORAGE_KEY);
-	return isAvailable(stored) ? stored : DEFAULT_ENVIRONMENT;
+	return isAvailable(stored) ? stored : defaultEnvironment();
 }
 
 /**

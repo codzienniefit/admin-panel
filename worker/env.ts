@@ -133,6 +133,25 @@ export const canSignIn = (env: PanelEnv): boolean =>
 	set(env.GOOGLE_CLIENT_SECRET) &&
 	hasCookieKey(env);
 
+/**
+ * The names of the values that are missing or not valid, in the order docs/SIGN-IN-SETUP.md lists
+ * them. Only ever sent while sign-in is not set up (see `sessionStatus` in auth.ts): once it is,
+ * nothing about the Worker's settings leaves it.
+ */
+export function missingSettings(env: PanelEnv): string[] {
+	const checks: [string, boolean][] = [
+		["PANEL_ORIGIN", panelOrigin(env) !== null],
+		["API_ORIGIN", apiOrigin(env) !== null],
+		["MEDIA_ORIGINS", mediaOrigins(env).size > 0],
+		["FIREBASE_API_KEY", set(env.FIREBASE_API_KEY)],
+		["GOOGLE_CLIENT_ID", set(env.GOOGLE_CLIENT_ID)],
+		["GOOGLE_CLIENT_SECRET", set(env.GOOGLE_CLIENT_SECRET)],
+		["SIGN_IN_COOKIE_KEY", hasCookieKey(env)],
+		["PANEL_SIGNING_SECRET", signingSecret(env) !== null],
+	];
+	return checks.filter(([, ok]) => !ok).map(([name]) => name);
+}
+
 /** The ways of signing in that have everything they need. One, or none. */
 export const signInMethods = (env: PanelEnv): SignInMethodId[] =>
 	canSignIn(env) ? ["google"] : [];

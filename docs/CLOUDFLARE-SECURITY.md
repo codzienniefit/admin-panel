@@ -50,8 +50,11 @@ Who tried and was refused: Zero Trust → **Logs → Access**.
 - Keep it one level under the zone (`x.codzienniefitapp.com`, not `a.b.codzienniefitapp.com`).
 - Do not link to it from anywhere public. Hostnames can still turn up in public certificate logs;
   that is why Access (1) matters more than the name.
-- In `wrangler.json` keep `"workers_dev": false` and `"preview_urls": false` (DEPLOY-RUNBOOK 5.2),
-  so the Worker has no second, guessable address.
+- In `wrangler.json` set `"workers_dev": false` and keep `"preview_urls": false` (DEPLOY-RUNBOOK
+  5.2), so the Worker has no second, guessable address. Until then its sign-in page is reachable
+  at `admin-panel.marta-100.workers.dev` (no data before a real sign-in).
+- In the Worker's Git build (Settings → Build), build only `main`: no branch or pull request
+  builds.
 
 ## 3. AI crawlers and bots
 

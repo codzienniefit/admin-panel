@@ -5,6 +5,7 @@ import {
 	canSignIn,
 	MIN_SIGNING_SECRET_LENGTH,
 	mediaOrigins,
+	missingSettings,
 	type PanelEnv,
 	panelOrigin,
 	realDeps,
@@ -282,5 +283,43 @@ describe("realDeps", () => {
 			answer,
 		);
 		expect(stand).toHaveBeenCalledWith("https://api.example.test/x", init);
+	});
+});
+
+describe("missingSettings", () => {
+	it("names nothing when everything is set", () => {
+		expect(missingSettings(makeWorld().env)).toEqual([]);
+	});
+
+	it("names every value, in the order of the setup guide, when nothing is set", () => {
+		expect(missingSettings({})).toEqual([
+			"PANEL_ORIGIN",
+			"API_ORIGIN",
+			"MEDIA_ORIGINS",
+			"FIREBASE_API_KEY",
+			"GOOGLE_CLIENT_ID",
+			"GOOGLE_CLIENT_SECRET",
+			"SIGN_IN_COOKIE_KEY",
+			"PANEL_SIGNING_SECRET",
+		]);
+	});
+
+	it("names a value that is set but not valid", () => {
+		expect(
+			missingSettings({
+				...makeWorld().env,
+				PANEL_ORIGIN: "http://panel.example.test",
+				SIGN_IN_COOKIE_KEY: "change-me",
+				PANEL_SIGNING_SECRET: "too short",
+				MEDIA_ORIGINS: "not an address",
+				GOOGLE_CLIENT_ID: "   ",
+			}),
+		).toEqual([
+			"PANEL_ORIGIN",
+			"MEDIA_ORIGINS",
+			"GOOGLE_CLIENT_ID",
+			"SIGN_IN_COOKIE_KEY",
+			"PANEL_SIGNING_SECRET",
+		]);
 	});
 });

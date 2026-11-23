@@ -11,6 +11,7 @@ import {
 import {
 	canSignIn,
 	type Deps,
+	missingSettings,
 	type PanelEnv,
 	type SignInMethodId,
 	signInMethods,
@@ -78,6 +79,19 @@ interface StatusBody {
 	methods: SignInMethodId[];
 	/** After a refused sign-in: the person's own user id, to pass to whoever keeps the list. */
 	refusedUid?: string;
+	/**
+	 * While sign-in is not set up (`methods` empty): the names of the Worker's values that are
+	 * missing or not valid, so whoever sets it up sees what is left. Never sent once sign-in works.
+	 */
+	missing?: string[];
+}
+
+/** The status of someone signed out; while sign-in is not set up, with what it still needs. */
+function signedOutBody(env: PanelEnv, methods: SignInMethodId[]): StatusBody {
+	const missing = methods.length === 0 ? missingSettings(env) : [];
+	return missing.length > 0
+		? { status: "signedOut", methods, missing }
+		: { status: "signedOut", methods };
 }
 
 const TEXT = {
@@ -126,14 +140,14 @@ async function sessionStatus(
 	const methods = signInMethods(env);
 	const session = readCookies(request).get(SESSION_COOKIE);
 	if (!session) {
-		const body: StatusBody = { status: "signedOut", methods };
+		const body = signedOutBody(env, methods);
 		const uid = await refusedUid(request, env, deps);
 		if (uid) body.refusedUid = uid;
 		return json(body);
 	}
 	if (methods.length === 0) {
 		// A cookie from before the settings were taken away.
-		return json({ status: "signedOut", methods }, 200, clearSession());
+		return json(signedOutBody(env, methods), 200, clearSession());
 	}
 	const who = await whoAmI(env, deps, session);
 	if (who.ok) {
@@ -446,8 +460,7 @@ export async function handleAuth(
 	if (origin === null) {
 		// Not configured: the sign-in page asks, and is told there is no way in.
 		if (method === "GET" && pathname === "/auth/session") {
-			const body: StatusBody = { status: "signedOut", methods: [] };
-			return json(body);
+			return json(signedOutBody(env, []));
 		}
 		return failure(503, TEXT.misconfigured, "NOT_CONFIGURED");
 	}

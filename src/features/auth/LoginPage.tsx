@@ -3,6 +3,7 @@ import { useState } from "react";
 import { auth } from "@/auth";
 import type { SignInMethod } from "@/auth/types";
 import { errorMessage } from "@/data/api/errors";
+import { onThisComputer } from "@/data/environment";
 import { Button } from "@/ui/Button";
 import { EnvironmentSelect } from "@/ui/EnvironmentSelect";
 import { Logo } from "@/ui/Logo";
@@ -64,7 +65,8 @@ export function LoginPage({ redirect, problem }: LoginPageProps) {
 					<h1>
 						<Logo className="h-6" />
 					</h1>
-					<EnvironmentSelect />
+					{/* on the deployed panel, the environments show only after sign-in */}
+					{onThisComputer() && <EnvironmentSelect />}
 				</div>
 
 				{error && (

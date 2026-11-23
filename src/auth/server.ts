@@ -26,6 +26,8 @@ const statusSchema = z.looseObject({
 		})
 		.nullish(),
 	methods: z.array(z.string()).default([]),
+	/** While sign-in is not set up: the Worker's values that are missing. Never sent once it works. */
+	missing: z.array(z.string()).optional(),
 	/** After a refused sign-in: the person's own user id. */
 	refusedUid: z.string().nullish(),
 });
@@ -41,6 +43,17 @@ const METHODS: Record<string, SignInMethod> = {
 
 const NOT_CONFIGURED =
 	"Logowanie do Produkcji nie jest jeszcze skonfigurowane. Do czasu ustawienia kluczy panel działa w środowisku Test.";
+/** Only names that look like a setting: anything else the Worker might send is left out. */
+const SETTING_NAME = /^[A-Z][A-Z0-9_]{1,63}$/;
+
+/** The "not configured" notice, with the Worker's missing values named when it says which. */
+export function notConfigured(missing: readonly string[] | undefined): string {
+	const names = (missing ?? []).filter((name) => SETTING_NAME.test(name));
+	return names.length > 0
+		? `${NOT_CONFIGURED} Brakuje ustawień Workera (Cloudflare → Workers & Pages → admin-panel → Settings → Variables and Secrets): ${names.join(", ")}.`
+		: NOT_CONFIGURED;
+}
+
 const UNREACHABLE =
 	"Nie udało się sprawdzić logowania. Sprawdź połączenie i odśwież stronę.";
 
@@ -87,7 +100,7 @@ export function createServerAuth(
 		if (!parsed.success) return false;
 		const { status, user } = parsed.data;
 		methods = parsed.data.methods.flatMap((id) => METHODS[id] ?? []);
-		notice = methods.length === 0 ? NOT_CONFIGURED : null;
+		notice = methods.length === 0 ? notConfigured(parsed.data.missing) : null;
 		refusedUid = parsed.data.refusedUid ?? null;
 		if (status === "signedOut" || !user) {
 			session.set({ status: "signedOut" });

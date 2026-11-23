@@ -220,27 +220,43 @@ versions and can overwrite a panel edit made after it loaded the item.
 ## Part 5. Panel (Cloudflare Worker)
 
 The panel is a **Cloudflare Worker with static assets** (not a Pages project): `wrangler deploy`
-uploads the built screens and the Worker together. It shows up in the dashboard under
-**Workers & Pages → admin-panel** after the first deploy.
+uploads the built screens and the Worker together. It is in the dashboard under
+**Workers & Pages → admin-panel**.
 
-### 5.1 Commit, test, first deploy
+**Every push to `main` of `codzienniefit/admin-panel` is deployed by Cloudflare itself**
+(Workers Builds, connected to the GitHub repository). Pushing is deploying: run the checks before
+every push. `npm run deploy` by hand is only for when the build is broken or switched off.
 
-The admin-panel repo has about 100 uncommitted files on `main` (all the panel work, the error
-details, this file, and `"keep_vars": true` in `wrangler.json`, which keeps the text variables you
-set in the dashboard across deploys). Commit and push them, then:
+### 5.1 The Git build: check its settings once
+
+Already done on 2026-11-23: the panel's code is on `main` (`defe6a0`, `5448bb9`) and Cloudflare
+deployed it to `https://admin-panel.marta-100.workers.dev`.
+
+Workers & Pages → admin-panel → **Settings → Build**:
+
+- Git repository: `codzienniefit/admin-panel`, production branch **`main`**.
+- Build command: `npm run build`.
+- Deploy command: **`npx wrangler deploy`**. (`npm run deploy` builds a second time; the build
+  command has already built.)
+- Builds for other branches / pull requests: **off**. A branch build would publish a preview
+  version; `"preview_urls": false` keeps it off the internet, but there is no reason to build it.
+- Build watch paths: leave as is (everything).
+
+Before every push:
 
 ```bash
 cd /Users/mzolnieruk/github/admin-panel && npm ci && npm run test:all
 ```
 
-```bash
-cd /Users/mzolnieruk/github/admin-panel && npm run deploy
-```
+On the deployed panel the sign-in page shows only the real Google sign-in, with no environment
+switch. Until Part 5.3 is done, it says sign-in is not configured and **lists the Worker values
+still missing** (names only; once sign-in works, nothing about the settings is shown). The Test
+environment (sample data) opens only after a real sign-in, from the environment switch in the top
+bar; on your computer (`npm run dev`) it works as before. Until Part 5.2 is done the page is also
+reachable at the `workers.dev` address, which only shows that sign-in page; do 5.2 (or put
+Cloudflare Access in front, CLOUDFLARE-SECURITY.md §1) soon.
 
-This creates the Worker. Until Part 5.3 is done, Produkcja is switched off and the login page
-says so; the Test environment (sample data in the browser) works on the `workers.dev` address.
-
-### 5.2 The panel's address
+### 5.2 The panel's address (and the end of `workers.dev`)
 
 1. Cloudflare dashboard → **Workers & Pages → admin-panel → Settings → Domains & Routes → Add →
    Custom domain** → the panel's hostname (e.g. `studio-x7k2.codzienniefitapp.com`). Cloudflare creates
@@ -300,13 +316,12 @@ pbcopy < /dev/null
 change takes effect at once; text variables from the dashboard survive deploys thanks to
 `keep_vars`.
 
-### 5.4 Deploy again with the address
+### 5.4 Deploy with the address
 
-After the `wrangler.json` change in 5.2:
-
-```bash
-cd /Users/mzolnieruk/github/admin-panel && npm run deploy
-```
+Pushing the `wrangler.json` change from 5.2 deploys it: Cloudflare builds `main`, adds the custom
+domain and switches `workers.dev` off. Check the build in Workers & Pages → admin-panel →
+**Deployments** (or the build log), then open `https://admin-panel.marta-100.workers.dev`: it must
+no longer answer.
 
 ### 5.5 Check the panel
 
@@ -334,15 +349,17 @@ two-factor sign-in on every account that controls it. About 30 minutes.
 cd /Users/mzolnieruk/github/admin-panel && npx wrangler rollback
 ```
 
-(or Workers & Pages → admin-panel → Deployments → the previous one → Rollback). The backend does
-not depend on the panel; rolling the panel back never affects the app or Retool.
+(or Workers & Pages → admin-panel → Deployments → the previous one → Rollback). The next push to
+`main` deploys again, so also revert the bad commit (`git revert <commit>` and push) before
+anything else is pushed. The backend does not depend on the panel; rolling the panel back never
+affects the app or Retool.
 
 ## Part 6. After launch
 
 - **Opening a section for writing** takes two changes shipped together: its line in
   `src/data/api/capabilities.ts` (`"test-only"` first: only items whose stored internal comment
-  starts with `[TEST]`) and its name in `OPEN_FOR_WRITING` in `worker/proxy.ts`; then
-  `npm run deploy`. Move it to `"on"` only once you have accepted it.
+  starts with `[TEST]`) and its name in `OPEN_FOR_WRITING` in `worker/proxy.ts`; then push to
+  `main` (Cloudflare deploys it). Move it to `"on"` only once you have accepted it.
 - **Messages and accounts** (`sendMessage`, `messages`, `users`): build the rate limit and the
   second confirmation step (`AUTH-HARDENING.md` rules 17 and 18) in the backend first.
 - **Adding an admin**: they sign in and are refused (the page shows their user id); check their

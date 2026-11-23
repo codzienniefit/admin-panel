@@ -1408,6 +1408,31 @@ describe("GET /auth/google/callback: the backend refuses", () => {
 // ─── Who is signed in ───────────────────────────────────────────────────────
 
 describe("GET /auth/session", () => {
+	it("never names the Worker's settings once sign-in works, also when something else is missing", async () => {
+		for (const world of [
+			makeWorld(),
+			makeWorld({ MEDIA_ORIGINS: undefined }),
+		]) {
+			const body = (await bodyOf(
+				await world.send(fromPanel("/auth/session")),
+			)) as Record<string, unknown>;
+			expect(body.methods).toEqual(["google"]);
+			expect("missing" in body).toBe(false);
+		}
+	});
+
+	it("names what is missing while sign-in is not set up", async () => {
+		const world = makeWorld({
+			GOOGLE_CLIENT_ID: undefined,
+			MEDIA_ORIGINS: undefined,
+		});
+		expect(await bodyOf(await world.send(fromPanel("/auth/session")))).toEqual({
+			status: "signedOut",
+			methods: [],
+			missing: ["MEDIA_ORIGINS", "GOOGLE_CLIENT_ID"],
+		});
+	});
+
 	it("signed out: says so and names the ways in, asking nobody", async () => {
 		const world = makeWorld();
 		const response = await world.send(fromPanel("/auth/session"));
@@ -1614,6 +1639,8 @@ describe("GET /auth/session", () => {
 			expect(await bodyOf(response), name).toEqual({
 				status: "signedOut",
 				methods: [],
+				// while sign-in is not set up, the page is told what is left to set
+				missing: [name],
 			});
 			expect(clears(response, SESSION_COOKIE), name).toBe(true);
 			expect(unset.calls, name).toEqual([]);
@@ -1626,6 +1653,7 @@ describe("GET /auth/session", () => {
 		expect(await bodyOf(response)).toEqual({
 			status: "signedOut",
 			methods: [],
+			missing: ["SIGN_IN_COOKIE_KEY"],
 		});
 	});
 

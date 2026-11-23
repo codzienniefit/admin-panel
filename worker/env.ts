@@ -50,6 +50,105 @@ export interface LogEntry {
 	[field: string]: string | number | boolean | null | undefined;
 }
 
+export type LogLevel = "info" | "warn" | "error";
+
+/** Refusals only someone outside the panel causes: tagged like the backend's alerts. */
+const SECURITY_REASONS: Record<string, string> = {
+	host: "a request to an address other than PANEL_ORIGIN",
+	foreign: "a request that did not come from the panel's own page",
+	noAttempt: "a return from Google for a sign-in this browser did not start",
+	notInTable: "a call to an API path the panel never uses",
+};
+
+/** Sign-ins that end because of our own setup, not the person: worth an error. */
+const SETUP_OUTCOMES = new Set(["misconfigured", "unavailable"]);
+
+const text = (value: unknown): string =>
+	value === null || value === undefined ? "" : String(value);
+
+/**
+ * The line a log entry is read by in Cloudflare's Logs view, and its level. The tags match the
+ * backend's: `[ADMIN_ACTION]` for what an admin did, `[SECURITY_ALERT]` for what only someone
+ * outside the panel causes. Never more than the entry holds: no body, cookie, token or query.
+ */
+export function describeLog(entry: LogEntry): {
+	level: LogLevel;
+	message: string;
+} {
+	const route = [text(entry.method), text(entry.route)]
+		.filter((part) => part !== "")
+		.join(" ");
+	const where = route ? ` ${route}` : "";
+	const reason = text(entry.reason);
+	switch (entry.event) {
+		case "refused": {
+			const security = SECURITY_REASONS[reason];
+			if (security) {
+				return {
+					level: "warn",
+					message: `[SECURITY_ALERT] Refused ${security}${where}`,
+				};
+			}
+			const status = entry.status ? `, ${text(entry.status)}` : "";
+			return {
+				level: "warn",
+				message: `Refused (${reason || "no reason"}${status})${where}`,
+			};
+		}
+		case "forwarded": {
+			const status = Number(entry.status);
+			const who = entry.uid ? ` by uid=${text(entry.uid)}` : "";
+			return {
+				level: status >= 500 ? "error" : status >= 400 ? "warn" : "info",
+				message: `[ADMIN_ACTION]${where} → ${text(entry.status)}${who}`,
+			};
+		}
+		case "signIn": {
+			const outcome = text(entry.outcome);
+			const uid = entry.uid ? ` uid=${text(entry.uid)}` : "";
+			if (outcome === "admin") {
+				return { level: "info", message: `[ADMIN_ACTION] Signed in:${uid}` };
+			}
+			if (outcome === "forbidden") {
+				return {
+					level: "warn",
+					message: `[SECURITY_ALERT] Sign-in refused: not a panel admin${uid ? `,${uid}` : ""}`,
+				};
+			}
+			if (outcome === "cancelled") {
+				return { level: "info", message: "Sign-in cancelled at Google" };
+			}
+			return {
+				level: SETUP_OUTCOMES.has(outcome) ? "error" : "warn",
+				message: `Sign-in failed: ${outcome || "unknown"}${
+					outcome === "unavailable"
+						? " (the backend could not be reached or has no panel routes)"
+						: outcome === "misconfigured"
+							? " (check the Worker's settings and PANEL_SIGNING_SECRET in Azure)"
+							: ""
+				}${uid}`,
+			};
+		}
+		case "signOut":
+			return {
+				level: "info",
+				message: entry.ended ? "Signed out" : "Signed out (no session)",
+			};
+		case "backendRefusedWorker":
+			return {
+				level: "error",
+				message: `The backend refused the Worker's signed call${where}${
+					reason ? ` (${reason})` : ""
+				}: check that PANEL_SIGNING_SECRET is the same in Azure and in the Worker`,
+			};
+		case "error":
+			return {
+				level: "error",
+				message: `Worker error: ${text(entry.name) || "unknown"}`,
+			};
+	}
+}
+
 /** What a handler needs from outside, so tests can stand in for it. */
 export interface Deps {
 	fetch: typeof fetch;
@@ -63,7 +162,14 @@ export const realDeps: Deps = {
 	fetch: (input, init) => fetch(input, init),
 	now: () => Date.now(),
 	randomBytes: (length) => crypto.getRandomValues(new Uint8Array(length)),
-	log: (entry) => console.log(JSON.stringify(entry)),
+	log: (entry) => {
+		const { level, message } = describeLog(entry);
+		// One line of JSON: Cloudflare's Logs view shows `message` and indexes every field.
+		const line = JSON.stringify({ message, level, ...entry });
+		if (level === "error") console.error(line);
+		else if (level === "warn") console.warn(line);
+		else console.log(line);
+	},
 };
 
 /** True when SIGN_IN_COOKIE_KEY is a key: 32 bytes of base64. */

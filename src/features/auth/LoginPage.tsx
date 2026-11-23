@@ -106,9 +106,11 @@ export function LoginPage({ redirect, problem }: LoginPageProps) {
 								>
 									{busy === method.id ? "Logowanie…" : method.label}
 								</Button>
-								<p className="mt-1 px-1 text-xs text-muted">
-									{method.description}
-								</p>
+								{method.description && (
+									<p className="mt-1 px-1 text-xs text-muted">
+										{method.description}
+									</p>
+								)}
 							</div>
 						))}
 					</div>

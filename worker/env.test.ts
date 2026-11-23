@@ -3,6 +3,7 @@ import {
 	apiOrigin,
 	canReachBackend,
 	canSignIn,
+	describeLog,
 	MIN_SIGNING_SECRET_LENGTH,
 	mediaOrigins,
 	missingSettings,
@@ -265,12 +266,27 @@ describe("realDeps", () => {
 		expect([...first]).not.toEqual([...second]);
 	});
 
-	it("writes a log entry as one line of JSON", () => {
-		const written = vi.spyOn(console, "log").mockImplementation(() => {});
+	it("writes a log entry as one line of JSON, with a readable message, at its level", () => {
+		const info = vi.spyOn(console, "log").mockImplementation(() => {});
+		const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+		const error = vi.spyOn(console, "error").mockImplementation(() => {});
 		realDeps.log({ event: "refused", reason: "host" });
-		expect(written).toHaveBeenCalledTimes(1);
-		expect(written.mock.calls[0]).toEqual([
-			'{"event":"refused","reason":"host"}',
+		realDeps.log({ event: "signOut", ended: true });
+		realDeps.log({ event: "error", name: "TypeError" });
+		expect(warn.mock.calls).toEqual([
+			[
+				'{"message":"[SECURITY_ALERT] Refused a request to an address other than PANEL_ORIGIN","level":"warn","event":"refused","reason":"host"}',
+			],
+		]);
+		expect(info.mock.calls).toEqual([
+			[
+				'{"message":"Signed out","level":"info","event":"signOut","ended":true}',
+			],
+		]);
+		expect(error.mock.calls).toEqual([
+			[
+				'{"message":"Worker error: TypeError","level":"error","event":"error","name":"TypeError"}',
+			],
 		]);
 	});
 
@@ -321,5 +337,112 @@ describe("missingSettings", () => {
 			"SIGN_IN_COOKIE_KEY",
 			"PANEL_SIGNING_SECRET",
 		]);
+	});
+});
+
+describe("describeLog", () => {
+	it("tags what only someone outside the panel causes as a security alert", () => {
+		expect(
+			describeLog({ event: "refused", route: "/auth", reason: "foreign" }),
+		).toEqual({
+			level: "warn",
+			message:
+				"[SECURITY_ALERT] Refused a request that did not come from the panel's own page /auth",
+		});
+		expect(
+			describeLog({ event: "refused", method: "GET", reason: "notInTable" })
+				.message,
+		).toBe(
+			"[SECURITY_ALERT] Refused a call to an API path the panel never uses GET",
+		);
+		expect(
+			describeLog({
+				event: "refused",
+				route: "/auth/google/callback",
+				reason: "noAttempt",
+			}).message,
+		).toContain("[SECURITY_ALERT]");
+		expect(
+			describeLog({ event: "signIn", outcome: "forbidden", uid: "u1" }),
+		).toEqual({
+			level: "warn",
+			message: "[SECURITY_ALERT] Sign-in refused: not a panel admin, uid=u1",
+		});
+	});
+
+	it("tags what an admin did, with who", () => {
+		expect(
+			describeLog({ event: "signIn", outcome: "admin", uid: "u1" }),
+		).toEqual({
+			level: "info",
+			message: "[ADMIN_ACTION] Signed in: uid=u1",
+		});
+		expect(
+			describeLog({
+				event: "forwarded",
+				method: "GET",
+				route: "manageChallenges",
+				status: 200,
+				uid: "u1",
+			}),
+		).toEqual({
+			level: "info",
+			message: "[ADMIN_ACTION] GET manageChallenges → 200 by uid=u1",
+		});
+	});
+
+	it("raises the level with what went wrong", () => {
+		expect(
+			describeLog({
+				event: "forwarded",
+				method: "POST",
+				route: "x",
+				status: 422,
+			}).level,
+		).toBe("warn");
+		expect(
+			describeLog({
+				event: "forwarded",
+				method: "POST",
+				route: "x",
+				status: 503,
+			}).level,
+		).toBe("error");
+		expect(describeLog({ event: "signIn", outcome: "unavailable" })).toEqual({
+			level: "error",
+			message:
+				"Sign-in failed: unavailable (the backend could not be reached or has no panel routes)",
+		});
+		expect(
+			describeLog({ event: "signIn", outcome: "misconfigured" }).level,
+		).toBe("error");
+		expect(describeLog({ event: "signIn", outcome: "failed" }).level).toBe(
+			"warn",
+		);
+		expect(describeLog({ event: "signIn", outcome: "cancelled" }).level).toBe(
+			"info",
+		);
+		expect(
+			describeLog({ event: "backendRefusedWorker", route: "/auth/session" }),
+		).toEqual({
+			level: "error",
+			message:
+				"The backend refused the Worker's signed call /auth/session: check that PANEL_SIGNING_SECRET is the same in Azure and in the Worker",
+		});
+	});
+
+	it("says a refusal's reason and status when it has no security meaning", () => {
+		expect(
+			describeLog({
+				event: "refused",
+				method: "POST",
+				route: "manageWorkouts",
+				status: 403,
+				reason: "READ_ONLY",
+			}),
+		).toEqual({
+			level: "warn",
+			message: "Refused (READ_ONLY, 403) POST manageWorkouts",
+		});
 	});
 });

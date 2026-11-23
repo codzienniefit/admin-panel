@@ -15,7 +15,7 @@ const GOOGLE: SignInMethod = {
 	id: "google",
 	kind: "redirect",
 	label: "Zaloguj się przez Google",
-	description: "Otworzy stronę logowania Google.",
+	description: "",
 };
 
 function realAuth(status: "admin" | "signedOut", notice: string | null = null) {

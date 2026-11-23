@@ -37,7 +37,7 @@ const METHODS: Record<string, SignInMethod> = {
 		id: "google",
 		kind: "redirect",
 		label: "Zaloguj się przez Google",
-		description: "Otworzy stronę logowania Google.",
+		description: "",
 	},
 };
 

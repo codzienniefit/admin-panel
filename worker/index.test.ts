@@ -407,14 +407,16 @@ describe("the Worker as Cloudflare calls it", () => {
 	});
 
 	it("logs a refusal as one line of JSON", async () => {
-		const written = vi.spyOn(console, "log").mockImplementation(() => {});
+		const written = vi.spyOn(console, "warn").mockImplementation(() => {});
 		const response = await fetchOf(
 			bare("/api/manageUsers", { at: "https://evil.example.test" }),
 			makeWorld().env,
 		);
 		expect(response.status).toBe(404);
 		expect(written.mock.calls).toEqual([
-			['{"event":"refused","reason":"host","ray":null}'],
+			[
+				'{"message":"[SECURITY_ALERT] Refused a request to an address other than PANEL_ORIGIN","level":"warn","event":"refused","reason":"host","ray":null}',
+			],
 		]);
 	});
 
@@ -433,7 +435,7 @@ describe("the Worker as Cloudflare calls it", () => {
 	});
 
 	it("turns anything that goes wrong inside into a 500 that says nothing, and logs the kind of error only", async () => {
-		const written = vi.spyOn(console, "log").mockImplementation(() => {});
+		const written = vi.spyOn(console, "error").mockImplementation(() => {});
 		vi.spyOn(crypto, "getRandomValues").mockImplementation(() => {
 			throw new TypeError(
 				"a detail that could quote something: made-up-detail",
@@ -447,12 +449,14 @@ describe("the Worker as Cloudflare calls it", () => {
 		expect(await response.text()).not.toContain("made-up-detail");
 		expect(setCookies(response)).toEqual([]);
 		expect(written.mock.calls).toEqual([
-			['{"event":"error","name":"TypeError"}'],
+			[
+				'{"message":"Worker error: TypeError","level":"error","event":"error","name":"TypeError"}',
+			],
 		]);
 	});
 
 	it("names what was thrown `unknown` when it was not an error", async () => {
-		const written = vi.spyOn(console, "log").mockImplementation(() => {});
+		const written = vi.spyOn(console, "error").mockImplementation(() => {});
 		vi.spyOn(crypto, "getRandomValues").mockImplementation(() => {
 			throw { toString: () => "made-up-detail" };
 		});
@@ -462,7 +466,9 @@ describe("the Worker as Cloudflare calls it", () => {
 		);
 		await expectFailure(response, 500, "WORKER_ERROR");
 		expect(written.mock.calls).toEqual([
-			['{"event":"error","name":"unknown"}'],
+			[
+				'{"message":"Worker error: unknown","level":"error","event":"error","name":"unknown"}',
+			],
 		]);
 	});
 

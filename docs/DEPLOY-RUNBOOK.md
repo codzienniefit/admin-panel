@@ -433,7 +433,12 @@ notifications on; API tokens with the least access. GitHub: protect `main` in bo
 
 - Application Insights: `[SECURITY_ALERT]` (alert from 3.6) and `[ADMIN_ACTION]`.
 - Cloudflare → Security → **Events**: what the WAF rules and the rate limit blocked.
-- Workers & Pages → admin-panel → **Logs** (observability is on): the Worker's own refusals.
+- Workers & Pages → admin-panel → **Observability**: every request (100%, with its address; a user
+  search's query is part of it) and the Worker's own lines, each with a readable message and a
+  level. Filter by `[SECURITY_ALERT]` (another host, a request not from the panel's page, a Google
+  return the panel did not start, an unknown API path, a non-admin signing in) or `[ADMIN_ACTION]`
+  (sign-ins and calls, with the uid); errors include the backend refusing the Worker (check
+  `PANEL_SIGNING_SECRET` in both places) and sign-ins failing because the backend is unreachable.
 
 ## Part 8. Rollback
 

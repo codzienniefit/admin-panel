@@ -75,6 +75,18 @@ export function messageIssues(
 	if (group?.requiresTargetGroupValue && !message.targetGroupValue?.trim()) {
 		add("targetGroupValue", "Wskaż, kogo dokładnie dotyczy ta grupa");
 	}
+	// A value the chosen group does not take would be dropped on delivery
+	// without a word; the backend refuses to send such a message.
+	if (
+		group &&
+		!group.requiresTargetGroupValue &&
+		message.targetGroupValue?.trim()
+	) {
+		add(
+			"targetGroupValue",
+			"Ta grupa odbiorców nie ma dodatkowego wskazania. Usuń je albo wybierz inną grupę",
+		);
+	}
 	if (message.fancyContent.length === 0) {
 		add("fancyContent", "Wiadomość nie ma treści");
 	} else {

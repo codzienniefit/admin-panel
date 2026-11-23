@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { type ApiIssue, isApiError } from "@/data/api/errors";
+import { type ApiIssue, failureText, isApiError } from "@/data/api/errors";
 import { changeUserEmail } from "@/data/collections/users";
 import type { UserAccount } from "@/data/schemas/user";
 import { formatDateTime } from "@/domain/dates";
@@ -66,7 +66,10 @@ export function UserAccountTab({ account }: { account: UserAccount }) {
 				? error.issues
 				: [
 						generalIssue(
-							"Nie udało się zmienić adresu. Adres konta jest taki jak przedtem; spróbuj ponownie za chwilę.",
+							failureText(
+								error,
+								"Nie udało się zmienić adresu. Adres konta jest taki jak przedtem; spróbuj ponownie za chwilę.",
+							),
 						),
 					],
 		);

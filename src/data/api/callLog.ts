@@ -50,13 +50,16 @@ const STATUS: Record<ApiErrorKind, number | null> = {
 	network: null,
 };
 
-/** The status a failure stands for. The mock has no HTTP; the kinds map 1:1. */
+/**
+ * The status of a failure: the one the backend really sent when the error
+ * carries it, otherwise the one its kind stands for (the mock has no HTTP).
+ */
 export function statusOf(error: unknown): {
 	status: number | null;
 	kind: ApiErrorKind | "unknown";
 } {
 	return isApiError(error)
-		? { status: STATUS[error.kind], kind: error.kind }
+		? { status: error.status ?? STATUS[error.kind], kind: error.kind }
 		: { status: null, kind: "unknown" };
 }
 

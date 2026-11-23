@@ -9,7 +9,10 @@ The web panel that replaces the Retool panel and Patryk's planner app.
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md)                       | How the panel is built today                                                            |
 | [CODE-GUIDELINES.md](docs/CODE-GUIDELINES.md)                 | Rules for writing code here, with reasons                                               |
 | [DEFINITION-OF-DONE.md](docs/DEFINITION-OF-DONE.md)           | When work may start and when it is finished: tests, lint, checks by hand                |
-| [SECURITY.md](docs/SECURITY.md)                               | What was reviewed, what protects the panel, what stage 2 must add                       |
+| [SECURITY.md](docs/SECURITY.md)                               | What was reviewed, what protects the panel, how sign-in is built                        |
+| [SIGN-IN-SETUP.md](docs/SIGN-IN-SETUP.md)                     | Switching Produkcja on: every key, where it comes from, where it goes                   |
+| [AUTH-HARDENING.md](docs/AUTH-HARDENING.md)                   | How sign-in is designed and why: the review, the rules, the backend's part, the runbook |
+| [PRODUCTION-API.md](docs/PRODUCTION-API.md)                   | Every call to the real backend, and what is switched off                                |
 | [RISKS.md](docs/RISKS.md)                                     | What could go wrong and what is done about it                                           |
 | [PLAN.md](docs/PLAN.md), [ROADMAP.md](docs/ROADMAP.md)        | What is intended, and in which order                                                    |
 | [PHASE-7-RESULT.md](docs/PHASE-7-RESULT.md)                   | The latest phase; the panel now covers every Retool tab and the planner, on sample data |
@@ -20,9 +23,9 @@ The web panel that replaces the Retool panel and Patryk's planner app.
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev      # http://localhost:5173, Test environment, needs no keys
 npm run check    # secrets scan, typecheck, lint, unit tests, production build
-npm run test:ui  # 72 browser tests, Test environment only (first time: npx playwright install chromium)
+npm run test:ui  # 74 browser tests, Test environment only (first time: npx playwright install chromium)
 npm run test:all # both
 npm run format   # apply lint and formatting fixes
 ```

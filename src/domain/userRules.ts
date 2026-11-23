@@ -14,21 +14,50 @@ import { matchesQuery } from "./text";
 
 /** Shorter queries would match half the user base; they return nothing. */
 export const USER_QUERY_MIN = 3;
-/** A search never returns more than this; the rest needs a narrower query. */
+/** Every word of a query needs this many characters. */
+export const USER_TERM_MIN = 2;
+/**
+ * A search never returns more than this; the rest needs a narrower query.
+ * It is also the most the backend lets the panel ask for.
+ */
 export const USER_SEARCH_LIMIT = 20;
 
-export const isSearchable = (query: string): boolean =>
-	query.trim().length >= USER_QUERY_MIN;
+/**
+ * The words of a query as the backend counts them: split at spaces, commas
+ * and semicolons, accents left out (its `splitSearchTerms`).
+ */
+function searchTerms(query: string): string[] {
+	return query
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.trim()
+		.split(/[\s,;]+/)
+		.filter((term) => term !== "");
+}
 
-/** What to tell someone whose query cannot be searched; null when it can. */
+/**
+ * What to tell someone whose query cannot be searched; null when it can.
+ * The backend refuses the same queries: one word of at least three
+ * characters, and no word shorter than two.
+ */
 export function searchQueryProblem(query: string): string | null {
 	const text = query.trim();
 	if (!text) return "Wpisz adres e-mail, imię i nazwisko albo identyfikator";
 	if (text.length < USER_QUERY_MIN) {
 		return `Wpisz co najmniej ${USER_QUERY_MIN} znaki`;
 	}
+	const terms = searchTerms(text);
+	if (terms.some((term) => term.length < USER_TERM_MIN)) {
+		return `Wpisz słowa po co najmniej ${USER_TERM_MIN} znaki`;
+	}
+	if (!terms.some((term) => term.length >= USER_QUERY_MIN)) {
+		return `Wpisz przynajmniej jedno słowo o co najmniej ${USER_QUERY_MIN} znakach`;
+	}
 	return null;
 }
+
+export const isSearchable = (query: string): boolean =>
+	searchQueryProblem(query) === null;
 
 /** True when the query appears in the e-mail, the name or the id. */
 export function userMatches(

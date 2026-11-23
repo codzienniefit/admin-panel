@@ -77,7 +77,11 @@ function splittingCharacters(text: string): string[] {
 	return [...new Set(found)];
 }
 
-const TAG = /<\/?[^<>]*>/g;
+// A tag is a "<" followed by a letter (or by "/" and a letter) and closed by
+// a ">". A "<" followed by anything else is a sign in a sentence ("tempo < 5
+// min, puls > 120"), not a tag, however far away the next ">" is. The same
+// pattern as the backend's (`contentBlockRules.ts`), so both refuse the same.
+const TAG = /<\/?[a-zA-Z][^<>]*>/g;
 const isSupportedTag = (tag: string) =>
 	tag === "<b>" || tag === "</b>" || tag === "</a>" || /^<a\s[^>]*>$/.test(tag);
 
@@ -194,7 +198,7 @@ function blockProblems(
 	if (block.type === "Title") {
 		if (!content.trim()) return [["error", "Tytuł jest pusty"]];
 		const out: Array<[ContentIssue["severity"], string]> = [];
-		if (/<[^>]*>/.test(content)) {
+		if (new RegExp(TAG.source).test(content)) {
 			out.push([
 				"error",
 				"Tytuł nie obsługuje tagów. Przenieś formatowany fragment do bloku tekstu",

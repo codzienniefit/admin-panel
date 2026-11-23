@@ -569,7 +569,7 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 			</fieldset>
 
 			{!readOnly && (
-				<div className="fixed inset-x-0 bottom-0 z-30 border-line border-t bg-surface/95 backdrop-blur">
+				<div className="fixed inset-x-0 bottom-0 z-30 border-line border-t bg-surface">
 					<div className="mx-auto flex max-w-[1500px] items-center justify-end gap-3 px-4 py-3 md:px-6">
 						<span className="text-sm text-muted">
 							{dirty ? "Niezapisane zmiany" : "Brak zmian"}

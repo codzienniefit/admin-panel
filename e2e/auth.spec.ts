@@ -1,18 +1,42 @@
 import { SIGNED_OUT } from "./support/environment";
-import { expect, open, pick, test } from "./support/test";
+import { choose, expect, open, pick, test } from "./support/test";
 
 test.describe("environment", () => {
-	test("the panel works on sample data and production cannot be picked", async ({
+	test("the panel works on sample data by default", async ({ page }) => {
+		await open(page, "/challenges");
+		await expect(page.getByRole("combobox", { name: "Środowisko" })).toHaveText(
+			"Test",
+		);
+	});
+
+	test("Produkcja asks for a real sign-in and leads back to Test", async ({
 		page,
 	}) => {
 		await open(page, "/challenges");
-		const environment = page.getByRole("combobox", { name: "Środowisko" });
-		await expect(environment).toHaveText("Test");
+		await choose(page, "Środowisko", /Produkcja/);
 
-		await environment.click();
+		// The demo session does not count there, and no keys are set here.
+		await expect(page).toHaveURL(/\/login/);
 		await expect(
-			page.getByRole("option", { name: /Produkcja/ }),
-		).toHaveAttribute("aria-disabled", "true");
+			page.getByRole("heading", { name: "Logowanie niedostępne" }),
+		).toBeVisible();
+		await expect(page.getByRole("button", { name: /Wejdź jako/ })).toHaveCount(
+			0,
+		);
+
+		// Nothing behind sign-in opens by typing its address.
+		await page.goto("/workouts");
+		await expect(page).toHaveURL(/\/login/);
+
+		// Back in Test the demo session is still there, and so is the panel.
+		await choose(page, "Środowisko", /Test/);
+		await expect(page).toHaveURL(/\/challenges/);
+		await expect(
+			page.getByRole("navigation", { name: "Główne" }),
+		).toBeVisible();
+		await expect(page.getByRole("combobox", { name: "Środowisko" })).toHaveText(
+			"Test",
+		);
 	});
 });
 

@@ -1,29 +1,52 @@
 import { useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { auth } from "@/auth";
+import type { SignInMethod } from "@/auth/types";
 import { errorMessage } from "@/data/api/errors";
-import { currentEnvironment, ENVIRONMENTS } from "@/data/environment";
 import { Button } from "@/ui/Button";
+import { EnvironmentSelect } from "@/ui/EnvironmentSelect";
 import { Logo } from "@/ui/Logo";
 import { Notice } from "@/ui/Notice";
-import { Tag } from "@/ui/Tag";
 import { attempt } from "@/ui/tasks";
 
-/** Sign-in. `redirect` is where the person was heading when they were stopped. */
-export function LoginPage({ redirect }: { redirect: string }) {
+/** Why a sign-in at Google came back without a session. */
+const RETURN_PROBLEMS: Record<string, string> = {
+	forbidden: "To konto nie ma dostępu do panelu.",
+	cancelled: "Logowanie zostało przerwane.",
+	disabled: "To konto jest zablokowane.",
+	tooManyAttempts: "Za dużo prób. Spróbuj ponownie za kilka minut.",
+	unavailable: "Logowanie jest chwilowo niedostępne. Spróbuj za chwilę.",
+	misconfigured:
+		"Logowanie nie jest poprawnie skonfigurowane. Daj znać administratorowi.",
+};
+const FALLBACK = "Nie udało się zalogować";
+
+export const returnProblem = (code: string | undefined): string | null =>
+	code ? (RETURN_PROBLEMS[code] ?? `${FALLBACK}.`) : null;
+
+interface LoginPageProps {
+	/** Where the person was heading when they were stopped. */
+	redirect: string;
+	/** Set when a sign-in at Google came back refused. */
+	problem?: string;
+}
+
+/** Sign-in: the first thing anyone sees. */
+export function LoginPage({ redirect, problem }: LoginPageProps) {
 	const router = useRouter();
 	const [busy, setBusy] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
-	const environment = ENVIRONMENTS.find(
-		(e) => e.value === currentEnvironment(),
-	);
+	const [error, setError] = useState<string | null>(returnProblem(problem));
+	const notice = auth.notice?.() ?? null;
+	// Shown only next to the refusal it belongs to.
+	const refusedUid =
+		problem === "forbidden" ? (auth.refusedUid?.() ?? null) : null;
 
-	const signIn = async (methodId: string) => {
-		setBusy(methodId);
+	const signIn = async (method: SignInMethod) => {
+		setBusy(method.id);
 		setError(null);
-		const signedIn = await attempt(() => auth.signIn(methodId));
+		const signedIn = await attempt(() => auth.signIn(method.id, { redirect }));
 		if (!signedIn.ok) {
-			setError(errorMessage(signedIn.error, "Nie udało się zalogować"));
+			setError(errorMessage(signedIn.error, FALLBACK));
 			setBusy(null);
 			return;
 		}
@@ -39,9 +62,7 @@ export function LoginPage({ redirect }: { redirect: string }) {
 					<h1>
 						<Logo className="h-6" />
 					</h1>
-					{environment && (
-						<Tag tone={environment.tone}>{environment.label}</Tag>
-					)}
+					<EnvironmentSelect />
 				</div>
 				<p className="mt-1 text-sm text-muted">Panel administracyjny</p>
 
@@ -49,28 +70,46 @@ export function LoginPage({ redirect }: { redirect: string }) {
 					<div className="mt-5">
 						<Notice tone="red" role="alert" title="Nie udało się zalogować">
 							{error}
+							{refusedUid && (
+								<span className="mt-2 block">
+									Żeby dostać dostęp, przekaż ten identyfikator osobie, która
+									prowadzi listę administratorów:{" "}
+									<span className="select-all break-all font-mono">
+										{refusedUid}
+									</span>
+								</span>
+							)}
+						</Notice>
+					</div>
+				)}
+				{notice && (
+					<div className="mt-5">
+						<Notice tone="amber" title="Logowanie niedostępne">
+							{notice}
 						</Notice>
 					</div>
 				)}
 
-				<div className="mt-6 flex flex-col gap-3">
-					{auth.methods.map((method, index) => (
-						<div key={method.id}>
-							<Button
-								variant={index === 0 ? "primary" : "secondary"}
-								size="md"
-								className="w-full"
-								disabled={busy !== null}
-								onClick={() => void signIn(method.id)}
-							>
-								{busy === method.id ? "Logowanie…" : method.label}
-							</Button>
-							<p className="mt-1 px-1 text-xs text-muted">
-								{method.description}
-							</p>
-						</div>
-					))}
-				</div>
+				{auth.methods.length > 0 && (
+					<div className="mt-6 flex flex-col gap-3">
+						{auth.methods.map((method, index) => (
+							<div key={method.id}>
+								<Button
+									variant={index === 0 ? "primary" : "secondary"}
+									size="md"
+									className="w-full"
+									disabled={busy !== null}
+									onClick={() => void signIn(method)}
+								>
+									{busy === method.id ? "Logowanie…" : method.label}
+								</Button>
+								<p className="mt-1 px-1 text-xs text-muted">
+									{method.description}
+								</p>
+							</div>
+						))}
+					</div>
+				)}
 
 				{redirect !== "/" && (
 					<p className="mt-6 border-line border-t pt-4 text-xs text-muted">

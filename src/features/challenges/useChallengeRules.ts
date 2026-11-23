@@ -1,6 +1,9 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { badgesCollection } from "@/data/collections/badges";
-import { challengesCollection } from "@/data/collections/challenges";
+import {
+	challengesCollection,
+	challengeTarget,
+} from "@/data/collections/challenges";
 import { workoutsCollection } from "@/data/collections/workouts";
 import type { ChallengeContext } from "@/domain/challengeRules";
 import { useConfig } from "@/features/config/useConfig";
@@ -29,6 +32,14 @@ export function useChallengeRules(ownId?: string) {
 		challengeIds: new Set((challenges ?? []).map((c) => c.id)),
 		ownId,
 		promotedChallengeId: config.internal.promotedChallengeId,
+		// As the server has them: not edits held after a failed save, which
+		// would make a changed subtitle look unchanged.
+		storedSubtitles: new Map(
+			(challenges ?? []).map((c) => [
+				c.id,
+				(challengeTarget.saved(c.id) ?? c).subtitle,
+			]),
+		),
 	};
 
 	return {

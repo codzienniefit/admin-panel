@@ -160,7 +160,13 @@ settings, messages, users. Errors are
 | Environment | ApiClient | AuthProvider | State |
 |---|---|---|---|
 | Test | mock, in the browser | mock, two made-up people | available |
-| Produkcja | HTTP adapter | Firebase | listed, not available yet |
+| Produkcja | HTTP (`data/api/http/`), through the Worker | the app's Firebase accounts, through the Worker (`auth/server.ts`) | built, selectable; not live until the keys are set ([SIGN-IN-SETUP.md](SIGN-IN-SETUP.md)); read-only |
+
+The HTTP client is one file per area, each with three parts: a lenient schema of what the backend
+sends, the mapping both ways as pure functions, and the calls. `data/api/capabilities.ts` says what
+an environment's backend can do and what may be written to it; the client checks it before every
+call, so something that is off costs no request. Every call and every gap is listed in
+[PRODUCTION-API.md](PRODUCTION-API.md).
 
 The mock (`data/api/mock/`) is a small core (`kernel.ts`: clock, latency, forced failure and
 conflict, etags, persistence) with one module per area on top of it. It implements the **target**
@@ -187,8 +193,15 @@ The pathless route `routes/_app.tsx` guards every screen: no session redirects t
 address to return to; a signed-in person without the admin claim sees `/forbidden`. The return
 address is checked by `auth/redirect.ts` so it can only point inside the panel.
 
-This guard is for the user's convenience. Access is enforced by the backend, on every request (see
-[SECURITY.md](SECURITY.md)).
+This guard is for the user's convenience. Access is enforced by the Worker's session and by the
+backend, on every request (see [SECURITY.md](SECURITY.md)).
+
+In Produkcja the page holds no token. The Worker takes the person to Google, hands the result to
+the backend, and keeps the session the backend creates in one cookie the page cannot read. The
+backend decides who is an admin (its own list) and checks the session and the Worker's signature
+on every call. `auth/server.ts` only asks the Worker who is signed in.
+[SECURITY.md §5a](SECURITY.md) has the properties, [AUTH-HARDENING.md](AUTH-HARDENING.md) the
+rules and reasons.
 
 ## 9. Addresses
 
@@ -260,15 +273,23 @@ components, because the React Compiler does not compile a component that contain
 
 ## 13. The Worker
 
-`worker/index.ts` answers `/api/health` and nothing else. Everything else is static files, with
-`index.html` as the fallback for client-side routes. `public/_headers` sets the security headers.
-Forwarding to the backend and the two endpoints that need a secret arrive in stage 2.
+Static files are served by Cloudflare, with `index.html` as the fallback for client-side routes and
+`public/_headers` for the security headers. Two prefixes reach the Worker (`wrangler.json`):
+
+| Prefix | File | Does |
+|---|---|---|
+| `/auth/*` | `worker/auth.ts`, `session.ts`, `firebase.ts` | sign-in, the session cookies, sign-out |
+| `/api/*` | `worker/proxy.ts` | forwards to the backend for a signed-in admin: one host, a fixed list of endpoints and headers |
+
+Its settings (`worker/env.ts`) are Cloudflare secrets; with none set it signs nobody in and forwards
+nothing. Handlers take their `fetch`, clock and random bytes as arguments, so the tests call them
+directly with fakes.
 
 ## 14. Not built yet
 
 | Thing | When |
 |---|---|
-| Firebase sign-in, HTTP adapter, Worker forwarding | stage 2, [ROADMAP.md](ROADMAP.md) |
+| Hiding in Produkcja what its backend cannot do yet (today such actions answer with a refusal) | with each live slice, [ROADMAP.md](ROADMAP.md) |
 | AI descriptions, YouTube lookups, import of Patryk's local plans | stage 2, last slices |
 | Recording status and format on workouts, admins page | need the backend first |
 | Continuous integration | not set up; see [RISKS.md](RISKS.md). Browser tests exist: [TESTING.md](TESTING.md) |

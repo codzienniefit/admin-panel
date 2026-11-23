@@ -1,12 +1,13 @@
 import { currentEnvironment } from "@/data/environment";
 import { createMockAuth } from "./mock";
+import { createServerAuth } from "./server";
 import type { AuthProvider } from "./types";
 
 // One sign-in system per environment, like the ApiClient.
 function createAuth(): AuthProvider {
-	const environment = currentEnvironment();
-	if (environment === "test") return createMockAuth();
-	throw new Error(`Środowisko "${environment}" nie jest jeszcze dostępne.`);
+	return currentEnvironment() === "test"
+		? createMockAuth()
+		: createServerAuth();
 }
 
 export const auth: AuthProvider = createAuth();

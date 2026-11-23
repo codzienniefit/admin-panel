@@ -1,6 +1,11 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
-import { type ApiIssue, isApiError } from "@/data/api/errors";
+import {
+	type ApiIssue,
+	errorMessage,
+	failureText,
+	isApiError,
+} from "@/data/api/errors";
 import { badgesCollection } from "@/data/collections/badges";
 import { grantUserBadge, revokeUserBadge } from "@/data/collections/users";
 import { formatDate } from "@/domain/dates";
@@ -47,7 +52,11 @@ function problemsOf(error: unknown): ApiIssue[] {
 			),
 		];
 	}
-	return [generalIssue("Nie udało się. Spróbuj ponownie za chwilę.")];
+	return [
+		generalIssue(
+			failureText(error, "Nie udało się. Spróbuj ponownie za chwilę."),
+		),
+	];
 }
 
 export function UserBadgesTab({ uid, person }: UserBadgesTabProps) {
@@ -85,7 +94,7 @@ export function UserBadgesTab({ uid, person }: UserBadgesTabProps) {
 					<Button onClick={() => void held.refetch()}>Spróbuj ponownie</Button>
 				}
 			>
-				Sprawdź połączenie i spróbuj jeszcze raz.
+				{errorMessage(held.error, "Sprawdź połączenie i spróbuj jeszcze raz.")}
 			</Notice>
 		);
 	}

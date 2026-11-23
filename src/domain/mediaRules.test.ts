@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fromLocalInput, toLocalInput } from "./dates";
 import {
 	acceptedTypes,
+	cleanUploadPath,
 	dropProblem,
 	MEDIA_FOLDERS,
 	mediaFolder,
@@ -43,11 +44,53 @@ describe("media upload rules", () => {
 
 	it("accepts audio only in the audio folder", () => {
 		expect(
-			uploadProblem(folder("audio"), { name: "trening.m4a", size: 50_000_000 }),
+			uploadProblem(folder("audio"), { name: "trening.m4a", size: 30_000_000 }),
 		).toBeNull();
 		expect(
 			uploadProblem(folder("workouts"), { name: "trening.m4a", size: 1000 }),
 		).not.toBeNull();
+	});
+
+	it("takes for audio what the backend takes: m4a, mp3 and wav, up to 32 MB", () => {
+		const MB = 1024 * 1024;
+		for (const name of ["a.m4a", "a.mp3", "a.wav", "A.MP3"]) {
+			expect(
+				uploadProblem(folder("audio"), { name, size: 32 * MB }),
+			).toBeNull();
+		}
+		// The backend has no content type for m4v, and stores ogg and mp4 only
+		// for Retool.
+		for (const name of ["a.m4v", "a.ogg", "a.mp4", "a.webp", "a"]) {
+			expect(uploadProblem(folder("audio"), { name, size: 1000 })).toContain(
+				"m4a, mp3, wav",
+			);
+		}
+		// More than the panel's Worker forwards.
+		expect(
+			uploadProblem(folder("audio"), { name: "a.m4a", size: 32 * MB + 1 }),
+		).toContain("limit to 32 MB");
+		expect(
+			uploadProblem(folder("audio"), { name: "a.m4a", size: 50_000_000 }),
+		).toContain("limit");
+	});
+
+	it("has the backend's five folders, pictures as webp only, with its limits", () => {
+		// src/config/mediaUpload.ts of the backend, PANEL_UPLOAD_FOLDERS.
+		const KB = 1024;
+		expect(
+			MEDIA_FOLDERS.map((item) => [
+				item.id,
+				item.kind,
+				[...item.extensions],
+				item.maxBytes,
+			]),
+		).toEqual([
+			["workouts", "image", ["webp"], 250 * KB],
+			["challenges", "image", ["webp"], 300 * KB],
+			["messages", "image", ["webp"], 300 * KB],
+			["badges", "image", ["webp"], 50 * KB],
+			["audio", "audio", ["m4a", "mp3", "wav"], 32 * 1024 * KB],
+		]);
 	});
 
 	it("refuses a name with nothing usable in it", () => {
@@ -61,6 +104,52 @@ describe("media upload rules", () => {
 			"workouts/poranna-mobilnosc-1.webp",
 		);
 		expect(uploadPath("audio", "Żółć łąka.m4a")).toBe("audio/zolc-laka.m4a");
+	});
+
+	it("builds the path the backend would store, so it is never asked to change it", () => {
+		// The cases of the backend's own tests (tests/services/mediaService.test.ts).
+		const cases: [string, string][] = [
+			["audio/start płmaraton_128.m4a", "audio/start-plmaraton_128.m4a"],
+			["audio/ŁÓDŹ ĄĆĘŃŚŻŹ.m4a", "audio/lodz-acenszz.m4a"],
+			["audio/marszobieg 20 B_128 (1).m4a", "audio/marszobieg-20-b_128-1.m4a"],
+			["audio/TEMPO A_poprawione.m4a", "audio/tempo-a_poprawione.m4a"],
+			["audio/ZONE 2 C_128.m4a", "audio/zone-2-c_128.m4a"],
+			["audio/tempo-5x5_128.m4a", "audio/tempo-5x5_128.m4a"],
+			["messages/image.webp", "messages/image.webp"],
+			["audio/../../etc/passwd.png", "audio/etc/passwd.png"],
+			["./audio//nested///file.m4a", "audio/nested/file.m4a"],
+			// Where the panel's own slug used to differ: dots in a row, and a
+			// dash left next to a dot.
+			["audio/weird...name.m4a", "audio/weird.name.m4a"],
+			["audio/ spaced name .m4a", "audio/spaced-name.m4a"],
+			["audio/файл.m4a", "audio/file.m4a"],
+			["audio/你好.m4a", "audio/file.m4a"],
+			["audio/.m4a", "audio/file.m4a"],
+			["audio/....m4a", "audio/file.m4a"],
+			["audio/---.m4a", "audio/file.m4a"],
+			["audio/名前 test.m4a", "audio/test.m4a"],
+			["audio/Track.M4A", "audio/track.m4a"],
+			["audio/noextension", "audio/noextension"],
+			["workouts/Moje Zdjęcie.webp", "workouts/moje-zdjecie.webp"],
+		];
+		for (const [given, stored] of cases) {
+			expect(cleanUploadPath(given), given).toBe(stored);
+			// Clean once is clean for good.
+			expect(cleanUploadPath(stored), stored).toBe(stored);
+		}
+		// The two spellings of one letter end as the same name.
+		expect(cleanUploadPath("audio/zone2 przebiez\u0307ki_128.m4a")).toBe(
+			cleanUploadPath("audio/zone2 przebie\u017cki_128.m4a"),
+		);
+		expect(cleanUploadPath("")).toBe("");
+		expect(cleanUploadPath("///")).toBe("");
+	});
+
+	it("gives a file the same path whichever way its name is cleaned", () => {
+		expect(uploadPath("audio", "weird...name (2) .m4a")).toBe(
+			cleanUploadPath("audio/weird...name (2) .m4a"),
+		);
+		expect(uploadPath("workouts", "a - .b.webp")).toBe("workouts/a.b.webp");
 	});
 });
 
@@ -102,7 +191,7 @@ describe("media folders", () => {
 
 	it("lists the types a file chooser should offer", () => {
 		expect(acceptedTypes(folder("workouts"))).toBe(".webp");
-		expect(acceptedTypes(folder("audio"))).toBe(".m4a,.m4v,.mp3,.wav");
+		expect(acceptedTypes(folder("audio"))).toBe(".m4a,.mp3,.wav");
 	});
 });
 

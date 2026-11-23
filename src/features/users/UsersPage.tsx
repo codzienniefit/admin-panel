@@ -1,4 +1,5 @@
 import { useForm } from "react-hook-form";
+import { errorMessage } from "@/data/api/errors";
 import type { UserSummary } from "@/data/schemas/user";
 import { formatDate } from "@/domain/dates";
 import { plural } from "@/domain/text";
@@ -137,7 +138,10 @@ function SearchResults({
 					</Button>
 				}
 			>
-				Sprawdź połączenie i spróbuj jeszcze raz.
+				{errorMessage(
+					search.error,
+					"Sprawdź połączenie i spróbuj jeszcze raz.",
+				)}
 			</Notice>
 		);
 	}

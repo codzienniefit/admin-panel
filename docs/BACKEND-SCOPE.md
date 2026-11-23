@@ -7,6 +7,15 @@ real data. Companion to [PLAN.md](PLAN.md); evidence and file:line references ar
 Sizes are backend-only, including tests under that repo's rules: **S** up to a day, **M** a few days,
 **L** a week or more.
 
+> **State on 2026-11-13: built, not deployed.** B0 was built differently from what is written
+> below: not an `admin` claim on the existing routes, but the panel's own `panel/…` routes with a
+> list of admins in code ([AUTH-HARDENING.md](AUTH-HARDENING.md) section 6). B1, B2 (except B2.9),
+> B3 and B5.1 to B5.8 are built (B5.1, the doubled purge address, fixed on 2026-11-16, with a
+> button for it in the panel's settings); of B4, media phase A and the audit trail are built,
+> direct uploads and the YouTube lookup are not. The new editing contract applies on the panel's routes only; Retool's routes answer as
+> before. What changes on deploy and what was not built: the backend repository's
+> `docs/admin-panel.md`. The text below is the scope as first written and is kept for the reasons.
+
 ## Summary
 
 | Block | What                                                                                                   | Size              | Needed by roadmap step |
@@ -148,7 +157,7 @@ tests for all three endpoint types.
 | B2.4  | **Lists return everything.** `GET manageChallenges` sends every challenge with every path and day                                                                                           | `?view=summary` on challenges (no paths, no fancy content) and workouts. The panel lists from the summary and loads one item for editing                                                                                 | S               |
 | B2.5  | **Message draft identity is `createdAtUtc`.** The upsert DTO has no `id`; the client must resend the exact timestamp                                                                        | Accept `id` on upsert; keep the timestamp rule as a fallback                                                                                                                                                             | S               |
 | B2.6  | **Thin validation.** Challenge: no check of title, image, `lengthDays` against the day count, dates, or duplicate `levelId` across paths. Workout: almost nothing                           | Add the missing rules (as publish-time errors under B1.3)                                                                                                                                                                | S–M             |
-| B2.7  | Single-item GET exists only for challenges and workouts                                                                                                                                     | Optional: `manageBadges/{id}`, `manageOffers/{id}`. The lists are small; the panel can read from the list                                                                                                                | S, low priority |
+| B2.7  | Single-item GET exists only for challenges and workouts                                                                                                                                     | Optional: `manageBadges/{id}`, `manageOffers/{id}` (both exist on the panel's routes since 2026-11-16). The lists are small; the panel can read from the list                                                                                                                | S, low priority |
 | B2.8  | Ad-hoc response shapes: `manageUserProgress` has no DTO, `accounts/{userId}` returns a raw Firebase `UserRecord` and answers 200 for an unknown user                                        | Typed DTOs, 404 for unknown user                                                                                                                                                                                         | S               |
 | B2.9  | The admin DTOs are in the npm package `codziennie-fit-dtos` but `internal.ts` is not exported and the package ships raw `.ts`                                                               | Add an `exports` entry for `./internal` and emit `.d.ts`. The panel then type-checks its schemas against the backend's own types                                                                                         | S               |
 | B2.10 | **A field missing from the request is wiped.** Upserts build the row from the request alone and replace the stored row, so a client that predates a field erases it on every save           | Omitted means "keep what is stored", by default, for every field. Details below                                                                                                                                          | S–M             |

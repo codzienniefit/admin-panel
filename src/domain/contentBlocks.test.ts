@@ -62,8 +62,14 @@ describe("content validation", () => {
 		it("must not be empty", () => {
 			expect(errorsOf(title("   "))).toEqual(["Tytuł jest pusty"]);
 		});
+		it("may carry a less-than and a greater-than sign that are no tag", () => {
+			expect(errorsOf(title("Tempo < 5 min, puls > 120"))).toEqual([]);
+			expect(errorsOf(title("3 < 5 > 2"))).toEqual([]);
+		});
+
 		it("must not carry tags", () => {
 			expect(errorsOf(title("<b>Mocny</b> start"))).toHaveLength(1);
+			expect(errorsOf(title("Koniec</b>"))).toHaveLength(1);
 		});
 		it("warns about a line break", () => {
 			expect(errorsOf(title("Dwie\nlinie"))).toEqual([]);
@@ -93,6 +99,24 @@ describe("content validation", () => {
 			["<b >spacja</b>", "a space inside the tag"],
 		])("refuses %s (%s)", (content) => {
 			expect(errorsOf(text(content)).join(" ")).toContain("zapisany inaczej");
+		});
+
+		it("does not take a sign in a sentence for a tag", () => {
+			// Only "<" with a letter (or "/" and a letter) right after it begins a tag.
+			for (const sentence of [
+				"tempo < 5 min, puls > 120",
+				"3 < 5 i 7 > 2",
+				"serce <3 biegania > wszystko",
+				"a <= b, c >= d",
+				"strzałka -> i <- z powrotem",
+				"a </ 3 > b",
+			]) {
+				expect(errorsOf(text(sentence)), sentence).toEqual([]);
+			}
+			// With a letter or a slash after it, it is one, as before.
+			expect(errorsOf(text("tempo <i>szybkie</i>"))).toHaveLength(1);
+			expect(errorsOf(text("koniec </i> tu"))).toHaveLength(1);
+			expect(errorsOf(text("tempo <5min> i <b>mocno</b>"))).toEqual([]);
 		});
 
 		it("needs every tag closed", () => {

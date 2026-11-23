@@ -22,13 +22,15 @@ import {
 import { challengeIssues } from "@/domain/challengeRules";
 import { extensionOf } from "@/domain/mediaRules";
 import { slugify } from "@/domain/text";
-import { workoutIssues } from "@/domain/workoutRules";
+import { statusChangeFrom, workoutIssues } from "@/domain/workoutRules";
 import { badgesArea } from "./badges";
+import { cacheApi } from "./cache";
 import { internalConfigFixture, workoutConfigFixture } from "./configFixtures";
 import { UNKNOWN_FIELD } from "./fixtures";
 import { copy, createKernel, type MockApiOptions } from "./kernel";
 import { placeholderAudio, placeholderImage, toDataUrl } from "./mediaUrls";
 import { messagesApi } from "./messages";
+import { offersApi } from "./offers";
 import { planningApi } from "./planning";
 import { settingsApi } from "./settings";
 import { usersApi } from "./users";
@@ -42,7 +44,7 @@ import { usersApi } from "./users";
 
 export type { MockApiOptions } from "./kernel";
 
-const AUDIO = new Set(["m4a", "m4v", "mp3", "wav"]);
+const AUDIO = new Set(["m4a", "mp3", "wav"]);
 const IMAGE = new Set(["webp", "png", "jpg", "jpeg", "gif", "svg"]);
 const MIME: Record<string, string> = {
 	webp: "image/webp",
@@ -150,11 +152,18 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 	): ApiIssue[] {
 		const issues = workoutIssues(incoming, workoutConfigFixture, {
 			badgeIds: badges.assignableIds(),
+			// As the backend's status route: taking a published workout down
+			// needs no film or recording.
+			statusChangeFrom: statusChangeFrom(stored, incoming),
 		});
 
 		if (incoming.videoUrl) {
+			// A workout in the bin does not hold its film any more.
 			const twin = [...workouts.values()].find(
-				(w) => w.id !== incoming.id && w.videoUrl === incoming.videoUrl,
+				(w) =>
+					w.id !== incoming.id &&
+					w.status !== "deleted" &&
+					w.videoUrl === incoming.videoUrl,
 			);
 			if (twin) {
 				issues.push({
@@ -213,6 +222,10 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 			challengeIds: new Set(challenges.keys()),
 			ownId: incoming.id,
 			promotedChallengeId: promoted.get(),
+			// A new challenge's fresh id is not here yet, so it counts as new.
+			storedSubtitles: new Map(
+				[...challenges.values()].map((c) => [c.id, c.subtitle]),
+			),
 		});
 		if (stored?.status === "deleted" && incoming.status === "deleted") {
 			issues.push({
@@ -406,6 +419,8 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 			challenges: () => [...challenges.values()],
 		}),
 		settings: settingsApi(kernel),
+		offers: offersApi(kernel),
+		cache: cacheApi(kernel),
 	};
 }
 

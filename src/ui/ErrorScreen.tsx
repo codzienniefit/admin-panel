@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ApiError } from "@/data/api/errors";
 import { copyText } from "@/lib/clipboard";
 import { Button } from "./Button";
 
@@ -13,6 +14,12 @@ function technicalDetails(error: unknown): string {
 		`Czas: ${new Date().toISOString()}`,
 		`Adres: ${window.location.href}`,
 	];
+	if (error instanceof ApiError) {
+		// what the backend really answered, also when the message is the panel's own
+		if (error.status !== undefined) lines.push(`Status HTTP: ${error.status}`);
+		lines.push(`Rodzaj: ${error.kind}`);
+		if (error.details) lines.push(`Szczegóły: ${error.details}`);
+	}
 	if (error instanceof Error) {
 		lines.push(`Błąd: ${error.name}: ${error.message}`);
 		if (error.stack) lines.push("", error.stack);

@@ -1,4 +1,5 @@
 import { Link, Outlet } from "@tanstack/react-router";
+import { capabilitiesFor, isReadOnly } from "@/data/api/capabilities";
 import { currentEnvironment, ENVIRONMENTS } from "@/data/environment";
 import { CallLogButton } from "@/features/devtools/CallLog";
 import { EnvironmentSelect } from "@/ui/EnvironmentSelect";
@@ -12,6 +13,7 @@ const SECTIONS = [
 	{ to: "/media", label: "Media", exact: false },
 	{ to: "/messages", label: "Wiadomości", exact: false },
 	{ to: "/badges", label: "Odznaki", exact: false },
+	{ to: "/offers", label: "Oferty", exact: false },
 	{ to: "/users", label: "Użytkownicy", exact: false },
 	{ to: "/settings", label: "Ustawienia", exact: false },
 ] as const;
@@ -30,7 +32,7 @@ function TopBar({ children }: { children?: React.ReactNode }) {
 		(e) => e.value === currentEnvironment(),
 	);
 	return (
-		<header className="sticky top-0 z-40 border-line border-b bg-surface/90 backdrop-blur">
+		<header className="sticky top-0 z-40 border-line border-b bg-surface">
 			<div className="flex h-14 items-center gap-3 px-4 md:gap-5 md:px-6">
 				<Link to="/challenges" className="shrink-0">
 					{/* The full logotype needs room; a phone gets the sign. */}
@@ -51,6 +53,25 @@ function TopBar({ children }: { children?: React.ReactNode }) {
 				<UserMenu />
 			</div>
 		</header>
+	);
+}
+
+/**
+ * Says so when the environment lets nothing be saved, before someone edits
+ * a form only to have the save refused.
+ */
+function ReadOnlyBar() {
+	if (!isReadOnly(capabilitiesFor(currentEnvironment()))) return null;
+	return (
+		<div
+			data-tone="amber"
+			role="status"
+			className="border-(--tone) border-b bg-(--tone-soft) px-4 py-2 text-sm text-(--tone-ink) md:px-6"
+		>
+			<strong className="font-semibold">Produkcja: tylko odczyt.</strong> Dane
+			są prawdziwe, ale zapisywanie jest jeszcze wyłączone. Zmiany można
+			próbować w środowisku Test.
+		</div>
 	);
 }
 
@@ -87,6 +108,7 @@ export function Shell() {
 					))}
 				</nav>
 			</TopBar>
+			<ReadOnlyBar />
 			<main className="flex-1 p-4 md:p-6">
 				<Outlet />
 			</main>

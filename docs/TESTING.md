@@ -9,9 +9,9 @@ Related: [DEFINITION-OF-DONE.md](DEFINITION-OF-DONE.md), [CODE-GUIDELINES.md §9
 
 | Kind | Command | Where | Count (2026-11-11) | For |
 |---|---|---|---|---|
-| Unit tests | `npm run test` | `src/**/*.test.ts`, next to the code | 1216 in 47 files, about a second | rules, merging, the saver, planner operations, dates, the pretend server |
+| Unit tests | `npm run test` | `src/**/*.test.ts` and `worker/**/*.test.ts`, next to the code | 3152 in 71 files, about two seconds | rules, merging, the saver, planner operations, dates, the pretend server; the production client's mapping and error handling (about 940); the Worker's sign-in, session and forwarding (about 300) |
 | Guideline guard | part of `npm run test` | `src/conventions.test.ts` | 8 | keeps the written guidelines true by reading the source |
-| UI tests | `npm run test:ui` | `e2e/*.spec.ts` | 72 in 16 files, about 30 seconds | the basic things a person does, in a real browser |
+| UI tests | `npm run test:ui` | `e2e/*.spec.ts` | 74 in 16 files, about 30 seconds | the basic things a person does, in a real browser |
 
 `npm run check` runs the secrets scan, both type checks, lint, the unit tests and the production
 build. `npm run test:all` adds the UI tests. Neither needs the network or any backend.
@@ -24,6 +24,9 @@ of changes and before handing work over for a push. Always locally: nothing runs
 There is no staging backend; the one backend is production. So:
 
 - Unit tests run in Node against the in-process pretend server, with injected clocks.
+- The production client (`src/data/api/http/`) is tested against fake answers shaped like the real
+  backend's, and the Worker (`worker/`) by calling its handlers with a fake `fetch`. Neither opens
+  a connection: Firebase, Google and the backend are all stand-ins.
 - UI tests run in the panel's **Test** environment only: every browser is started with it selected,
   and any request that would leave the machine is refused and fails the test. This is set once, in
   `e2e/support/`, not in each spec.
@@ -59,8 +62,10 @@ checked in the browser until the badge list has arrived (the server checks it ei
 
 - **Touch.** Dragging is tested with a mouse. A real phone has not been tried (RISKS R43).
 - **Browsers other than Chromium.** Add a project in `playwright.config.ts` when it matters.
-- **The real API and real sign-in.** They do not exist yet. The mock's contract tests are written
-  against `ApiClient` and move to the HTTP adapter unchanged.
+- **The real API and real sign-in.** The code for both exists and is tested against fakes only
+  (mapping, error handling, the session, the request guard). Nothing has run against the real
+  backend, Firebase or Google; that needs the keys and is Michał's check
+  ([SIGN-IN-SETUP.md §10](SIGN-IN-SETUP.md)).
 - The content block editor in depth (reordering, links, pasted JSON), dropping a file onto a field,
   the calendar's drag.
 - **Nothing runs these on push.** There is no continuous integration, by decision (2026-11-11).

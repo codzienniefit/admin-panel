@@ -4,6 +4,7 @@ import {
 	dialog,
 	expect,
 	open,
+	pick,
 	test,
 	toast,
 } from "./support/test";
@@ -50,4 +51,44 @@ test("a plan type is added and removed", async ({ page }) => {
 	await confirm(page, /Usunąć rodzaj planu „\[TEST\] Regeneracyjny”/, "Usuń");
 	await expect(toast(page, "Rodzaj planu usunięty")).toBeVisible();
 	await expect(added).toHaveCount(0);
+});
+
+test("the app's cache is cleared after a confirmation, and a failure says so", async ({
+	page,
+}) => {
+	await open(page, "/settings");
+	await page.getByRole("link", { name: "Aplikacja" }).click();
+	await expect(
+		page.getByRole("heading", { name: "Pamięć podręczna backendu" }),
+	).toBeVisible();
+	const clear = page.getByRole("button", { name: "Wyczyść cache backendu" });
+
+	// Saying no clears nothing.
+	await clear.click();
+	await confirm(page, "Wyczyścić cache backendu?", "Anuluj");
+	await expect(page.getByText(/Ostatnio wyczyszczono/)).toHaveCount(0);
+
+	await clear.click();
+	await confirm(page, "Wyczyścić cache backendu?", "Wyczyść cache");
+	await expect(
+		page.getByText(/Ostatnio wyczyszczono: \d\d\.\d\d\.\d{4}/),
+	).toBeVisible();
+	// The Test environment has no CDN, and says so.
+	await expect(page.getByText(/nic nie zostało wyczyszczone/)).toBeVisible();
+	await expect(clear).toBeEnabled();
+
+	// A purge that fails shows why.
+	await pick(page, "Konto: Ada Adminowska", "Dane testowe…");
+	const controls = dialog(page, "Dane testowe");
+	await controls
+		.getByRole("switch", { name: "Następny zapis się nie uda" })
+		.click();
+	await controls.getByRole("button", { name: "Zamknij" }).last().click();
+	await clear.click();
+	await confirm(page, "Wyczyścić cache backendu?", "Wyczyść cache");
+	await expect(
+		page
+			.getByRole("alert")
+			.filter({ hasText: "Nie udało się wyczyścić cache" }),
+	).toBeVisible();
 });

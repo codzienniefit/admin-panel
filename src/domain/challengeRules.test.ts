@@ -71,6 +71,85 @@ describe("challenge rules", () => {
 		}
 	});
 
+	describe("the subtitle minimum: only for new or changed subtitles", () => {
+		// C1 is stored with a subtitle that predates the rule; C2 with none.
+		const stored: ChallengeContext = {
+			...context,
+			storedSubtitles: new Map([
+				["C1", "7d"],
+				["C2", null],
+			]),
+		};
+
+		it("refuses a short subtitle on a new challenge", () => {
+			for (const subtitle of ["7d", "", null]) {
+				const fresh = { ...complete, subtitle };
+				// No id yet, or an id the backend does not have.
+				expect(
+					paths(fresh, { ...stored, ownId: undefined }),
+					String(subtitle),
+				).toEqual(["subtitle"]);
+				expect(
+					paths(fresh, { ...stored, ownId: "C9" }),
+					String(subtitle),
+				).toEqual(["subtitle"]);
+			}
+		});
+
+		it("treats every challenge as new when the stored subtitles are not given", () => {
+			expect(paths({ ...complete, subtitle: "7d" }, context)).toEqual([
+				"subtitle",
+			]);
+		});
+
+		it("accepts an existing challenge whose short subtitle is unchanged", () => {
+			for (const status of ["published", "hidden"] as const) {
+				expect(paths({ ...complete, status, subtitle: "7d" }, stored)).toEqual(
+					[],
+				);
+				// Spaces around it do not make it a change.
+				expect(
+					paths({ ...complete, status, subtitle: " 7d " }, stored),
+				).toEqual([]);
+			}
+		});
+
+		it("accepts an existing challenge whose empty subtitle stays empty", () => {
+			const c2 = { ...stored, ownId: "C2" };
+			expect(paths({ ...complete, subtitle: "" }, c2)).toEqual([]);
+			expect(paths({ ...complete, subtitle: null }, c2)).toEqual([]);
+			expect(paths({ ...complete, subtitle: "   " }, c2)).toEqual([]);
+			expect(
+				paths(
+					{ ...complete, subtitle: "" },
+					{ ...stored, storedSubtitles: new Map([["C1", ""]]) },
+				),
+			).toEqual([]);
+		});
+
+		it("refuses an existing challenge whose subtitle is changed to a short one", () => {
+			expect(paths({ ...complete, subtitle: "8d" }, stored)).toEqual([
+				"subtitle",
+			]);
+			expect(paths({ ...complete, subtitle: "" }, stored)).toEqual([
+				"subtitle",
+			]);
+			expect(
+				paths({ ...complete, subtitle: "Ab" }, { ...stored, ownId: "C2" }),
+			).toEqual(["subtitle"]);
+		});
+
+		it("accepts a changed subtitle that is long enough", () => {
+			expect(paths({ ...complete, subtitle: "Osiem dni" }, stored)).toEqual([]);
+		});
+
+		it("still lets a draft have any subtitle", () => {
+			expect(
+				paths({ ...complete, status: "draft", subtitle: "8d" }, stored),
+			).toEqual([]);
+		});
+	});
+
 	it("refuses ids the configuration does not know", () => {
 		expect(paths({ ...complete, categoryId: "inna" })).toEqual(["categoryId"]);
 		expect(paths({ ...complete, goalsIds: ["sila", "latanie"] })).toEqual([

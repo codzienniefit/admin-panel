@@ -11,6 +11,7 @@ import {
 	describeAssignment,
 	describeAssignments,
 	isEventBadge,
+	normalizeClaimToken,
 } from "./badgeRules";
 
 const normal: NewBadge = {
@@ -186,6 +187,24 @@ describe("badge rules", () => {
 				takenClaimTokens: new Set(["spotkanie2026"]),
 			}),
 		).toEqual(["claimToken"]);
+	});
+
+	it("takes a claim code in any case: it is put in capitals on the way to the backend", () => {
+		for (const claimToken of ["spotkanie2026", "Spotkanie2026", "KOD12345"]) {
+			expect(paths({ ...eventBadge, claimToken })).toEqual([]);
+			// What is sent passes the backend's rule: capitals and digits only.
+			expect(normalizeClaimToken(claimToken)).toMatch(/^[A-Z0-9]{6,32}$/);
+		}
+		// A space is still not part of a code.
+		expect(paths({ ...eventBadge, claimToken: " KOD12345" })).toEqual([
+			"claimToken",
+		]);
+	});
+
+	it("puts a claim code in the form it is stored in", () => {
+		expect(normalizeClaimToken("  bieg2026 ")).toBe("BIEG2026");
+		expect(normalizeClaimToken("BIEG2026")).toBe("BIEG2026");
+		expect(normalizeClaimToken("")).toBe("");
 	});
 
 	it("refuses a claim code on a badge that is not for an event", () => {

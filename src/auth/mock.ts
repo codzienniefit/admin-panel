@@ -37,11 +37,13 @@ const USERS: Record<DemoId, { user: AuthUser; admin: boolean }> = {
 const METHODS: readonly SignInMethod[] = [
 	{
 		id: "admin",
+		kind: "button",
 		label: "Wejdź jako administratorka",
 		description: "Konto przykładowe z dostępem do panelu.",
 	},
 	{
 		id: "noAccess",
+		kind: "button",
 		label: "Wejdź jako osoba bez dostępu",
 		description: "Konto przykładowe bez uprawnień, żeby zobaczyć odmowę.",
 	},

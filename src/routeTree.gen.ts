@@ -17,6 +17,7 @@ import { Route as AppBadgesRouteImport } from './routes/_app/badges'
 import { Route as AppDesignRouteImport } from './routes/_app/design'
 import { Route as AppMediaRouteImport } from './routes/_app/media'
 import { Route as AppMessagesRouteImport } from './routes/_app/messages'
+import { Route as AppOffersRouteImport } from './routes/_app/offers'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
 import { Route as AppWorkoutsRouteImport } from './routes/_app/workouts'
@@ -28,7 +29,10 @@ import { Route as AppChallengesCalendarRouteImport } from './routes/_app/challen
 import { Route as AppChallengesNewRouteImport } from './routes/_app/challenges/new'
 import { Route as AppMessagesMessageIdRouteImport } from './routes/_app/messages/$messageId'
 import { Route as AppMessagesNewRouteImport } from './routes/_app/messages/new'
+import { Route as AppOffersOfferIdRouteImport } from './routes/_app/offers/$offerId'
+import { Route as AppOffersNewRouteImport } from './routes/_app/offers/new'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
+import { Route as AppSettingsAppRouteImport } from './routes/_app/settings/app'
 import { Route as AppSettingsFoldersRouteImport } from './routes/_app/settings/folders'
 import { Route as AppSettingsPlanTypesRouteImport } from './routes/_app/settings/plan-types'
 import { Route as AppSettingsTrainingTypesRouteImport } from './routes/_app/settings/training-types'
@@ -78,6 +82,11 @@ const AppMediaRoute = AppMediaRouteImport.update({
 const AppMessagesRoute = AppMessagesRouteImport.update({
   id: '/messages',
   path: '/messages',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOffersRoute = AppOffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
   getParentRoute: () => AppRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
@@ -136,9 +145,24 @@ const AppMessagesNewRoute = AppMessagesNewRouteImport.update({
   path: '/new',
   getParentRoute: () => AppMessagesRoute,
 } as any)
+const AppOffersOfferIdRoute = AppOffersOfferIdRouteImport.update({
+  id: '/$offerId',
+  path: '/$offerId',
+  getParentRoute: () => AppOffersRoute,
+} as any)
+const AppOffersNewRoute = AppOffersNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AppOffersRoute,
+} as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppSettingsRoute,
+} as any)
+const AppSettingsAppRoute = AppSettingsAppRouteImport.update({
+  id: '/app',
+  path: '/app',
   getParentRoute: () => AppSettingsRoute,
 } as any)
 const AppSettingsFoldersRoute = AppSettingsFoldersRouteImport.update({
@@ -210,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/design': typeof AppDesignRoute
   '/media': typeof AppMediaRoute
   '/messages': typeof AppMessagesRouteWithChildren
+  '/offers': typeof AppOffersRouteWithChildren
   '/settings': typeof AppSettingsRouteWithChildren
   '/users': typeof AppUsersRouteWithChildren
   '/workouts': typeof AppWorkoutsRouteWithChildren
@@ -220,6 +245,9 @@ export interface FileRoutesByFullPath {
   '/challenges/new': typeof AppChallengesNewRoute
   '/messages/$messageId': typeof AppMessagesMessageIdRoute
   '/messages/new': typeof AppMessagesNewRoute
+  '/offers/$offerId': typeof AppOffersOfferIdRoute
+  '/offers/new': typeof AppOffersNewRoute
+  '/settings/app': typeof AppSettingsAppRoute
   '/settings/folders': typeof AppSettingsFoldersRoute
   '/settings/plan-types': typeof AppSettingsPlanTypesRoute
   '/settings/training-types': typeof AppSettingsTrainingTypesRoute
@@ -241,6 +269,7 @@ export interface FileRoutesByTo {
   '/design': typeof AppDesignRoute
   '/media': typeof AppMediaRoute
   '/messages': typeof AppMessagesRouteWithChildren
+  '/offers': typeof AppOffersRouteWithChildren
   '/workouts': typeof AppWorkoutsRouteWithChildren
   '/': typeof AppIndexRoute
   '/badges/$badgeId': typeof AppBadgesBadgeIdRoute
@@ -249,6 +278,9 @@ export interface FileRoutesByTo {
   '/challenges/new': typeof AppChallengesNewRoute
   '/messages/$messageId': typeof AppMessagesMessageIdRoute
   '/messages/new': typeof AppMessagesNewRoute
+  '/offers/$offerId': typeof AppOffersOfferIdRoute
+  '/offers/new': typeof AppOffersNewRoute
+  '/settings/app': typeof AppSettingsAppRoute
   '/settings/folders': typeof AppSettingsFoldersRoute
   '/settings/plan-types': typeof AppSettingsPlanTypesRoute
   '/settings/training-types': typeof AppSettingsTrainingTypesRoute
@@ -272,6 +304,7 @@ export interface FileRoutesById {
   '/_app/design': typeof AppDesignRoute
   '/_app/media': typeof AppMediaRoute
   '/_app/messages': typeof AppMessagesRouteWithChildren
+  '/_app/offers': typeof AppOffersRouteWithChildren
   '/_app/settings': typeof AppSettingsRouteWithChildren
   '/_app/users': typeof AppUsersRouteWithChildren
   '/_app/workouts': typeof AppWorkoutsRouteWithChildren
@@ -283,6 +316,9 @@ export interface FileRoutesById {
   '/_app/challenges/new': typeof AppChallengesNewRoute
   '/_app/messages/$messageId': typeof AppMessagesMessageIdRoute
   '/_app/messages/new': typeof AppMessagesNewRoute
+  '/_app/offers/$offerId': typeof AppOffersOfferIdRoute
+  '/_app/offers/new': typeof AppOffersNewRoute
+  '/_app/settings/app': typeof AppSettingsAppRoute
   '/_app/settings/folders': typeof AppSettingsFoldersRoute
   '/_app/settings/plan-types': typeof AppSettingsPlanTypesRoute
   '/_app/settings/training-types': typeof AppSettingsTrainingTypesRoute
@@ -307,6 +343,7 @@ export interface FileRouteTypes {
     | '/design'
     | '/media'
     | '/messages'
+    | '/offers'
     | '/settings'
     | '/users'
     | '/workouts'
@@ -317,6 +354,9 @@ export interface FileRouteTypes {
     | '/challenges/new'
     | '/messages/$messageId'
     | '/messages/new'
+    | '/offers/$offerId'
+    | '/offers/new'
+    | '/settings/app'
     | '/settings/folders'
     | '/settings/plan-types'
     | '/settings/training-types'
@@ -338,6 +378,7 @@ export interface FileRouteTypes {
     | '/design'
     | '/media'
     | '/messages'
+    | '/offers'
     | '/workouts'
     | '/'
     | '/badges/$badgeId'
@@ -346,6 +387,9 @@ export interface FileRouteTypes {
     | '/challenges/new'
     | '/messages/$messageId'
     | '/messages/new'
+    | '/offers/$offerId'
+    | '/offers/new'
+    | '/settings/app'
     | '/settings/folders'
     | '/settings/plan-types'
     | '/settings/training-types'
@@ -368,6 +412,7 @@ export interface FileRouteTypes {
     | '/_app/design'
     | '/_app/media'
     | '/_app/messages'
+    | '/_app/offers'
     | '/_app/settings'
     | '/_app/users'
     | '/_app/workouts'
@@ -379,6 +424,9 @@ export interface FileRouteTypes {
     | '/_app/challenges/new'
     | '/_app/messages/$messageId'
     | '/_app/messages/new'
+    | '/_app/offers/$offerId'
+    | '/_app/offers/new'
+    | '/_app/settings/app'
     | '/_app/settings/folders'
     | '/_app/settings/plan-types'
     | '/_app/settings/training-types'
@@ -458,6 +506,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMessagesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/offers': {
+      id: '/_app/offers'
+      path: '/offers'
+      fullPath: '/offers'
+      preLoaderRoute: typeof AppOffersRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -535,11 +590,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMessagesNewRouteImport
       parentRoute: typeof AppMessagesRoute
     }
+    '/_app/offers/$offerId': {
+      id: '/_app/offers/$offerId'
+      path: '/$offerId'
+      fullPath: '/offers/$offerId'
+      preLoaderRoute: typeof AppOffersOfferIdRouteImport
+      parentRoute: typeof AppOffersRoute
+    }
+    '/_app/offers/new': {
+      id: '/_app/offers/new'
+      path: '/new'
+      fullPath: '/offers/new'
+      preLoaderRoute: typeof AppOffersNewRouteImport
+      parentRoute: typeof AppOffersRoute
+    }
     '/_app/settings/': {
       id: '/_app/settings/'
       path: '/'
       fullPath: '/settings/'
       preLoaderRoute: typeof AppSettingsIndexRouteImport
+      parentRoute: typeof AppSettingsRoute
+    }
+    '/_app/settings/app': {
+      id: '/_app/settings/app'
+      path: '/app'
+      fullPath: '/settings/app'
+      preLoaderRoute: typeof AppSettingsAppRouteImport
       parentRoute: typeof AppSettingsRoute
     }
     '/_app/settings/folders': {
@@ -650,7 +726,22 @@ const AppMessagesRouteWithChildren = AppMessagesRoute._addFileChildren(
   AppMessagesRouteChildren,
 )
 
+interface AppOffersRouteChildren {
+  AppOffersOfferIdRoute: typeof AppOffersOfferIdRoute
+  AppOffersNewRoute: typeof AppOffersNewRoute
+}
+
+const AppOffersRouteChildren: AppOffersRouteChildren = {
+  AppOffersOfferIdRoute: AppOffersOfferIdRoute,
+  AppOffersNewRoute: AppOffersNewRoute,
+}
+
+const AppOffersRouteWithChildren = AppOffersRoute._addFileChildren(
+  AppOffersRouteChildren,
+)
+
 interface AppSettingsRouteChildren {
+  AppSettingsAppRoute: typeof AppSettingsAppRoute
   AppSettingsFoldersRoute: typeof AppSettingsFoldersRoute
   AppSettingsPlanTypesRoute: typeof AppSettingsPlanTypesRoute
   AppSettingsTrainingTypesRoute: typeof AppSettingsTrainingTypesRoute
@@ -658,6 +749,7 @@ interface AppSettingsRouteChildren {
 }
 
 const AppSettingsRouteChildren: AppSettingsRouteChildren = {
+  AppSettingsAppRoute: AppSettingsAppRoute,
   AppSettingsFoldersRoute: AppSettingsFoldersRoute,
   AppSettingsPlanTypesRoute: AppSettingsPlanTypesRoute,
   AppSettingsTrainingTypesRoute: AppSettingsTrainingTypesRoute,
@@ -723,6 +815,7 @@ interface AppRouteChildren {
   AppDesignRoute: typeof AppDesignRoute
   AppMediaRoute: typeof AppMediaRoute
   AppMessagesRoute: typeof AppMessagesRouteWithChildren
+  AppOffersRoute: typeof AppOffersRouteWithChildren
   AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppUsersRoute: typeof AppUsersRouteWithChildren
   AppWorkoutsRoute: typeof AppWorkoutsRouteWithChildren
@@ -738,6 +831,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDesignRoute: AppDesignRoute,
   AppMediaRoute: AppMediaRoute,
   AppMessagesRoute: AppMessagesRouteWithChildren,
+  AppOffersRoute: AppOffersRouteWithChildren,
   AppSettingsRoute: AppSettingsRouteWithChildren,
   AppUsersRoute: AppUsersRouteWithChildren,
   AppWorkoutsRoute: AppWorkoutsRouteWithChildren,

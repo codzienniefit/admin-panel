@@ -27,7 +27,7 @@ Switching reloads the page, so data from one environment can never stay on scree
 | Sign-in  | none yet (two demo users from Phase 1)                                                | Firebase, admin claim                                            |
 | Shows    | the whole target panel, including features the backend cannot do yet                  | only what the backend supports so far; grows with each slice     |
 | Safe to  | try everything: every function is on, nothing leaves the browser                      | read; writes follow §4                                           |
-| Exists   | since Phase 0                                                                         | listed but not selectable until slice L1                         |
+| Exists   | since Phase 0                                                                         | selectable since 2026-11-11; leads to a real sign-in             |
 | Purpose  | design, review with Patryk, speed and scale tests, the specification for backend work | real work                                                        |
 
 There is one deployment, on push. Where the rest of this document says "demo" it means the Test
@@ -130,6 +130,25 @@ There is one backend and it is production. These rules hold for every slice in �
 Each slice is: backend change → backend deployed by hand → panel change → pushed by Michał, which
 deploys it → §2 check, under the rules in §4. A slice is small enough to finish and observe before the next begins.
 
+**State on 2026-11-13.** Both halves of every slice below are written and tested against
+stand-ins for each other. Nothing is deployed, no key is set, and nothing has run against the real
+services. What changes when the backend is deployed, and the decisions waiting, are in the backend
+repository's `docs/admin-panel.md`.
+
+| Slice | Panel | Backend | Still needed |
+| ----- | ----- | ------- | ------------ |
+| L0 | done: the Worker forwards only the calls in its table, to one backend host | – | `API_ORIGIN`, `PANEL_ORIGIN` set in Cloudflare |
+| L1 | done: Google sign-in, one session cookie, every call signed ([AUTH-HARDENING.md](AUTH-HARDENING.md)) | done: `panel/…` routes, the guard, the list of admins in code | the keys ([SIGN-IN-SETUP.md](SIGN-IN-SETUP.md)), admins on the list, a backend deploy |
+| L2 | done: every read, with schemas and error handling | done | a first run on real data, and fixes for rows that do not fit |
+| L3–L5 | done in the client: every write, versions, the `[TEST]` rule. Closed at the Worker (`OPEN_FOR_WRITING`) and in the page (`capabilities.ts`) | done: versions and conflicts, saved item in the answer, field-level errors, left-out fields kept | open one section at a time, in both places; screens for warnings and "in use"; limits per admin and a second step before `sendMessage` and `users` |
+| L6 | done in the client: draft, publish, hide, delete, restore | done: status for challenges and workouts, relaxed checks for a draft, full checks to publish | a check of existing content against the new publish rules; the cache purge decision |
+| L7 | done in the client: planning notes and planner settings | done: the document store | opening `planning` for writing |
+| L8 | partly: media limits and paging are understood; no history screen | partly: media paging and limits, the record of changes. Not built: direct uploads, YouTube lookup | |
+
+Sign-in is not the Firebase SDK in the browser, as the plan below first said, but Google through
+the Worker with the session created by the backend ([SECURITY.md §5a](SECURITY.md)). The slices
+read the same otherwise.
+
 ### L0. The path to production, with nothing behind it
 
 - **Backend:** nothing.
@@ -210,7 +229,10 @@ deploys it → §2 check, under the rules in §4. A slice is small enough to fin
 
 - **Backend:** B4 — direct media upload, audit trail, YouTube lookup.
 - **Panel:** history tab; AI descriptions and YouTube lookup through the Worker; whichever extras
-  were agreed (offers, grant and revoke badge, message unsend); the quote's round of fixes.
+  were agreed (grant and revoke badge, message unsend); the quote's round of fixes.
+- **Special offers (agreed 2026-11-16, built on both sides):** the screen Oferty, the panel's
+  routes `panel/manageOffers`, `…/{id}`, `…/{id}/status` and `panel/manageOfferChoices`. Writing
+  is off in Produkcja (`offers`, no test form) until the section is accepted.
 
 ### Order at a glance
 

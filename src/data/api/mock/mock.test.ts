@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/data/api/errors";
 import { blankChallenge } from "@/data/schemas/challenge";
+import { blankOffer } from "@/data/schemas/offer";
 import { blankWorkout } from "@/data/schemas/workout";
 import { memoryStorage } from "@/lib/storage";
 import { createStore } from "@/lib/store";
 import { defaultMockControls, type MockControls } from "./controls";
-import { UNKNOWN_FIELD } from "./fixtures";
+import { buildFixtures, UNKNOWN_FIELD } from "./fixtures";
 import { createMockApi } from "./index";
 import { SNAPSHOT_KEY } from "./persistence";
 
@@ -165,6 +166,7 @@ describe("workouts contract", () => {
 		trainingTypeIds: ["stretching"],
 		imageRelativePath: "workouts/nowy.webp",
 		durationMinutes: 25,
+		audioRelativePath: "audio/nowy.m4a",
 	};
 
 	it("assigns the id on create and returns the stored workout", async () => {
@@ -201,6 +203,79 @@ describe("workouts contract", () => {
 		);
 	});
 
+	it("needs a film or a recording outside a draft", async () => {
+		const { api } = setup();
+		const draft = await api.workouts.create({
+			...blankWorkout(),
+			title: "Spokojne rozciąganie",
+			levelId: "beginner",
+			trainingTypeIds: ["stretching"],
+			imageRelativePath: "workouts/rozciaganie.webp",
+			durationMinutes: 20,
+		});
+		expect(draft.status).toBe("draft");
+		for (const status of ["published", "hidden"] as const) {
+			await expect(
+				api.workouts.save({ ...draft, status }, { etag: draft.etag }),
+			).rejects.toMatchObject({
+				kind: "validation",
+				issues: [
+					{
+						path: "videoUrl",
+						message: "Dodaj film albo nagranie, żeby opublikować trening",
+					},
+				],
+			});
+		}
+		const published = await api.workouts.save(
+			{ ...draft, status: "published", audioRelativePath: "audio/a.m4a" },
+			{ etag: draft.etag },
+		);
+		expect(published.status).toBe("published");
+	});
+
+	it("lets a published workout without either be taken down, and nothing more", async () => {
+		// Stored without either, as a workout from before the rule can be.
+		const fixtures = buildFixtures();
+		const old = fixtures.workouts.find((w) => w.status === "published");
+		if (!old) throw new Error("no published workout");
+		old.videoUrl = null;
+		old.audioRelativePath = null;
+		const api = createMockApi({
+			fixtures,
+			controls: createStore<MockControls>({
+				...defaultMockControls,
+				minLatencyMs: 0,
+				maxLatencyMs: 0,
+			}),
+			sleep: async () => {},
+			storage: null,
+		});
+		const stored = (await api.workouts.list()).find((w) => w.id === old.id);
+		if (!stored) throw new Error("workout missing");
+
+		// An edit while published: refused.
+		await expect(
+			api.workouts.save(
+				{ ...stored, title: `${stored.title} (nowe)` },
+				{ etag: stored.etag },
+			),
+		).rejects.toMatchObject({ kind: "validation" });
+		// Taken down with nothing else changed: allowed.
+		const hidden = await api.workouts.save(
+			{ ...stored, status: "hidden" },
+			{ etag: stored.etag },
+		);
+		expect(hidden.status).toBe("hidden");
+		// Published again: refused.
+		await expect(
+			api.workouts.save(
+				{ ...hidden, status: "published" },
+				{ etag: hidden.etag },
+			),
+		).rejects.toMatchObject({ kind: "validation" });
+	});
+
 	it("keeps unknown fields of a workout through a save", async () => {
 		const { api } = setup();
 		const [workout] = await api.workouts.list();
@@ -218,7 +293,12 @@ describe("workouts contract", () => {
 		const taken = (await api.workouts.list()).find((w) => w.videoUrl);
 		if (!taken) throw new Error("no workout with a film");
 		const error = await api.workouts
-			.create({ ...complete, status: "draft", videoUrl: taken.videoUrl })
+			.create({
+				...complete,
+				status: "draft",
+				audioRelativePath: null,
+				videoUrl: taken.videoUrl,
+			})
 			.catch((e: ApiError) => e);
 		expect(error).toMatchObject({
 			kind: "validation",
@@ -440,8 +520,50 @@ describe("challenges contract", () => {
 			.save({ ...draft, status: "published" }, { etag: draft.etag })
 			.catch((e: ApiError) => e);
 		expect(error).toMatchObject({ kind: "validation" });
+		// Not the subtitle: it is stored empty and not being changed, and the
+		// minimum is for new or changed subtitles only.
 		expect((error as ApiError).issues.map((i) => i.path)).toEqual(
-			expect.arrayContaining(["subtitle", "imageRelativePath", "paths"]),
+			expect.arrayContaining(["imageRelativePath", "paths"]),
+		);
+	});
+
+	it("holds only a new or changed subtitle to the minimum", async () => {
+		const { api } = setup();
+		const published = (await api.challenges.list()).find(
+			(c) => c.status === "published" && c.id !== "C2",
+		);
+		if (!published) throw new Error("no published challenge");
+
+		// A short subtitle as a draft, then published with it unchanged.
+		const draft = await api.challenges.save(
+			{ ...published, status: "draft", subtitle: "Ab" },
+			{ etag: published.etag },
+		);
+		const republished = await api.challenges.save(
+			{ ...draft, status: "published" },
+			{ etag: draft.etag },
+		);
+		expect(republished).toMatchObject({ status: "published", subtitle: "Ab" });
+
+		// Changed to another short one: refused.
+		await expect(
+			api.challenges.save(
+				{ ...republished, subtitle: "Cd" },
+				{ etag: republished.etag },
+			),
+		).rejects.toMatchObject({
+			kind: "validation",
+			issues: [{ path: "subtitle" }],
+		});
+
+		// A new challenge with a short subtitle: refused.
+		const { id: _id, etag: _etag, ...fields } = republished;
+		const created = await api.challenges
+			.create({ ...fields, subtitle: "Ab" })
+			.catch((e: ApiError) => e);
+		expect(created).toMatchObject({ kind: "validation" });
+		expect((created as ApiError).issues.map((i) => i.path)).toContain(
+			"subtitle",
 		);
 	});
 
@@ -514,5 +636,138 @@ describe("challenges contract", () => {
 			{ etag: deleted.etag },
 		);
 		expect(restored.status).toBe("draft");
+	});
+});
+
+describe("cache contract", () => {
+	it("answers a purge after the usual delay, and says nothing was purged", async () => {
+		const waits: number[] = [];
+		const controls = createStore<MockControls>({
+			...defaultMockControls,
+			minLatencyMs: 300,
+			maxLatencyMs: 300,
+		});
+		const api = createMockApi({
+			controls,
+			sleep: async (ms) => {
+				waits.push(ms);
+			},
+			storage: null,
+			now: () => "2026-11-16T10:00:00.000Z",
+		});
+		expect(await api.cache.purge()).toEqual({
+			purgedAtUtc: "2026-11-16T10:00:00.000Z",
+			simulated: true,
+		});
+		expect(waits).toEqual([300]);
+	});
+
+	it("fails when a failure is forced, so the refusal can be tried", async () => {
+		const { api, controls } = setup({ failNextSave: true });
+		await expect(api.cache.purge()).rejects.toMatchObject({ kind: "server" });
+		expect(controls.get().failNextSave).toBe(false);
+		await expect(api.cache.purge()).resolves.toMatchObject({
+			simulated: true,
+		});
+	});
+});
+
+describe("offers contract", () => {
+	it("lists the fixtures with their state and purchases", async () => {
+		const { api } = setup();
+		const offers = await api.offers.list();
+		expect(offers.map((offer) => offer.code)).toEqual([
+			"LATO2026",
+			"BLACKFRIDAY",
+			"WIOSNA2026",
+		]);
+		expect(offers[0]).toMatchObject({ active: true, purchases: 42 });
+	});
+
+	it("creates a draft, and refuses one written in a form the backend would refuse", async () => {
+		const { api } = setup();
+		const created = await api.offers.create({
+			...blankOffer(),
+			code: "JESIEN",
+			offeringId: "pro_promo_1month_free",
+		});
+		expect(created).toMatchObject({ id: "o_4", active: false, purchases: 0 });
+
+		await expect(
+			api.offers.create({ ...blankOffer(), code: "jesien2", offeringId: "x" }),
+		).rejects.toMatchObject({
+			kind: "validation",
+			issues: [expect.objectContaining({ path: "code" })],
+		});
+	});
+
+	it("refuses to switch on a draft that is not complete, and switches on one that is", async () => {
+		const { api } = setup();
+		const draft = (await api.offers.list()).find((offer) => offer.id === "o_2");
+		if (!draft) throw new Error("no draft fixture");
+
+		await expect(
+			api.offers.setActive("o_2", true, { etag: draft.etag }),
+		).rejects.toMatchObject({
+			kind: "validation",
+			issues: expect.arrayContaining([
+				expect.objectContaining({ path: "subtitle" }),
+				expect.objectContaining({ path: "storeIos" }),
+			]),
+		});
+
+		const completed = await api.offers.save(
+			{
+				...draft,
+				subtitle: "Tylko w ten weekend",
+				storeIos: { productId: "cf.pro.half" },
+			},
+			{ etag: draft.etag },
+		);
+		const live = await api.offers.setActive("o_2", true, {
+			etag: completed.etag,
+		});
+		expect(live.active).toBe(true);
+	});
+
+	it("refuses to switch on an offering RevenueCat does not know", async () => {
+		const { api } = setup();
+		const draft = await api.offers.create({
+			...blankOffer(),
+			code: "LITERowka".toUpperCase(),
+			offeringId: "pro_promo_typo",
+			title: "Tytuł",
+			subtitle: "Podtytuł",
+			storeAndroid: {
+				productId: "cf_pro",
+				basePlanId: "monthly",
+				offerId: "x",
+			},
+			storeIos: { productId: "cf.pro" },
+		});
+		await expect(
+			api.offers.setActive(draft.id, true, { etag: draft.etag }),
+		).rejects.toMatchObject({
+			kind: "validation",
+			issues: [expect.objectContaining({ path: "offeringId" })],
+		});
+	});
+
+	it("switches a live offer off without checking anything, and refuses an old version", async () => {
+		const { api } = setup();
+		const [live] = await api.offers.list();
+		if (!live) throw new Error("no fixtures");
+		const off = await api.offers.setActive(live.id, false, { etag: live.etag });
+		expect(off.active).toBe(false);
+		await expect(
+			api.offers.setActive(live.id, true, { etag: live.etag }),
+		).rejects.toMatchObject({ kind: "conflict" });
+	});
+
+	it("knows a few RevenueCat ids for the selects", async () => {
+		const { api } = setup();
+		const choices = await api.offers.choices();
+		expect(choices.offeringIds).toContain("pro_promo_1month_free");
+		expect(choices.entitlementIds).toContain("Pro");
 	});
 });

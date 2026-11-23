@@ -1,7 +1,7 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { type ApiIssue, isApiError } from "@/data/api/errors";
+import { type ApiIssue, errorMessage, isApiError } from "@/data/api/errors";
 import { badgesCollection } from "@/data/collections/badges";
 import { challengesCollection } from "@/data/collections/challenges";
 import {
@@ -18,7 +18,12 @@ import {
 } from "@/data/schemas/workout";
 import { formatDateTime } from "@/domain/dates";
 import { challengesUsing } from "@/domain/workoutFilters";
-import { workoutIssues } from "@/domain/workoutRules";
+import {
+	DURATION_MAX,
+	DURATION_MIN,
+	statusChangeFrom,
+	workoutIssues,
+} from "@/domain/workoutRules";
 import { useConfig } from "@/features/config/useConfig";
 import { ContentField } from "@/features/content/ContentField";
 import { MediaField } from "@/features/media/MediaField";
@@ -196,8 +201,10 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 		(badge) => badge.type === "normal" && !badge.isHidden,
 	);
 	const badgeIds = new Set(assignableBadges.map((badge) => badge.id));
-	const minMinutes = Math.round(config.duration.fromSeconds / 60);
-	const maxMinutes = Math.round(config.duration.toSeconds / 60);
+	// Not the config's `duration`: that is the range of the app's filter, and
+	// a real workout can be shorter or longer.
+	const minMinutes = DURATION_MIN;
+	const maxMinutes = DURATION_MAX;
 
 	const showIssues = (issues: readonly ApiIssue[]) =>
 		setProblems(placeIssues(form, FIELDS, issues));
@@ -211,7 +218,10 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 		// Until the badge list has arrived the badge is not checked here (every
 		// badge would look unknown); the server checks it either way.
 		const rules = (item: NewWorkout) =>
-			workoutIssues(item, config, loadingBadges ? {} : { badgeIds });
+			workoutIssues(item, config, {
+				...(loadingBadges ? {} : { badgeIds }),
+				statusChangeFrom: statusChangeFrom(workout, item),
+			});
 
 		if (!workout) {
 			// The same rules the server applies, checked first so that problems
@@ -230,13 +240,7 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 				showIssues(
 					isApiError(error) && error.kind === "validation"
 						? error.issues
-						: [
-								generalIssue(
-									error instanceof Error
-										? error.message
-										: "Nie udało się zapisać",
-								),
-							],
+						: [generalIssue(errorMessage(error, "Nie udało się zapisać"))],
 				);
 				return;
 			}

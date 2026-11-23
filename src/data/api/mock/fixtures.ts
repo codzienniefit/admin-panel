@@ -141,8 +141,11 @@ function buildWorkouts(count: number): Workout[] {
 					: roll < 0.23
 						? "deleted"
 						: "published";
-		const hasAudio = !handMade && rng.chance(0.1);
-		const hasVideo = !hasAudio && (handMade || rng.chance(0.85));
+		const rolledAudio = !handMade && rng.chance(0.1);
+		const hasVideo = !rolledAudio && (handMade || rng.chance(0.85));
+		// Outside a draft a workout needs a film or a recording (workoutRules).
+		// Decided after the rolls, so the rest of the sample data stays the same.
+		const hasAudio = rolledAudio || (!hasVideo && status !== "draft");
 		const added = handMade ? 400 - index : rng.int(1, 700);
 		const complete = status !== "draft";
 		const slug = slugify(title);

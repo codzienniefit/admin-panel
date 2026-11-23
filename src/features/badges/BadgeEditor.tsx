@@ -2,7 +2,7 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { type ApiIssue, isApiError } from "@/data/api/errors";
+import { type ApiIssue, failureText, isApiError } from "@/data/api/errors";
 import {
 	badgeSaver,
 	badgesCollection,
@@ -298,7 +298,10 @@ function BadgeForm({
 						? error.issues
 						: [
 								generalIssue(
-									"Nie udało się zapisać. Spróbuj ponownie za chwilę.",
+									failureText(
+										error,
+										"Nie udało się zapisać. Spróbuj ponownie za chwilę.",
+									),
 								),
 							],
 				);
@@ -379,7 +382,10 @@ function BadgeForm({
 						generalIssue(
 							changed
 								? "Ktoś zmienił tę odznakę w międzyczasie. Na ekranie jest już jej aktualna wersja: sprawdź ją i spróbuj ponownie."
-								: "Nie udało się usunąć. Spróbuj ponownie za chwilę.",
+								: failureText(
+										error,
+										"Nie udało się usunąć. Spróbuj ponownie za chwilę.",
+									),
 						),
 					],
 		);

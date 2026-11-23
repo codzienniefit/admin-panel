@@ -1,4 +1,4 @@
-import { type ApiIssue, isApiError } from "@/data/api/errors";
+import { type ApiIssue, failureText, isApiError } from "@/data/api/errors";
 import {
 	createMessage,
 	messagesCollection,
@@ -79,9 +79,12 @@ function failure(action: MessageAction, error: unknown): ApiIssue[] {
 	}
 	return [
 		generalIssue(
-			action === "send"
-				? "Nie udało się wysłać. Zanim spróbujesz ponownie, odśwież stronę i sprawdź, czy wiadomość nie ma już statusu „Wysłana”."
-				: "Nie udało się. Spróbuj ponownie za chwilę.",
+			failureText(
+				error,
+				action === "send"
+					? "Nie udało się wysłać. Zanim spróbujesz ponownie, odśwież stronę i sprawdź, czy wiadomość nie ma już statusu „Wysłana”."
+					: "Nie udało się. Spróbuj ponownie za chwilę.",
+			),
 		),
 	];
 }

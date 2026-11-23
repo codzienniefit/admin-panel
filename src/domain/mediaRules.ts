@@ -1,7 +1,8 @@
-import { slugify } from "./text";
-
 // Which files may go where. The limits are the ones the Retool panel
-// enforced; they keep the app's downloads small.
+// enforced; they keep the app's downloads small. The backend holds an upload
+// from the panel to the same list (its src/config/mediaUpload.ts) and stores
+// a file only under a path that is already clean (its `sanitizeRelativePath`,
+// repeated here as `cleanUploadPath`), so the two have to stay in step.
 
 export interface MediaFolder {
 	id: string;
@@ -47,8 +48,12 @@ export const MEDIA_FOLDERS: readonly MediaFolder[] = [
 		id: "audio",
 		label: "Audio",
 		kind: "audio",
-		extensions: ["m4a", "m4v", "mp3", "wav"],
-		maxBytes: 200 * MB,
+		// No m4v: the backend has never stored one (it has no content type for
+		// it). And no more than 32 MB: an upload goes through the panel's
+		// Worker, which forwards at most that. A longer recording needs an
+		// upload straight to storage, which is not built.
+		extensions: ["m4a", "mp3", "wav"],
+		maxBytes: 32 * MB,
 	},
 ];
 
@@ -81,7 +86,7 @@ export function uploadProblem(
 	if (file.size > folder.maxBytes) {
 		return `Plik ma ${formatBytes(file.size)}, a limit to ${formatBytes(folder.maxBytes)}.`;
 	}
-	if (!slugify(file.name.slice(0, -extension.length - 1))) {
+	if (!cleanSegment(file.name.slice(0, -extension.length - 1))) {
 		return "Nazwa pliku musi zawierać litery lub cyfry.";
 	}
 	return null;
@@ -102,9 +107,65 @@ export function dropProblem(
 	return uploadProblem(folder, file);
 }
 
+const TRANSLITERATED: Record<string, string> = {
+	ł: "l",
+	Ł: "l",
+	ß: "ss",
+	æ: "ae",
+	Æ: "ae",
+	ø: "o",
+	Ø: "o",
+	đ: "d",
+	Đ: "d",
+	ð: "d",
+	þ: "th",
+};
+
+/**
+ * One folder or file name the way the backend stores it: lower-case ASCII
+ * letters, digits, ".", "_" and "-"; no run of dots or dashes, no dash next
+ * to a dot, neither at either end. Step for step the backend's
+ * `sanitizePathSegment`, so that what the panel asks for is what is stored.
+ */
+function cleanSegment(segment: string): string {
+	return (
+		segment
+			.normalize("NFC")
+			// Letters with no decomposed form need a mapping of their own.
+			.replace(/[łŁßæÆøØđĐðþ]/g, (letter) => TRANSLITERATED[letter] ?? "")
+			.normalize("NFD")
+			.replace(/[\u0300-\u036f]/g, "")
+			.toLowerCase()
+			.replace(/[^a-z0-9._-]+/g, "-")
+			.replace(/\.{2,}/g, ".")
+			.replace(/-{2,}/g, "-")
+			.replace(/-*\.-*/g, ".")
+			.replace(/^[-.]+|[-.]+$/g, "")
+	);
+}
+
+/**
+ * A whole path in the form the backend accepts from the panel without
+ * changing it: each folder cleaned, the file name cleaned apart from its
+ * extension, a name with nothing usable in it called "file". The same as
+ * the backend's `sanitizeRelativePath`; a path that is already clean comes
+ * back as it is. Empty when the path names nothing at all.
+ */
+export function cleanUploadPath(relativePath: string): string {
+	const raw = relativePath
+		.split("/")
+		.filter((segment) => segment !== "" && segment !== "." && segment !== "..");
+	const fileName = raw.pop();
+	if (fileName === undefined) return "";
+	const folders = raw.map(cleanSegment).filter((segment) => segment !== "");
+	const dot = fileName.lastIndexOf(".");
+	const stem = cleanSegment(dot >= 0 ? fileName.slice(0, dot) : fileName);
+	const extension = dot >= 0 ? cleanSegment(fileName.slice(dot + 1)) : "";
+	const name = `${stem || "file"}${extension ? `.${extension}` : ""}`;
+	return [...folders, name].join("/");
+}
+
 /** The path a file gets: folder plus a storage-safe version of its name. */
 export function uploadPath(folderId: string, fileName: string): string {
-	const extension = extensionOf(fileName);
-	const stem = slugify(fileName.slice(0, -extension.length - 1));
-	return `${folderId}/${stem}.${extension}`;
+	return cleanUploadPath(`${folderId}/${fileName}`);
 }

@@ -14,6 +14,8 @@ import {
 	revokeIssues,
 	searchQueryProblem,
 	USER_QUERY_MIN,
+	USER_SEARCH_LIMIT,
+	USER_TERM_MIN,
 	userMatches,
 } from "./userRules";
 
@@ -51,6 +53,39 @@ describe("user search", () => {
 		expect(searchQueryProblem("")).toContain("Wpisz");
 		expect(searchQueryProblem("an")).toBe("Wpisz co najmniej 3 znaki");
 		expect(searchQueryProblem("ann")).toBeNull();
+	});
+
+	it("needs words the backend will search for: each of two characters, one of three", () => {
+		for (const query of [
+			"anna",
+			"anna nowak",
+			"an nowak",
+			"żół",
+			"a-b",
+			"anna@example.test",
+		]) {
+			expect(searchQueryProblem(query), query).toBeNull();
+			expect(isSearchable(query), query).toBe(true);
+		}
+		for (const query of ["a nowak", "anna k", "ab, c", "anna;b"]) {
+			expect(searchQueryProblem(query), query).toBe(
+				"Wpisz słowa po co najmniej 2 znaki",
+			);
+			expect(isSearchable(query), query).toBe(false);
+		}
+		for (const query of ["an no", "ab cd ef", "ab,cd"]) {
+			expect(searchQueryProblem(query), query).toBe(
+				"Wpisz przynajmniej jedno słowo o co najmniej 3 znakach",
+			);
+			expect(isSearchable(query), query).toBe(false);
+		}
+		// A letter with its accents is one character, as the backend counts it.
+		expect(isSearchable("a\u0328\u0308 nowak")).toBe(false);
+	});
+
+	it("never asks for more rows than the backend lets the panel have", () => {
+		expect(USER_SEARCH_LIMIT).toBe(20);
+		expect(USER_TERM_MIN).toBe(2);
 	});
 
 	it("matches the e-mail, the name or the id", () => {

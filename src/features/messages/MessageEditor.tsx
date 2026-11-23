@@ -1,7 +1,7 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { type ApiIssue, isApiError } from "@/data/api/errors";
+import { type ApiIssue, failureText, isApiError } from "@/data/api/errors";
 import { challengesCollection } from "@/data/collections/challenges";
 import {
 	createMessage,
@@ -239,7 +239,10 @@ function MessageForm({
 						? error.issues
 						: [
 								generalIssue(
-									"Nie udało się zapisać. Spróbuj ponownie za chwilę.",
+									failureText(
+										error,
+										"Nie udało się zapisać. Spróbuj ponownie za chwilę.",
+									),
 								),
 							],
 				);
@@ -349,7 +352,10 @@ function MessageForm({
 		if (!copied.ok) {
 			show("Nie można utworzyć kopii", [
 				generalIssue(
-					"Nie udało się zapisać kopii. Spróbuj ponownie za chwilę.",
+					failureText(
+						copied.error,
+						"Nie udało się zapisać kopii. Spróbuj ponownie za chwilę.",
+					),
 				),
 			]);
 			return;

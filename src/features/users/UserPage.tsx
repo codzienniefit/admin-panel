@@ -1,4 +1,4 @@
-import { isApiError } from "@/data/api/errors";
+import { errorMessage, isApiError } from "@/data/api/errors";
 import { Button } from "@/ui/Button";
 import { EmptyState } from "@/ui/EmptyState";
 import { Loading, useDelayedLoading } from "@/ui/Loading";
@@ -82,7 +82,10 @@ export function UserPage({ uid, tab, onTabChange, onBack }: UserPageProps) {
 							</Button>
 						}
 					>
-						Sprawdź połączenie i spróbuj jeszcze raz.
+						{errorMessage(
+							account.error,
+							"Sprawdź połączenie i spróbuj jeszcze raz.",
+						)}
 					</Notice>
 				)}
 			</div>

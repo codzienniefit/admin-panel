@@ -22,6 +22,16 @@ export const SPECIAL_CATEGORIES = ["event", "specialTraining"] as const;
 
 const CLAIM_TOKEN = /^[A-Za-z0-9]{6,32}$/;
 
+/**
+ * A claim code in the one form the backend stores: no space around it, in
+ * capitals. It refuses a code written any other way instead of changing it
+ * (MUST_BE_UPPERCASE), so the code is put in this form before it is sent:
+ * what a person typed as "bieg2026" is the code "BIEG2026". The app compares
+ * codes without regard to case.
+ */
+export const normalizeClaimToken = (token: string): string =>
+	token.trim().toUpperCase();
+
 /** A workout or challenge that awards a badge. */
 export interface BadgeAssignment {
 	kind: "workout" | "challenge";

@@ -113,6 +113,16 @@ describe("message rules", () => {
 		// A draft may leave it for later.
 		expect(paths(toChallenge)).toEqual([]);
 	});
+
+	it("refuses to send a value the chosen group does not take", () => {
+		// The backend would not deliver it, and refuses rather than drop it.
+		const leftOver = { ...ready, targetGroup: "all", targetGroupValue: "C2" };
+		expect(paths(leftOver, "send")).toEqual(["targetGroupValue"]);
+		expect(paths({ ...leftOver, targetGroupValue: "  " }, "send")).toEqual([]);
+		expect(paths({ ...leftOver, targetGroupValue: null }, "send")).toEqual([]);
+		// A draft may still hold it while the group is being chosen.
+		expect(paths(leftOver)).toEqual([]);
+	});
 });
 
 describe("message actions", () => {

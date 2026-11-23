@@ -54,6 +54,29 @@ export interface ChallengeContext {
 	/** This challenge's own id, when it has one. */
 	ownId?: string;
 	promotedChallengeId?: string | null;
+	/**
+	 * The subtitle of every stored challenge, by id, as the backend has it.
+	 * A challenge whose `ownId` is not here is new. Left out, every challenge
+	 * is treated as new, which is the stricter reading.
+	 */
+	storedSubtitles?: ReadonlyMap<string, string | null>;
+}
+
+/**
+ * Whether the subtitle minimum applies: to a new challenge, or to one whose
+ * subtitle is being changed. An existing challenge saved with the subtitle it
+ * already has keeps it, however short (decided 2026-11-16; the backend
+ * follows the same rule). Compared after trimming both, with nothing and an
+ * empty text the same, as the backend compares them.
+ */
+function subtitleIsNewOrChanged(
+	subtitle: string | null | undefined,
+	context: ChallengeContext,
+): boolean {
+	const ownId = context.ownId;
+	if (!ownId || !context.storedSubtitles?.has(ownId)) return true;
+	const stored = context.storedSubtitles.get(ownId) ?? "";
+	return (subtitle ?? "").trim() !== stored.trim();
 }
 
 export function challengeIssues(
@@ -238,7 +261,10 @@ export function challengeIssues(
 	if (title && title.length < TITLE_MIN) {
 		add("title", `Nazwa musi mieć co najmniej ${TITLE_MIN} znaki`);
 	}
-	if ((challenge.subtitle ?? "").trim().length < TITLE_MIN) {
+	if (
+		(challenge.subtitle ?? "").trim().length < TITLE_MIN &&
+		subtitleIsNewOrChanged(challenge.subtitle, context)
+	) {
 		add("subtitle", `Podtytuł musi mieć co najmniej ${TITLE_MIN} znaki`);
 	}
 	if (!challenge.imageRelativePath) {

@@ -1,11 +1,13 @@
 import { readStored, writeStored } from "@/lib/storage";
 import type { Tone } from "@/ui/tones";
 
-// Which backend the panel talks to. Chosen in the top bar.
+// Which backend the panel talks to. Chosen on the sign-in page and in the
+// top bar.
 //
 // "test" is the in-process sample data: everything can be tried there and
-// nothing leaves the browser. "production" joins the list with the live
-// slices in docs/ROADMAP.md; until then it is shown but cannot be picked.
+// nothing leaves the browser. "production" is the real backend, behind a
+// real sign-in. Picking it here protects nothing by itself: who may read and
+// write is decided by the Worker's session and by the backend.
 
 export type Environment = "test" | "production";
 
@@ -28,9 +30,9 @@ export const ENVIRONMENTS: readonly EnvironmentInfo[] = [
 	{
 		value: "production",
 		label: "Produkcja",
-		hint: "wkrótce",
+		hint: "prawdziwe dane",
 		tone: "green",
-		available: false,
+		available: true,
 	},
 ];
 

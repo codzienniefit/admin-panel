@@ -4,8 +4,15 @@ import { sanitizeRedirect } from "@/auth/redirect";
 import { LoginPage } from "@/features/auth/LoginPage";
 
 export const Route = createFileRoute("/login")({
-	validateSearch: (search: Record<string, unknown>) => ({
+	validateSearch: (
+		search: Record<string, unknown>,
+	): { redirect: string; error?: string } => ({
 		redirect: sanitizeRedirect(search.redirect),
+		// A short code the Worker sends back with; never shown as it is.
+		...(typeof search.error === "string" &&
+		/^[A-Za-z]{1,32}$/.test(search.error)
+			? { error: search.error }
+			: {}),
 	}),
 	beforeLoad: async () => {
 		await auth.ready();
@@ -17,6 +24,6 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginRoute() {
-	const { redirect: target } = Route.useSearch();
-	return <LoginPage redirect={target} />;
+	const { redirect: target, error } = Route.useSearch();
+	return <LoginPage redirect={target} problem={error} />;
 }

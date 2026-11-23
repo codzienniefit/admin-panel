@@ -494,7 +494,7 @@ describe("a save that fails", () => {
 		expect(phase()).toEqual({ phase: "error", message: "Brak uprawnień" });
 	});
 
-	it("explains a failure that has no text of its own", async () => {
+	it("explains a failure that has no text of its own, with what was thrown", async () => {
 		const { saver, sent, failures, phase } = setup();
 		failures.push("coś pękło");
 
@@ -503,10 +503,12 @@ describe("a save that fails", () => {
 		).rejects.toBe("coś pękło");
 
 		expect(sent).toHaveLength(1);
-		expect(saver.held.get()?.message).toBe("Nie udało się zapisać");
+		expect(saver.held.get()?.message).toBe(
+			"Nie udało się zapisać (Szczegóły: „coś pękło”)",
+		);
 		expect(phase()).toEqual({
 			phase: "error",
-			message: "Nie udało się zapisać",
+			message: "Nie udało się zapisać (Szczegóły: „coś pękło”)",
 		});
 	});
 

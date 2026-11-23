@@ -8,8 +8,11 @@ import {
 	switchEnvironment,
 } from "./environment";
 
-// The guard that matters here: until the live slices exist, nothing a browser
-// can hold in its storage may point the panel at production.
+// The choice of environment is remembered in the browser. What must hold:
+// the panel starts on sample data, only the two known values are ever
+// accepted, and a switch reloads the page so nothing from one environment
+// stays on screen in the other. Picking Produkcja grants nothing by itself;
+// that is the Worker's session and the backend (worker/, docs/SECURITY.md).
 
 afterEach(() => {
 	vi.unstubAllGlobals();
@@ -20,12 +23,9 @@ describe("the list of environments", () => {
 		expect(DEFAULT_ENVIRONMENT).toBe("test");
 	});
 
-	it("offers exactly one environment, and it is not production", () => {
+	it("offers Test and Produkcja", () => {
 		const available = ENVIRONMENTS.filter((e) => e.available);
-		expect(available.map((e) => e.value)).toEqual(["test"]);
-		expect(ENVIRONMENTS.find((e) => e.value === "production")).toMatchObject({
-			available: false,
-		});
+		expect(available.map((e) => e.value)).toEqual(["test", "production"]);
 	});
 
 	it("has the default among the available ones", () => {
@@ -68,12 +68,12 @@ describe("currentEnvironment", () => {
 		expect(currentEnvironment()).toBe("test");
 	});
 
-	it("ignores a stored environment that cannot be picked", () => {
+	it("reads a stored Produkcja", () => {
 		vi.stubGlobal(
 			"localStorage",
 			memoryStorage({ "cf.environment": "production" }),
 		);
-		expect(currentEnvironment()).toBe("test");
+		expect(currentEnvironment()).toBe("production");
 	});
 
 	it.each(["Production", "prod", "", "null", '"production"'])(
@@ -97,7 +97,7 @@ describe("currentEnvironment", () => {
 });
 
 describe("switchEnvironment", () => {
-	it("does not switch to production: nothing is stored, nothing reloads", () => {
+	it("switches to Produkcja: stores the choice and reloads", () => {
 		const storage = memoryStorage();
 		vi.stubGlobal("localStorage", storage);
 		const reload = vi.fn();
@@ -105,22 +105,49 @@ describe("switchEnvironment", () => {
 
 		switchEnvironment("production");
 
-		expect(storage.data.size).toBe(0);
-		expect(reload).not.toHaveBeenCalled();
-		expect(currentEnvironment()).toBe("test");
+		expect([...storage.data]).toEqual([[STORAGE_KEY, "production"]]);
+		expect(reload).toHaveBeenCalledTimes(1);
+		expect(currentEnvironment()).toBe("production");
 	});
 
-	it("leaves a tampered value as it found it", () => {
+	it("switches back to Test and reloads", () => {
 		const storage = memoryStorage({ [STORAGE_KEY]: "production" });
 		vi.stubGlobal("localStorage", storage);
 		const reload = vi.fn();
 		vi.stubGlobal("window", { location: { reload } });
 
+		switchEnvironment("test");
+
+		expect([...storage.data]).toEqual([[STORAGE_KEY, "test"]]);
+		expect(reload).toHaveBeenCalledTimes(1);
+	});
+
+	it("does not reload when the choice could not be stored", () => {
+		vi.stubGlobal("localStorage", {
+			getItem: () => null,
+			setItem: () => {
+				throw new Error("QuotaExceededError");
+			},
+			removeItem: () => {},
+		});
+		const reload = vi.fn();
+		vi.stubGlobal("window", { location: { reload } });
+
 		switchEnvironment("production");
 
-		expect([...storage.data]).toEqual([[STORAGE_KEY, "production"]]);
 		expect(reload).not.toHaveBeenCalled();
-		expect(currentEnvironment()).toBe("test");
+	});
+
+	it("ignores a value that is not an environment", () => {
+		const storage = memoryStorage();
+		vi.stubGlobal("localStorage", storage);
+		const reload = vi.fn();
+		vi.stubGlobal("window", { location: { reload } });
+
+		switchEnvironment("staging" as never);
+
+		expect(storage.data.size).toBe(0);
+		expect(reload).not.toHaveBeenCalled();
 	});
 
 	it("does nothing when asked for the environment already in use", () => {

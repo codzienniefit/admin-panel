@@ -71,6 +71,9 @@ describe("redirect after sign-in", () => {
 		["/design", "/design"],
 		["/challenges/C1/plan/p-easy?week=2", "/challenges/C1/plan/p-easy?week=2"],
 		["/", "/"],
+		["/apiary", "/apiary"],
+		["/authors/1", "/authors/1"],
+		["/workouts?q=żółw#top", "/workouts?q=żółw#top"],
 	])("keeps the in-panel path %s", (input, expected) => {
 		expect(sanitizeRedirect(input)).toBe(expected);
 	});
@@ -83,6 +86,16 @@ describe("redirect after sign-in", () => {
 		["design", "a relative path"],
 		["/login", "the login page itself"],
 		["/login?redirect=/x", "the login page with a query"],
+		["/login#x", "the login page with a fragment"],
+		["/api/manageUsers", "one of the Worker's addresses"],
+		["/auth/google/start", "the sign-in start"],
+		["/AUTH/google/start", "the sign-in start in capitals"],
+		["/x/../api/files?path=a.html", "a way round to /api"],
+		["/./auth/google/start", "a way round to /auth"],
+		["/x/..%2fapi", "an encoded slash"],
+		["/%2e%2e/api/files", "encoded dots"],
+		["/%2E%2E/auth", "encoded dots in capitals"],
+		["/a\u0000b", "a control character"],
 		[undefined, "nothing"],
 		[42, "a number"],
 	])("falls back to the start page for %s (%s)", (input, _why) => {

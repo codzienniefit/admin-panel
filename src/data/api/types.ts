@@ -3,6 +3,7 @@ import type { Challenge, NewChallenge } from "@/data/schemas/challenge";
 import type { InternalConfig, WorkoutConfig } from "@/data/schemas/config";
 import type { MediaFile, MediaUploadResult } from "@/data/schemas/media";
 import type { Message, NewMessage } from "@/data/schemas/message";
+import type { NewOffer, Offer, OfferChoices } from "@/data/schemas/offer";
 import type { Planning } from "@/data/schemas/planning";
 import type { PlannerSettings } from "@/data/schemas/settings";
 import type {
@@ -134,4 +135,39 @@ export interface ApiClient {
 			options: SaveOptions,
 		): Promise<PlannerSettings>;
 	};
+	offers: {
+		/** Every special offer, live and switched off. */
+		list(): Promise<Offer[]>;
+		/** The server assigns the id. */
+		create(offer: NewOffer): Promise<Offer>;
+		/** Saves the whole offer and returns it as stored, with a new etag. */
+		save(offer: Offer, options: SaveOptions): Promise<Offer>;
+		/**
+		 * Switches an offer on (checked as a save would be) or off (never
+		 * held up), without sending the rest of it.
+		 */
+		setActive(
+			offerId: string,
+			active: boolean,
+			options: SaveOptions,
+		): Promise<Offer>;
+		/** The offering and entitlement ids RevenueCat knows. */
+		choices(): Promise<OfferChoices>;
+	};
+	cache: {
+		/**
+		 * Asks the CDN in front of the app's catalogue to drop its copy, so the
+		 * app shows the newest content at once. Changes no data; the backend
+		 * also does it after every admin save. Refused within 30 seconds of the
+		 * last one.
+		 */
+		purge(): Promise<CachePurgeResult>;
+	};
+}
+
+export interface CachePurgeResult {
+	/** When the CDN accepted the purge, as an ISO instant. */
+	purgedAtUtc: string;
+	/** True when nothing was really purged: the Test environment has no CDN. */
+	simulated?: boolean;
 }

@@ -34,7 +34,7 @@ npm run check
 npm run test:all
 ```
 
-That is `npm run check` plus the browser tests (72 of them; about a minute in all). There is no continuous
+That is `npm run check` plus the browser tests (74 of them; about a minute in all). There is no continuous
 integration and none is planned for now (decided 2026-11-11), so this local run is the only thing
 that runs the tests. "Big" means: a phase or a feature, a refactor across several files, anything
 that touches saving, the planner or a shared component, a dependency update, and always the last
@@ -67,7 +67,7 @@ Passes when it reports 0 vulnerabilities. A finding is fixed, or written down in
 - [ ] A new planner operation has a test that its inverse undoes it.
 - [ ] Date logic passes in another time zone too: `TZ=America/Los_Angeles npx vitest run src/domain`.
 - [ ] No test needs the network, the real clock or the real backend.
-- [ ] A change to a screen passes the UI tests: `npm run test:ui` (72 tests, about 30 seconds, Test
+- [ ] A change to a screen passes the UI tests: `npm run test:ui` (74 tests, about 30 seconds, Test
       environment only; see [TESTING.md](TESTING.md)).
 - [ ] A new screen, or a new thing a person must be able to rely on, has a UI test
       ([e2e/README.md](../e2e/README.md) says how to write one).
@@ -133,7 +133,7 @@ files (`wrangler.json`, `public/_headers`, `worker/`), also:
 
 Stated so that nobody assumes more than is true:
 
-- **Browser tests cover the basic paths only**: 72 tests in Chromium with a mouse. Not touch, not
+- **Browser tests cover the basic paths only**: 74 tests in Chromium with a mouse. Not touch, not
   other browsers, not every screen in depth; the hand checks in section 4 still apply.
 - **No continuous integration, on purpose.** Nothing runs the tests on push. They are run locally,
   with `npm run test:all`, after every big set of changes (section 2).

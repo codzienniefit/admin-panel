@@ -8,15 +8,17 @@ const TABS = [
 	{ to: "/settings/plan-types", label: "Rodzaje planów" },
 	{ to: "/settings/training-types", label: "Typy treningów" },
 	{ to: "/settings/folders", label: "Foldery" },
+	{ to: "/settings/app", label: "Aplikacja" },
 ] as const;
 
-/** Settings of the planner, shared by the whole team. */
+/** Settings of the planner, shared by the whole team, and the app's cache. */
 export function SettingsLayout() {
 	return (
 		<div className="mx-auto flex max-w-[1100px] flex-col gap-4">
 			<h1 className="text-3xl font-semibold tracking-tight">Ustawienia</h1>
 			<p className="text-sm text-muted">
-				Wspólne dla całego zespołu. Dotyczą planowania; aplikacja ich nie widzi.
+				Wspólne dla całego zespołu. Rodzaje planów, typy treningów i foldery
+				dotyczą planowania; aplikacja ich nie widzi.
 			</p>
 			<nav aria-label="Ustawienia" className="flex gap-1 overflow-x-auto">
 				{TABS.map((tab) => (

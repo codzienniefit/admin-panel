@@ -1,5 +1,6 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
+import { errorMessage } from "@/data/api/errors";
 import { challengesCollection } from "@/data/collections/challenges";
 import { workoutsCollection } from "@/data/collections/workouts";
 import type {
@@ -56,7 +57,10 @@ export function UserProgressTab({ uid }: { uid: string }) {
 					</Button>
 				}
 			>
-				Sprawdź połączenie i spróbuj jeszcze raz.
+				{errorMessage(
+					progress.error,
+					"Sprawdź połączenie i spróbuj jeszcze raz.",
+				)}
 			</Notice>
 		);
 	}

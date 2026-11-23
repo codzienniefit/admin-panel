@@ -1367,6 +1367,13 @@ describe("GET /auth/google/callback: the backend refuses", () => {
 					() => new Response("oops", { status: 500 }),
 				);
 			},
+			// a backend deployed without the panel's routes: the host's own 404, no panel code
+			(world: World) => {
+				world.on(
+					`${API}/api/panel/session`,
+					() => new Response("", { status: 404 }),
+				);
+			},
 		]) {
 			const { world, run, reason } = await refusedBy(prepare);
 			expect(reason).toBe("unavailable");

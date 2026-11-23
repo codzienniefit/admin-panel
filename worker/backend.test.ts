@@ -977,12 +977,14 @@ describe("startSession", () => {
 				`${status} ${code}`,
 			).toEqual({ ok: false, reason });
 		}
+		// Without a code of the backend's guard it is not a refusal of the person: a backend without
+		// panel routes (404), a gateway, a page from something in between.
 		for (const [status, reason] of [
-			[400, "refused"],
-			[401, "refused"],
-			[403, "refused"],
-			[404, "refused"],
-			[429, "refused"],
+			[400, "unavailable"],
+			[401, "unavailable"],
+			[403, "unavailable"],
+			[404, "unavailable"],
+			[429, "unavailable"],
 			[500, "unavailable"],
 			[502, "unavailable"],
 		] as const) {
@@ -1005,7 +1007,7 @@ describe("startSession", () => {
 		);
 		expect(
 			await startSession(world.env, world.deps, "a-firebase-token"),
-		).toEqual({ ok: false, reason: "refused" });
+		).toEqual({ ok: false, reason: "unavailable" });
 		expect(world.calls).toHaveLength(1);
 	});
 

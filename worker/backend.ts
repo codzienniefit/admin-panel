@@ -236,6 +236,10 @@ export async function startSession(
 		return { ok: false, reason: "misconfigured" };
 	}
 	if (response.status >= 500) return { ok: false, reason: "unavailable" };
+	// Only the backend's own guard refuses with a reason it names. An answer without one (a 404
+	// from a backend that has no panel routes yet, a page from something in between) is not a
+	// refusal of this person: the backend is not there for the panel.
+	if (code === "") return { ok: false, reason: "unavailable" };
 	return { ok: false, reason: "refused" };
 }
 

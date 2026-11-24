@@ -390,6 +390,55 @@ describe("pasted text to blocks", () => {
 	it("returns nothing for blank input", () => {
 		expect(textToBlocks("  \n\n  ")).toEqual([]);
 	});
+
+	it("splits a short first line from the text right under it", () => {
+		const pasted =
+			"Dla kogo\nSilne nogi 14 dni: plan krok po kroku, z dniami odpoczynku.";
+		expect(textToBlocks(pasted)).toEqual([
+			{ type: "Title", content: "Dla kogo", metadata: null },
+			{
+				type: "Text",
+				content: "Silne nogi 14 dni: plan krok po kroku, z dniami odpoczynku.",
+				metadata: null,
+			},
+		]);
+	});
+
+	it("keeps the line breaks of the text under such a heading", () => {
+		expect(
+			textToBlocks("<b>Sprzęt</b>\nMata, woda i ręcznik.\nNic więcej.").map(
+				(b) => [b.type, b.content],
+			),
+		).toEqual([
+			["Title", "Sprzęt"],
+			["Text", "Mata, woda i ręcznik.\nNic więcej."],
+		]);
+	});
+
+	it("leaves a list of short lines as one text", () => {
+		expect(textToBlocks("Hantle\nMata\nRoller")).toEqual([
+			{ type: "Text", content: "Hantle\nMata\nRoller", metadata: null },
+		]);
+	});
+
+	it("does not take a line that leads into what follows as a heading", () => {
+		const pasted = "Potrzebujesz:\nmaty, butelki wody i dobrego nastroju.";
+		expect(textToBlocks(pasted)).toEqual([
+			{ type: "Text", content: pasted, metadata: null },
+		]);
+	});
+
+	it("does not take a sentence or a long first line as a heading", () => {
+		expect(
+			textToBlocks("Zaczynamy.\nPierwszy dzień to spokojna rozgrzewka.")[0]
+				?.type,
+		).toBe("Text");
+		expect(
+			textToBlocks(
+				"Pierwsza linia dłuższa niż tytuł\nPierwszy dzień to spokojna rozgrzewka.",
+			),
+		).toHaveLength(1);
+	});
 });
 
 describe("JSON form", () => {

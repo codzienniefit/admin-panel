@@ -13,7 +13,7 @@ import {
 	userProgressSchema,
 	userSearchResultSchema,
 } from "@/data/schemas/user";
-import { isSearchable, USER_SEARCH_LIMIT } from "@/domain/userRules";
+import { parseUserQuery, USER_SEARCH_LIMIT } from "@/domain/userRules";
 import { conform, isoInstantOrNull, isoOrNull } from "./shared";
 import type { Transport } from "./transport";
 
@@ -277,15 +277,11 @@ const EMPTY_SEARCH: UserSearchResult = {
 };
 
 /**
- * The first search on a fresh backend instance lists every account to build
- * its index (about a call per thousand accounts) and can take a minute; later
- * ones read the index. Below Cloudflare's 100 s limit for an answer.
+ * A whole address is one Firebase look-up. Only an address nobody has falls
+ * back to the backend's index, which on a fresh instance lists every account
+ * first and can take a minute. Below Cloudflare's 100 s limit for an answer.
  */
 export const USER_SEARCH_TIMEOUT_MS = 90_000;
-
-/** Firebase ids are 28 letters and digits; anything close is worth a direct look. */
-const looksLikeUid = (query: string): boolean =>
-	/^[A-Za-z0-9]{20,40}$/.test(query);
 
 export function usersArea(
 	transport: Transport,
@@ -324,28 +320,29 @@ export function usersArea(
 		get,
 		badges,
 		async search(query) {
-			const text = query.trim();
-			// Too short as a whole or word by word (domain/userRules, the
-			// backend's own rule): nothing is asked for, and the screen says why.
-			if (!isSearchable(text)) return EMPTY_SEARCH;
-			// The search looks at e-mail and name only, and on a fresh backend
-			// instance it first lists every account. An id is one direct look-up,
-			// so it goes first; only when no account has it is the text searched.
-			if (looksLikeUid(text)) {
+			// One person, by the whole address or the id (domain/userRules):
+			// anything else asks for nothing, and the screen says why.
+			const wanted = parseUserQuery(query);
+			if (!wanted) return EMPTY_SEARCH;
+			if (wanted.kind === "uid") {
 				try {
-					const account = await get(text);
+					const account = await get(wanted.uid);
 					const { hasProSubscription: _pro, ...summary } = account;
 					return { users: [summary], totalMatches: 1, truncated: false };
 				} catch (error) {
-					if (!isApiError(error) || error.kind !== "notFound") throw error;
+					if (isApiError(error) && error.kind === "notFound")
+						return EMPTY_SEARCH;
+					throw error;
 				}
 			}
+			// A whole address alone is one Firebase look-up on the backend, not
+			// a search of every account. `email`, so that the address is only
+			// ever compared with addresses.
 			return toSearchResult(
 				await transport.request({
 					path: ["manageUsers"],
-					// The query and the limit, and nothing else: the backend
-					// refuses a limit above this one and a `refresh` from the panel.
-					query: { query: text, limit: USER_SEARCH_LIMIT },
+					// the backend refuses a limit above this one
+					query: { email: wanted.email, limit: USER_SEARCH_LIMIT },
 					timeoutMs: USER_SEARCH_TIMEOUT_MS,
 				}),
 			);

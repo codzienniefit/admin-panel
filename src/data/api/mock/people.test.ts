@@ -9,6 +9,7 @@ import { defaultMockControls, type MockControls } from "./controls";
 import { UNKNOWN_FIELD } from "./fixtures";
 import { createMockApi } from "./index";
 import { SNAPSHOT_KEY } from "./persistence";
+import { buildUserFixtures } from "./userFixtures";
 
 // Contract tests for the messages, badges and users sections. Like the ones
 // in mock.test.ts they are written against ApiClient only, so they can run
@@ -611,17 +612,39 @@ describe("badges contract", () => {
 	});
 });
 
+/** The sample people, as the mock builds them: no search needed to list them. */
+const SAMPLE = buildUserFixtures();
+/** A handful of them, for tests that look at several people. */
+const SEVERAL = SAMPLE.slice(0, USER_SEARCH_LIMIT);
+
+/** A sample person's whole address, by its start: "anna.testowa". */
+function sampleEmail(start: string): string {
+	const email = SAMPLE.find((user) => user.email?.startsWith(start))?.email;
+	if (!email) throw new Error(`test: no sample address starts with ${start}`);
+	return email;
+}
+
 describe("users contract", () => {
-	const firstMatch = async (api: Api, query = "anna.testowa") => {
-		const [user] = (await api.users.search(query)).users;
-		if (!user) throw new Error(`nobody matches ${query}`);
+	const firstMatch = async (api: Api, start = "anna.testowa") => {
+		const email = sampleEmail(start);
+		const [user] = (await api.users.search(email)).users;
+		if (!user) throw new Error(`nobody has ${email}`);
 		return user;
 	};
 
-	it("returns nobody for a query shorter than three characters", async () => {
+	it("returns nobody unless the query is a whole address or an id", async () => {
 		const { api } = setup();
-		for (const query of ["", " ", "a", "an", "  an  ", "@e"]) {
-			expect(await api.users.search(query)).toMatchObject({
+		for (const query of [
+			"",
+			" ",
+			"an",
+			"@e",
+			"anna.testowa",
+			"testowa anna",
+			"example.test",
+			"test-",
+		]) {
+			expect(await api.users.search(query), query).toMatchObject({
 				users: [],
 				totalMatches: 0,
 				truncated: false,
@@ -629,38 +652,29 @@ describe("users contract", () => {
 		}
 	});
 
-	it("never returns more than the limit, and says when there is more", async () => {
-		const { api } = setup();
-		// Every sample address contains this, so it stands for "everyone".
-		const everyone = await api.users.search("example.test");
-		expect(everyone.users).toHaveLength(USER_SEARCH_LIMIT);
-		expect(everyone.totalMatches).toBeGreaterThan(USER_SEARCH_LIMIT);
-		expect(everyone.truncated).toBe(true);
-
-		const few = await api.users.search("anna.testowa");
-		expect(few.users.length).toBeGreaterThan(0);
-		expect(few.users.length).toBeLessThan(USER_SEARCH_LIMIT);
-		expect(few).toMatchObject({
-			totalMatches: few.users.length,
-			truncated: false,
-		});
-	});
-
-	it("finds people by e-mail, by name and by id", async () => {
+	it("finds one person by the whole address, in any letter case, or by id", async () => {
 		const { api } = setup();
 		const user = await firstMatch(api);
 		expect(user.email).toContain("anna.testowa");
+		const loud = await api.users.search(`  ${user.email?.toUpperCase()} `);
+		expect(loud).toMatchObject({ totalMatches: 1, truncated: false });
+		expect(loud.users.map((u) => u.uid)).toEqual([user.uid]);
 		const byId = await api.users.search(user.uid);
 		expect(byId.users.map((u) => u.uid)).toEqual([user.uid]);
-		const byName = await api.users.search("testowa anna");
-		expect(byName.users.map((u) => u.uid)).toContain(user.uid);
-		expect((await api.users.search("nie ma takiej osoby")).users).toEqual([]);
+		expect((await api.users.search("nikt.taki@example.test")).users).toEqual(
+			[],
+		);
+		expect((await api.users.search("test-niktniktniktniktnikt")).users).toEqual(
+			[],
+		);
 	});
 
 	it("uses only made-up people", async () => {
 		const { api } = setup();
-		const { users } = await api.users.search("test-");
-		expect(users.length).toBeGreaterThan(0);
+		const users = (
+			await Promise.all(SEVERAL.map((sample) => api.users.search(sample.uid)))
+		).flatMap((found) => found.users);
+		expect(users).toHaveLength(SEVERAL.length);
 		for (const user of users) {
 			expect(user.email).toMatch(/@example\.test$/);
 			expect(user.uid).toMatch(/^test-/);
@@ -711,7 +725,9 @@ describe("users contract", () => {
 			"anna.nowa@example.test",
 		);
 		expect(
-			(await api.users.search("anna.nowa")).users.map((u) => u.uid),
+			(await api.users.search("anna.nowa@example.test")).users.map(
+				(u) => u.uid,
+			),
 		).toEqual([user.uid]);
 	});
 
@@ -728,7 +744,7 @@ describe("users contract", () => {
 	it("lists a person's badges, all of them defined", async () => {
 		const { api } = setup();
 		const defined = new Set((await api.badges.list()).map((b) => b.id));
-		const { users } = await api.users.search("example.test");
+		const users = SEVERAL;
 		const lists = await Promise.all(users.map((u) => api.users.badges(u.uid)));
 		expect(lists.some((list) => list.length > 0)).toBe(true);
 		for (const list of lists) {
@@ -768,7 +784,7 @@ describe("users contract", () => {
 
 	it("will not take back a badge the person earned in the app", async () => {
 		const { api } = setup();
-		const { users } = await api.users.search("example.test");
+		const users = SEVERAL;
 		for (const user of users) {
 			const earned = (await api.users.badges(user.uid)).find(
 				(held) => !held.grantId,
@@ -802,7 +818,7 @@ describe("users contract", () => {
 		const { api } = setup();
 		const workouts = new Set((await api.workouts.list()).map((w) => w.id));
 		const challenges = new Set((await api.challenges.list()).map((c) => c.id));
-		const { users } = await api.users.search("example.test");
+		const users = SEVERAL;
 		let seen = 0;
 		for (const user of users) {
 			const progress = await api.users.progress(user.uid);
@@ -846,7 +862,8 @@ describe("personal data and persistence", () => {
 			name: "Trwała odznaka",
 			imageRelativePath: "badges/trwala.webp",
 		});
-		const [user] = (await before.users.search("maria.testowa")).users;
+		const [user] = (await before.users.search(sampleEmail("maria.testowa")))
+			.users;
 		if (!user) throw new Error("no such sample user");
 		const held = await before.users.grantBadge(user.uid, "s_2");
 
@@ -859,7 +876,7 @@ describe("personal data and persistence", () => {
 	it("writes no e-mail address and no search query to the browser's storage", async () => {
 		const storage = memoryStorage();
 		const api = open(storage);
-		const [user] = (await api.users.search("maria.testowa")).users;
+		const [user] = (await api.users.search(sampleEmail("maria.testowa"))).users;
 		if (!user) throw new Error("no such sample user");
 		await api.users.get(user.uid);
 		await api.users.changeEmail(user.uid, "maria.nowa@example.test");

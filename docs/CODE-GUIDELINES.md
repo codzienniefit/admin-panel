@@ -108,7 +108,7 @@ the loading mark (`<Loading />`) or disable the action until then.
   | "This part is still loading" | `Loading` (`ui/Loading.tsx`): draws nothing itself, the page shows one spinner |
   | One file from the media library: pick, upload from the computer, or drop | `MediaField` in a form, `MediaSlot` elsewhere |
   | A picture from the media library | `MediaImage` |
-  | A preview of what the app shows | `ContentPreview` inside `PhoneFrame` (a 375-point screen, so text wraps as it will there) |
+  | A preview of what the app shows | `ContentPreview` inside `AppScreen` (only the content, 375 points wide, so text wraps as it will there; no phone drawn around it) |
   | Rows that become cards on a phone | `Table` |
   | Problems from the rules: next to fields, or in a notice | `placeIssues`, `IssuesNotice` (`formIssues.tsx`) |
   | Tabs, an either-or switch | `Tabs`, `Segmented` |

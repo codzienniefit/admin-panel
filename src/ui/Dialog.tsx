@@ -19,11 +19,14 @@ interface DialogProps {
 /** A little longer than the closing transition below. */
 const EXIT_MS = 250;
 
+/** Width, and how tall it may grow, on desktop. */
 const WIDTH = {
-	sm: "md:w-[26rem]",
-	md: "md:w-[34rem]",
-	lg: "md:w-[48rem]",
-	full: "md:h-[calc(100dvh-3rem)] md:w-[min(92rem,calc(100vw-3rem))]",
+	sm: "md:w-[26rem] md:max-h-[85dvh]",
+	md: "md:w-[34rem] md:max-h-[85dvh]",
+	lg: "md:w-[48rem] md:max-h-[85dvh]",
+	// the whole window but its margins: an editor of content needs blocks and
+	// their preview side by side
+	full: "md:h-[calc(100dvh-3rem)] md:max-h-[calc(100dvh-3rem)] md:w-[min(92rem,calc(100vw-3rem))]",
 };
 
 /**
@@ -76,7 +79,7 @@ export function Dialog({
 				<BaseDialog.Backdrop className="fixed inset-0 z-50 min-h-dvh bg-black/50 transition-opacity duration-200 data-closed:pointer-events-none data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<BaseDialog.Viewport className="fixed inset-0 z-50 flex items-end justify-center data-closed:pointer-events-none md:items-center md:p-6">
 					<BaseDialog.Popup
-						className={`flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-dialog bg-surface shadow-menu outline-none transition-[opacity,scale] duration-200 data-closed:pointer-events-none data-ending-style:opacity-0 data-starting-style:opacity-0 md:max-h-[85dvh] md:max-w-[calc(100vw-3rem)] md:rounded-dialog md:data-ending-style:scale-95 md:data-starting-style:scale-95 ${WIDTH[size]}`}
+						className={`flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-dialog bg-surface shadow-menu outline-none transition-[opacity,scale] duration-200 data-closed:pointer-events-none data-ending-style:opacity-0 data-starting-style:opacity-0 md:max-w-[calc(100vw-3rem)] md:rounded-dialog md:data-ending-style:scale-95 md:data-starting-style:scale-95 ${WIDTH[size]}`}
 					>
 						<div className="flex shrink-0 items-start gap-4 px-5 pt-5 md:px-6 md:pt-6">
 							<div className="min-w-0 flex-1">

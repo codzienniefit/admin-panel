@@ -7,15 +7,10 @@ import type {
 	UserProgress,
 	UserSummary,
 } from "@/data/schemas/user";
-import { matchesQuery } from "./text";
 
 // Rules for looking people up and for the few things the panel may change
 // about them. One set, used by the screens and by the mock server.
 
-/** Shorter queries would match half the user base; they return nothing. */
-export const USER_QUERY_MIN = 3;
-/** Every word of a query needs this many characters. */
-export const USER_TERM_MIN = 2;
 /**
  * A search never returns more than this; the rest needs a narrower query.
  * It is also the most the backend lets the panel ask for.
@@ -23,51 +18,56 @@ export const USER_TERM_MIN = 2;
 export const USER_SEARCH_LIMIT = 20;
 
 /**
- * The words of a query as the backend counts them: split at spaces, commas
- * and semicolons, accents left out (its `splitSearchTerms`).
+ * A whole address, as the backend recognises one (its FULL_EMAIL_PATTERN):
+ * then it asks Firebase for that one account instead of searching.
  */
-function searchTerms(query: string): string[] {
-	return query
-		.normalize("NFD")
-		.replace(/[\u0300-\u036f]/g, "")
-		.trim()
-		.split(/[\s,;]+/)
-		.filter((term) => term !== "");
-}
+const FULL_EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/;
+/**
+ * Firebase makes ids of 28 letters and digits. Twenty or more such
+ * characters with no space or dot in them is no name or address.
+ */
+const UID = /^[A-Za-z0-9_-]{20,128}$/;
 
 /**
- * What to tell someone whose query cannot be searched; null when it can.
- * The backend refuses the same queries: one word of at least three
- * characters, and no word shorter than two.
+ * What a search is for: one person, by their whole e-mail address or their
+ * id. Both are one direct look-up. Names are never searched: on the backend
+ * that means listing every account first, which takes up to a minute and
+ * finds names poorly (people write theirs in many ways, or not at all).
  */
-export function searchQueryProblem(query: string): string | null {
+export type UserQuery =
+	| { kind: "email"; email: string }
+	| { kind: "uid"; uid: string };
+
+export function parseUserQuery(query: string): UserQuery | null {
 	const text = query.trim();
-	if (!text) return "Wpisz adres e-mail, imię i nazwisko albo identyfikator";
-	if (text.length < USER_QUERY_MIN) {
-		return `Wpisz co najmniej ${USER_QUERY_MIN} znaki`;
-	}
-	const terms = searchTerms(text);
-	if (terms.some((term) => term.length < USER_TERM_MIN)) {
-		return `Wpisz słowa po co najmniej ${USER_TERM_MIN} znaki`;
-	}
-	if (!terms.some((term) => term.length >= USER_QUERY_MIN)) {
-		return `Wpisz przynajmniej jedno słowo o co najmniej ${USER_QUERY_MIN} znakach`;
-	}
+	if (FULL_EMAIL.test(text)) return { kind: "email", email: text };
+	if (UID.test(text)) return { kind: "uid", uid: text };
 	return null;
 }
 
-export const isSearchable = (query: string): boolean =>
-	searchQueryProblem(query) === null;
+/** What to tell someone whose query cannot be searched; null when it can. */
+export function searchQueryProblem(query: string): string | null {
+	const text = query.trim();
+	if (!text) return "Wpisz adres e-mail albo identyfikator użytkownika";
+	if (parseUserQuery(text)) return null;
+	if (text.includes("@")) {
+		return "Wpisz cały adres e-mail, np. jan.kowalski@example.com";
+	}
+	return "Szukamy tylko po całym adresie e-mail albo identyfikatorze użytkownika, nie po imieniu ani nazwisku";
+}
 
-/** True when the query appears in the e-mail, the name or the id. */
+export const isSearchable = (query: string): boolean =>
+	parseUserQuery(query) !== null;
+
+/** The one account a query is for: the same address, or the same id. */
 export function userMatches(
-	user: Pick<UserSummary, "uid" | "email" | "displayName">,
-	query: string,
+	user: Pick<UserSummary, "uid" | "email">,
+	query: UserQuery,
 ): boolean {
-	return matchesQuery(
-		`${user.email ?? ""} ${user.displayName ?? ""} ${user.uid}`,
-		query,
-	);
+	return query.kind === "uid"
+		? user.uid === query.uid
+		: user.email !== null &&
+				normalizeEmail(user.email) === normalizeEmail(query.email);
 }
 
 /** The form an address is stored and compared in. */

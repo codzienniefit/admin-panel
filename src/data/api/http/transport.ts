@@ -98,12 +98,16 @@ export interface TransportOptions {
 	/** Used when a request reports progress; fetch cannot. */
 	upload?: Sender;
 	/**
-	 * Told about every request as it leaves; the function it returns is told
-	 * how it ended. For the developer's register (exchangeLog.ts).
+	 * Told about every request as it leaves, with the panel call it belongs
+	 * to when that is known; the function it returns is told how it ended.
+	 * For the developer's register (exchangeLog.ts).
 	 */
 	record?: (
 		request: ExchangeRequest,
+		context: { callId: number | null },
 	) => (outcome: { response: ExchangeResponse } | { error: string }) => void;
+	/** The panel call starting right now (callContext.ts). */
+	currentCall?: () => number | null;
 }
 
 /** Marks a request as made by the panel's own code. */
@@ -227,6 +231,7 @@ export function createTransport(options: TransportOptions): Transport {
 	async function exchange<T>(
 		request: RequestOptions<T>,
 		token: string | null,
+		callId: number | null,
 	): Promise<WireAnswer> {
 		const headers: Record<string, string> = {
 			accept: "application/json",
@@ -254,24 +259,27 @@ export function createTransport(options: TransportOptions): Transport {
 				(request.file ? UPLOAD_TIMEOUT_MS : DEFAULT_TIMEOUT_MS),
 			onProgress: request.onProgress,
 		};
-		const finish = options.record?.({
-			method: wire.method,
-			url: wire.url,
-			headers,
-			body:
-				body === undefined
-					? null
-					: typeof body === "string"
-						? body
-						: {
-								file:
-									"name" in body && typeof body.name === "string"
-										? body.name
-										: null,
-								type: body.type,
-								size: body.size,
-							},
-		});
+		const finish = options.record?.(
+			{
+				method: wire.method,
+				url: wire.url,
+				headers,
+				body:
+					body === undefined
+						? null
+						: typeof body === "string"
+							? body
+							: {
+									file:
+										"name" in body && typeof body.name === "string"
+											? body.name
+											: null,
+									type: body.type,
+									size: body.size,
+								},
+			},
+			{ callId },
+		);
 		try {
 			const answer = await (request.onProgress ? upload : send)(wire);
 			finish?.({
@@ -296,14 +304,16 @@ export function createTransport(options: TransportOptions): Transport {
 	async function sendChecked<T>(
 		request: RequestOptions<T>,
 	): Promise<Answer<T>> {
+		// read before the first await: later the call is no longer known
+		const callId = options.currentCall?.() ?? null;
 		let token = await options.getToken();
-		let answer = await exchange(request, token);
+		let answer = await exchange(request, token, callId);
 
 		// A token is good for an hour and a tab can stay open for a day: ask
 		// for a fresh one once before deciding the person is signed out.
 		if (answer.status === 401 && token) {
 			token = await options.getToken({ forceRefresh: true });
-			if (token) answer = await exchange(request, token);
+			if (token) answer = await exchange(request, token, callId);
 		}
 		if (answer.status === 401) options.onUnauthorized?.();
 

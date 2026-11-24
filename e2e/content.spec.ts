@@ -39,13 +39,19 @@ async function addTextBlock(description: Locator): Promise<Locator> {
 }
 
 /**
- * The content as it will be saved. In a dialog the editor shows one pane at
- * a time, so this leaves the blocks out of sight until `showBlocks`.
+ * The pane switch of a narrow editor. A workout's window is wide enough for
+ * blocks and preview side by side, and then there is no switch to press.
  */
+async function showPane(description: Locator, name: RegExp): Promise<void> {
+	const tab = description
+		.getByRole("group", { name: "Część edytora" })
+		.getByRole("button", { name });
+	if (await tab.isVisible()) await tab.click();
+}
+
+/** The content as it will be saved, in the preview's JSON view. */
 async function showJson(description: Locator): Promise<Locator> {
-	await description
-		.getByRole("button", { name: "Podgląd", exact: true })
-		.click();
+	await showPane(description, /^Podgląd/);
 	const preview = description.getByRole("region", {
 		name: "Podgląd",
 		exact: true,
@@ -55,7 +61,7 @@ async function showJson(description: Locator): Promise<Locator> {
 }
 
 async function showBlocks(description: Locator): Promise<void> {
-	await description.getByRole("button", { name: /^Bloki/ }).click();
+	await showPane(description, /^Bloki/);
 }
 
 /** Extends the selection back from the caret, as Shift + arrow does. */
@@ -109,10 +115,8 @@ test("content is edited in the form, block by block, and saved with it", async (
 	await added.fill("Na koniec napij się wody.");
 	await expect(placeholder).toBeHidden();
 
-	// In a dialog the editor is one column: the preview is the other pane.
-	await description
-		.getByRole("button", { name: "Podgląd", exact: true })
-		.click();
+	// beside the blocks, or the other pane of a narrow editor
+	await showPane(description, /^Podgląd/);
 	const preview = description.getByRole("region", {
 		name: "Podgląd",
 		exact: true,
@@ -178,6 +182,48 @@ test("ready text is pasted from a panel that stays out of the way", async ({
 	await expect(
 		reopened.description.getByRole("textbox", { name: "Tekst, blok 3" }),
 	).toHaveCount(0);
+});
+
+test("empty content opens on the paste box, previewed while it is typed", async ({
+	page,
+}) => {
+	await open(page, "/workouts/new");
+	const editor = dialog(page, "Nowy trening");
+	const description = editor.getByRole("group", { name: "Opis", exact: true });
+	const source = description.getByRole("textbox", { name: "Tekst źródłowy" });
+	const preview = description.getByRole("region", { name: "Podgląd" });
+
+	// no button to find first: there is nothing else to start from
+	await expect(source).toBeVisible();
+	await expect(
+		description.getByRole("button", { name: "Wklej gotowy tekst…" }),
+	).toHaveAttribute("aria-expanded", "true");
+
+	// A short line over a sentence is a heading and its text.
+	await source.fill(
+		"Dla kogo\nSilne nogi 14 dni: plan krok po kroku, z dniami odpoczynku.",
+	);
+	await expect(preview.getByText("Wklejany tekst")).toBeVisible();
+	await expect(preview.getByText("Dla kogo", { exact: true })).toBeVisible();
+	await expect(description.getByText("1 tytuł", { exact: true })).toBeVisible();
+
+	// corrected in the box, and the preview follows
+	await source.fill(
+		"Dla kogo\nSilne nogi 14 dni: plan krok po kroku, z dniami odpoczynku.\n\nSprzęt\nHantle i mata, nic więcej.",
+	);
+	await expect(preview.getByText("Sprzęt", { exact: true })).toBeVisible();
+
+	// Nothing to replace yet, so no question: the blocks are made.
+	await description.getByRole("button", { name: "Utwórz bloki" }).click();
+	await expect(toast(page, "Utworzono: 4 bloki")).toBeVisible();
+	await expect(
+		description.getByRole("textbox", { name: "Tytuł, blok 1" }),
+	).toHaveValue("Dla kogo");
+	await expect(
+		description.getByRole("textbox", { name: "Tekst, blok 2" }),
+	).toHaveText("Silne nogi 14 dni: plan krok po kroku, z dniami odpoczynku.");
+	await expect(preview.getByText("Wklejany tekst")).toHaveCount(0);
+	await expect(source).toHaveCount(0);
 });
 
 test("the paste panel can be hidden again, and the blocks are untouched", async ({
@@ -443,9 +489,7 @@ test("formatted text is saved with the workout and comes back formatted", async 
 	await expect(panel).toBeHidden();
 
 	// The preview draws the same text the way the app will.
-	await description
-		.getByRole("button", { name: "Podgląd", exact: true })
-		.click();
+	await showPane(description, /^Podgląd/);
 	const preview = description.getByRole("region", {
 		name: "Podgląd",
 		exact: true,

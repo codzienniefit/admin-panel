@@ -87,3 +87,35 @@ test("closing an editor with unsaved input asks first", async ({ page }) => {
 	await open(page, "/workouts/W1");
 	await expect(dialog(page, "Poranna mobilność bioder")).toBeVisible();
 });
+
+test("opening and closing a workout leaves the list where it was", async ({
+	page,
+}) => {
+	await open(page, "/workouts");
+	await expect(page.getByRole("row").nth(30)).toBeVisible();
+	await page.evaluate(() => window.scrollTo(0, 900));
+	await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(900);
+
+	// a row in view, not one the scroll would have to bring back
+	const row = page
+		.getByRole("row")
+		.filter({ hasNot: page.getByRole("columnheader") })
+		.nth(12);
+	await row.click();
+	await expect(page).toHaveURL(/\/workouts\/W/);
+	await expect(page.getByRole("dialog")).toBeVisible();
+	expect(await page.evaluate(() => window.scrollY)).toBe(900);
+
+	await page
+		.getByRole("dialog")
+		.getByRole("button", { name: "Zamknij", exact: true })
+		.click();
+	await expect(page.getByRole("dialog")).toHaveCount(0);
+	await expect(page).toHaveURL(/\/workouts$/);
+	expect(await page.evaluate(() => window.scrollY)).toBe(900);
+
+	// another screen still starts at the top
+	await page.getByRole("link", { name: "Wyzwania" }).click();
+	await expect(page).toHaveURL(/\/challenges/);
+	await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+});

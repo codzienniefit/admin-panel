@@ -791,11 +791,19 @@ describe("usersArea: get", () => {
 });
 
 describe("usersArea: search", () => {
-	it("asks for nothing when the query is too short", async () => {
+	it("asks for nothing unless it is a whole address or an id", async () => {
 		const backend = fakeBackend();
 		const api = usersArea(backend.transport, SWITCHED_OFF);
-		for (const query of ["", " ", "an", "  an  "]) {
-			expect(await api.search(query)).toEqual({
+		for (const query of [
+			"",
+			" ",
+			"anna",
+			"Anna Nowak",
+			"anna@",
+			"anna@example",
+			"Qm3xT7pLr9VbN2sK8dH",
+		]) {
+			expect(await api.search(query), query).toEqual({
 				users: [],
 				totalMatches: 0,
 				truncated: false,
@@ -804,31 +812,26 @@ describe("usersArea: search", () => {
 		expect(backend.requests).toEqual([]);
 	});
 
-	it("searches with the trimmed query and the panel's limit", async () => {
+	it("looks a whole address up as an address, with the panel's limit", async () => {
 		const backend = fakeBackend().on(
 			"GET",
 			"manageUsers",
 			json({
-				users: [
-					wireUserSummary(),
-					wireUserSummary({ uid: "u2", email: "anna.k@example.com" }),
-				],
-				totalMatches: 57,
-				truncated: true,
+				users: [wireUserSummary()],
+				totalMatches: 1,
+				truncated: false,
 				indexedAtUtc: "2026-11-11T09:45:00.000Z",
 			}),
 		);
 		const api = usersArea(backend.transport, SWITCHED_OFF);
 
-		const found = await api.search("  anna ");
+		const found = await api.search("  anna@example.com ");
 
-		expect(found.users.map((user) => user.uid)).toEqual([UID, "u2"]);
+		expect(found.users.map((user) => user.uid)).toEqual([UID]);
 		expect(found.users[0]).toMatchObject(wireUserSummary());
-		expect(found.totalMatches).toBe(57);
-		expect(found.truncated).toBe(true);
 		expect(backend.calls()).toEqual(["GET manageUsers"]);
 		expect(backend.only("GET", "manageUsers").query).toEqual({
-			query: "anna",
+			email: "anna@example.com",
 			limit: "20",
 		});
 	});
@@ -839,12 +842,12 @@ describe("usersArea: search", () => {
 			"anna+test@example.com&limit=999",
 		);
 		expect(backend.only("GET", "manageUsers").query).toEqual({
-			query: "anna+test@example.com&limit=999",
+			email: "anna+test@example.com&limit=999",
 			limit: "20",
 		});
 	});
 
-	it("returns an empty result for a query that is not an id", async () => {
+	it("returns an empty result for an address nobody has", async () => {
 		const backend = fakeBackend().on("GET", "manageUsers", searchAnswer());
 		const found = await usersArea(backend.transport, SWITCHED_OFF).search(
 			"nikt@example.com",
@@ -853,8 +856,8 @@ describe("usersArea: search", () => {
 		expect(backend.calls()).toEqual(["GET manageUsers"]);
 	});
 
-	describe("a query that looks like an account id", () => {
-		it("is looked up directly, without the slow search", async () => {
+	describe("an account id", () => {
+		it("is looked up directly, never searched", async () => {
 			const backend = fakeBackend().on("GET", ACCOUNT, todayAccount());
 			const api = usersArea(backend.transport, SWITCHED_OFF);
 
@@ -880,24 +883,13 @@ describe("usersArea: search", () => {
 			expect(backend.calls()).toEqual([`GET ${ACCOUNT}`]);
 		});
 
-		it("is searched as text when no account has that id", async () => {
-			const backend = fakeBackend()
-				.on("GET", ACCOUNT, errorReply(404, `User not found: ${UID}`))
-				.on("GET", "manageUsers", searchAnswer(wireUserSummary()));
-			const found = await usersArea(backend.transport, SWITCHED_OFF).search(
-				UID,
-			);
-			expect(found.users).toHaveLength(1);
-			expect(backend.calls()).toEqual([`GET ${ACCOUNT}`, "GET manageUsers"]);
-		});
-
-		it("gives the empty result when there is no such account either", async () => {
+		it("gives the empty result when no account has it, without a search", async () => {
 			for (const answer of [
 				json({ message: `User with id ${UID} not found` }),
 				errorReply(404, `User not found: ${UID}`),
 			]) {
 				const backend = fakeBackend()
-					.on("GET", "manageUsers", searchAnswer())
+					.on("GET", "manageUsers", searchAnswer(wireUserSummary()))
 					.on("GET", ACCOUNT, answer);
 				const found = await usersArea(backend.transport, SWITCHED_OFF).search(
 					UID,
@@ -907,6 +899,7 @@ describe("usersArea: search", () => {
 					totalMatches: 0,
 					truncated: false,
 				});
+				expect(backend.calls()).toEqual([`GET ${ACCOUNT}`]);
 			}
 		});
 
@@ -921,15 +914,14 @@ describe("usersArea: search", () => {
 		});
 
 		it.each([
-			"anna.nowak@example.com",
 			"Anna Nowak",
 			"Qm3xT7pLr9VbN2sK8dH",
-			"Qm3xT7pLr9VbN2sK8dHfJ4wZcYa1Qm3xT7pLr9VbN",
 			"Qm3xT7pLr9VbN2sK8dH/J4wZcYa1",
-		])("does not take %j for an id", async (query) => {
+			"Qm3xT7pLr9.VbN2sK8dHfJ4wZcYa1",
+		])("does not take %j for an id, and asks for nothing", async (query) => {
 			const backend = fakeBackend().on("GET", "manageUsers", searchAnswer());
 			await usersArea(backend.transport, SWITCHED_OFF).search(query);
-			expect(backend.calls()).toEqual(["GET manageUsers"]);
+			expect(backend.calls()).toEqual([]);
 		});
 	});
 
@@ -943,7 +935,7 @@ describe("usersArea: search", () => {
 		);
 		const error = await failure(
 			// One the panel's own rule lets through: the refusal is the backend's.
-			usersArea(backend.transport, SWITCHED_OFF).search("anna"),
+			usersArea(backend.transport, SWITCHED_OFF).search("anna@example.com"),
 		);
 		expect(error.kind).toBe("validation");
 		expect(error.status).toBe(400);
@@ -956,7 +948,7 @@ describe("usersArea: search", () => {
 			errorReply(500, "Failed to search users: Error: quota exceeded"),
 		);
 		const error = await failure(
-			usersArea(backend.transport, SWITCHED_OFF).search("anna"),
+			usersArea(backend.transport, SWITCHED_OFF).search("anna@example.com"),
 		);
 		expect(error.kind).toBe("server");
 	});
@@ -968,7 +960,7 @@ describe("usersArea: search", () => {
 			json([wireUserSummary()]),
 		);
 		const error = await failure(
-			usersArea(backend.transport, SWITCHED_OFF).search("anna"),
+			usersArea(backend.transport, SWITCHED_OFF).search("anna@example.com"),
 		);
 		expect(error.kind).toBe("server");
 		expect(error.message).toContain("Wyniki wyszukiwania");
@@ -1477,23 +1469,25 @@ describe("usersArea: search on the panel's route", () => {
 		expect(backend.requests).toEqual([]);
 	});
 
-	it("never sends a limit above the backend's, nor anything but the query and the limit", async () => {
+	it("never sends a limit above the backend's, nor anything but the address and the limit", async () => {
 		// "limit can be at most 20" and "refresh is not available to the admin panel".
 		const backend = fakeBackend().on(
 			"GET",
 			"manageUsers",
 			json({ users: [], totalMatches: 0, truncated: false }),
 		);
-		await usersArea(backend.transport, production()).search("anna nowak");
+		await usersArea(backend.transport, production()).search(
+			"anna.nowak@example.com",
+		);
 		const { query } = backend.only("GET", "manageUsers");
-		expect(Object.keys(query).toSorted()).toEqual(["limit", "query"]);
+		expect(Object.keys(query).toSorted()).toEqual(["email", "limit"]);
 		expect(Number(query.limit)).toBeLessThanOrEqual(20);
 	});
 
-	it("still asks for nothing, and reports nothing, under three characters in all", async () => {
+	it("still asks for nothing, and reports nothing, for a name", async () => {
 		const backend = fakeBackend();
 		const api = usersArea(backend.transport, production());
-		expect(await api.search("an")).toEqual({
+		expect(await api.search("anna nowak")).toEqual({
 			users: [],
 			totalMatches: 0,
 			truncated: false,
@@ -1514,7 +1508,7 @@ describe("usersArea: search on the panel's route", () => {
 			}),
 		);
 		const found = await usersArea(backend.transport, production()).search(
-			"anna nowak",
+			"anna.nowak@example.com",
 		);
 		expect(found).toMatchObject({
 			totalMatches: 31,
@@ -1522,7 +1516,7 @@ describe("usersArea: search on the panel's route", () => {
 			indexedAtUtc: "2026-11-13T09:45:00.000Z",
 		});
 		expect(backend.only("GET", "manageUsers").query).toEqual({
-			query: "anna nowak",
+			email: "anna.nowak@example.com",
 			limit: "20",
 		});
 	});
@@ -1533,20 +1527,20 @@ describe("usersArea: search on the panel's route", () => {
 			"manageUsers",
 			validationReply([
 				{
-					path: "query",
-					code: "TOO_SHORT",
-					message: "A search needs a term of at least 3 characters",
+					path: "email",
+					code: "TOO_LONG",
+					message: "Za długie",
 				},
 			]),
 		);
 		const error = await failure(
-			usersArea(backend.transport, production()).search("anna"),
+			usersArea(backend.transport, production()).search("anna@example.com"),
 		);
 		expect(error.kind).toBe("validation");
-		expect(error.issues[0]?.path).toBe("query");
+		expect(error.issues[0]?.path).toBe("email");
 	});
 
-	it("looks an id up first, and searches the text when the id finds nobody (404)", async () => {
+	it("looks an id up, and never searches the text when the id finds nobody (404)", async () => {
 		const backend = fakeBackend()
 			.on(
 				"GET",
@@ -1556,7 +1550,7 @@ describe("usersArea: search on the panel's route", () => {
 			.on("GET", ACCOUNT, notFoundReply(`User with id ${UID} not found`));
 		const found = await usersArea(backend.transport, production()).search(UID);
 		expect(found.users).toEqual([]);
-		expect(backend.calls()).toEqual([`GET ${ACCOUNT}`, "GET manageUsers"]);
+		expect(backend.calls()).toEqual([`GET ${ACCOUNT}`]);
 	});
 });
 

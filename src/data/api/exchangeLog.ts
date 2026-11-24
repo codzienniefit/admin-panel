@@ -24,6 +24,11 @@ export interface ExchangeResponse {
 
 export interface Exchange {
 	id: number;
+	/**
+	 * The panel call (callLog.ts) that sent it, when that is known: null for
+	 * a request a call sent after waiting for an earlier answer.
+	 */
+	callId: number | null;
 	/** `Date.now()` when the request left. */
 	startedAt: number;
 	/** Null while the request is running. */
@@ -76,7 +81,11 @@ export function keptHeaders(
  */
 export function recordExchange(
 	request: ExchangeRequest,
-	options: { log?: Store<readonly Exchange[]>; now?: () => number } = {},
+	options: {
+		log?: Store<readonly Exchange[]>;
+		now?: () => number;
+		callId?: number | null;
+	} = {},
 ): (outcome: { response: ExchangeResponse } | { error: string }) => void {
 	const log = options.log ?? exchangeLog;
 	const now = options.now ?? (() => Date.now());
@@ -86,6 +95,7 @@ export function recordExchange(
 		[
 			{
 				id,
+				callId: options.callId ?? null,
 				startedAt,
 				durationMs: null,
 				request: { ...request, headers: keptHeaders(request.headers) },
@@ -120,9 +130,8 @@ export function recordExchange(
 let nextId = 1;
 
 /**
- * The exchanges that started while a call ran, oldest first. JavaScript
- * cannot tell which call a request belongs to, so calls running at the same
- * time can add their own; the report names those calls.
+ * The exchanges that started while a call ran, oldest first, whoever sent
+ * them: calls running at the same time can add their own.
  */
 export function exchangesDuring(
 	exchanges: readonly Exchange[],
@@ -132,4 +141,44 @@ export function exchangesDuring(
 	return exchanges
 		.filter((entry) => entry.startedAt >= from && entry.startedAt <= to)
 		.sort((a, b) => a.startedAt - b.startedAt || a.id - b.id);
+}
+
+/**
+ * A call's own exchanges, oldest first: those sent in its name, and those
+ * sent in no one's name while it ran (a later request of a call that makes
+ * several). Never one another call is known to have sent.
+ */
+export function exchangesOf(
+	exchanges: readonly Exchange[],
+	call: { id: number; at: number },
+	end: number,
+): Exchange[] {
+	return exchanges
+		.filter(
+			(entry) =>
+				entry.callId === call.id ||
+				(entry.callId === null &&
+					entry.startedAt >= call.at &&
+					entry.startedAt <= end),
+		)
+		.sort((a, b) => a.startedAt - b.startedAt || a.id - b.id);
+}
+
+/**
+ * The address of a request as a person reads it: without the panel's own
+ * origin, and with the query decoded (workouts/a.webp, not workouts%2Fa.webp).
+ */
+export function shownUrl(url: string): string {
+	let parsed: URL;
+	try {
+		parsed = new URL(url, "http://panel.invalid");
+	} catch {
+		return url;
+	}
+	const address = `${parsed.pathname}${parsed.search}`;
+	try {
+		return decodeURIComponent(address);
+	} catch {
+		return address;
+	}
 }

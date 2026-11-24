@@ -14,8 +14,8 @@ import type { Workout } from "@/data/schemas/workout";
 import {
 	emailIssues,
 	grantIssues,
-	isSearchable,
 	normalizeEmail,
+	parseUserQuery,
 	revokeIssues,
 	USER_SEARCH_LIMIT,
 	userMatches,
@@ -140,10 +140,11 @@ export function usersApi(
 	return {
 		async search(query) {
 			await kernel.latency();
-			// Too short to mean anyone in particular: nobody is returned.
-			const matches = isSearchable(query)
+			// One person, by the whole address or the id: as the backend does it.
+			const wanted = parseUserQuery(query);
+			const matches = wanted
 				? [...accounts.values()]
-						.filter((account) => userMatches(account, query))
+						.filter((account) => userMatches(account, wanted))
 						.sort((a, b) =>
 							byName.compare(
 								a.displayName ?? a.email ?? "",

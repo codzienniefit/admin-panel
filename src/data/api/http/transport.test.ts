@@ -257,6 +257,26 @@ describe("createTransport: the developer's record of each exchange", () => {
 		]);
 	});
 
+	it("names the call that sent it, read before the token is awaited", async () => {
+		const calls: (number | null)[] = [];
+		let current: number | null = 7;
+		const wire = recorder(status(401), ok([]));
+		const transport = transportWith(wire.sender, {
+			currentCall: () => current,
+			getToken: async () => "token",
+			record: (_request, { callId }) => {
+				calls.push(callId);
+				return () => {};
+			},
+		});
+		const answer = transport.request({ path: ["manageWorkouts"] });
+		// the call is over as far as the clock of starting goes
+		current = null;
+		await answer;
+		// the retry with a fresh token is the same call's
+		expect(calls).toEqual([7, 7]);
+	});
+
 	it("is told why there was no answer, and the failure still comes through", async () => {
 		const outcomes: unknown[] = [];
 		const wire = recorder(new TypeError("Failed to fetch"));

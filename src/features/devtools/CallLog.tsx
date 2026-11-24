@@ -7,7 +7,13 @@ import {
 	severityOf,
 } from "@/data/api/callLog";
 import { copyIssueReport } from "@/data/api/copyReport";
-import { clearExchangeLog } from "@/data/api/exchangeLog";
+import {
+	clearExchangeLog,
+	type Exchange,
+	exchangeLog,
+	exchangesOf,
+	shownUrl,
+} from "@/data/api/exchangeLog";
 import { POLISH_TIME_ZONE } from "@/domain/polishTime";
 import { plural } from "@/domain/text";
 import { useStore } from "@/lib/store";
@@ -50,6 +56,48 @@ function statusText(entry: CallEntry): string {
 	return entry.state === "ok"
 		? `${code}OK`
 		: `${code}${KIND_LABELS[entry.kind ?? "unknown"]}`;
+}
+
+/** Reading is blue, adding green, changing amber, removing red. */
+const METHOD_TONES: Record<string, Tone> = {
+	GET: "blue",
+	POST: "green",
+	PUT: "orange",
+	PATCH: "amber",
+	DELETE: "red",
+};
+
+/** One request of a call: its method, its whole address, and its answer. */
+function RequestLine({
+	exchange,
+	withStatus,
+}: {
+	exchange: Exchange;
+	withStatus: boolean;
+}) {
+	const method = exchange.request.method.toUpperCase();
+	return (
+		<span className="flex min-w-0 items-baseline gap-2">
+			<span
+				data-tone={METHOD_TONES[method] ?? "grey"}
+				className="w-14 shrink-0 rounded-chip bg-(--tone-soft) px-1.5 py-px text-center font-mono text-[11px] font-semibold text-(--tone-ink)"
+			>
+				{method}
+			</span>
+			<span className="min-w-0 font-mono text-xs text-subtle [overflow-wrap:anywhere]">
+				{shownUrl(exchange.request.url)}
+			</span>
+			{withStatus && (
+				<span className="shrink-0 font-mono text-xs text-muted tabular-nums">
+					{exchange.response
+						? exchange.response.status
+						: exchange.error
+							? "brak odpowiedzi"
+							: "…"}
+				</span>
+			)}
+		</span>
+	);
 }
 
 const timeFormat = new Intl.DateTimeFormat("pl-PL", {
@@ -141,6 +189,7 @@ export function CallLogButton() {
 
 function CallLogDialog({ onClose }: { onClose: () => void }) {
 	const { entries } = useStore(callLog);
+	const exchanges = useStore(exchangeLog);
 	const [onlyFailed, setOnlyFailed] = useState(false);
 	const shown = onlyFailed
 		? entries.filter((entry) => entry.state === "failed")
@@ -200,7 +249,17 @@ function CallLogDialog({ onClose }: { onClose: () => void }) {
 				) : (
 					<ul aria-label="Wywołania" className="flex flex-col gap-1.5">
 						{shown.map((entry) => (
-							<CallRow key={entry.id} entry={entry} />
+							<CallRow
+								key={entry.id}
+								entry={entry}
+								requests={exchangesOf(
+									exchanges,
+									entry,
+									entry.durationMs === null
+										? Number.POSITIVE_INFINITY
+										: entry.at + entry.durationMs,
+								)}
+							/>
 						))}
 					</ul>
 				)}
@@ -209,7 +268,14 @@ function CallLogDialog({ onClose }: { onClose: () => void }) {
 	);
 }
 
-function CallRow({ entry }: { entry: CallEntry }) {
+function CallRow({
+	entry,
+	requests,
+}: {
+	entry: CallEntry;
+	/** The HTTP requests it sent; none against the in-process mock. */
+	requests: readonly Exchange[];
+}) {
 	const [open, setOpen] = useState(false);
 	const severity = severityOf(entry);
 	return (
@@ -237,6 +303,18 @@ function CallRow({ entry }: { entry: CallEntry }) {
 				<span className="w-16 text-right font-mono text-xs text-muted tabular-nums">
 					{entry.durationMs === null ? "…" : `${entry.durationMs} ms`}
 				</span>
+				{requests.length > 0 && (
+					<span className="flex w-full flex-col gap-1">
+						{requests.map((exchange) => (
+							<RequestLine
+								key={exchange.id}
+								exchange={exchange}
+								// one request: its status is the call's, shown above
+								withStatus={requests.length > 1}
+							/>
+						))}
+					</span>
+				)}
 			</button>
 			{open && (
 				<div className="grid gap-3 border-line border-t p-3 md:grid-cols-2">

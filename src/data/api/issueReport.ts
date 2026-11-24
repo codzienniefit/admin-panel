@@ -1,6 +1,6 @@
 import type { CallEntry } from "./callLog";
 import { isApiError } from "./errors";
-import { type Exchange, exchangesDuring } from "./exchangeLog";
+import { type Exchange, exchangesOf } from "./exchangeLog";
 
 // One JSON with everything needed to investigate a failure away from the
 // screen: what the panel was asked to do, every HTTP request it sent for it
@@ -93,8 +93,8 @@ function callReport(
 		...(call.kind ? { kind: call.kind } : {}),
 		args: call.args,
 		[call.state === "failed" ? "error" : "result"]: call.result ?? null,
-		/** Requests sent while this call ran, oldest first. */
-		exchanges: exchangesDuring(exchanges, call.at, end).map(exchangeReport),
+		/** This call's requests, oldest first (see exchangesOf). */
+		exchanges: exchangesOf(exchanges, call, end).map(exchangeReport),
 		...(concurrent.length > 0
 			? {
 					/** Calls that ran at the same time: some exchanges may be theirs. */

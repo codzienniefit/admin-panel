@@ -20,9 +20,9 @@ import { confirm } from "@/ui/confirm";
 import { JsonView } from "@/ui/JsonView";
 import { Segmented } from "@/ui/Segmented";
 import { toast } from "@/ui/toast";
+import { AppScreen } from "./AppScreen";
 import { blockField as field } from "./blockField";
 import { ContentPreview } from "./ContentPreview";
-import { PhoneFrame } from "./PhoneFrame";
 import { RichTextEditor } from "./RichTextEditor";
 
 // The editor for "fancy content": descriptions of workouts and challenges,
@@ -128,6 +128,9 @@ export function ContentEditor({
 	const [source, setSource] = useState("");
 	const [titleMax, setTitleMax] = useState(DEFAULT_TITLE_MAX);
 	const [pasteOpen, setPasteOpen] = useState(false);
+	// With no blocks yet, pasting ready text is the quickest start, so the
+	// box for it is already open, until someone hides it.
+	const [pasteDismissed, setPasteDismissed] = useState(false);
 	const [previewKind, setPreviewKind] = useState<PreviewKind>("look");
 	const [dragKey, setDragKey] = useState<string | null>(null);
 	const [dropAt, setDropAt] = useState<{ key: string; before: boolean } | null>(
@@ -261,6 +264,11 @@ export function ContentEditor({
 			: []
 		: textToBlocks(source, titleMax);
 	const incomingTitles = incoming.filter((b) => b.type === "Title").length;
+	const pasteShown =
+		!disabled && (pasteOpen || (rows.length === 0 && !pasteDismissed));
+	// While text waits in the box, the preview shows what it will become, so
+	// the text can be corrected before any block is made.
+	const previewingPaste = pasteShown && incoming.length > 0;
 
 	const applyIncoming = async (mode: "replace" | "append") => {
 		if (incoming.length === 0) return;
@@ -291,12 +299,14 @@ export function ContentEditor({
 
 	const showPaste = () => {
 		setPasteOpen(true);
+		setPasteDismissed(false);
 		// Once the panel is on screen: typing or Ctrl+V is the next thing done.
 		setTimeout(() => sourceBox.current?.focus(), 0);
 	};
 
 	const hidePaste = () => {
 		setPasteOpen(false);
+		setPasteDismissed(true);
 		// The button that hid the panel is gone with it; the keyboard goes back
 		// to the one that opens it.
 		document.getElementById(pasteToggleId)?.focus();
@@ -597,19 +607,18 @@ export function ContentEditor({
 								<Button
 									id={pasteToggleId}
 									variant="ghost"
-									aria-expanded={pasteOpen}
-									aria-controls={pasteOpen ? pastePanelId : undefined}
-									onClick={() =>
-										pasteOpen ? setPasteOpen(false) : showPaste()
-									}
+									aria-expanded={pasteShown}
+									aria-controls={pasteShown ? pastePanelId : undefined}
+									onClick={() => (pasteShown ? hidePaste() : showPaste())}
 								>
 									Wklej gotowy tekst…
 								</Button>
 							</div>
 						</div>
 
-						{/* The other way: paste ready text or JSON. Folded until asked for. */}
-						{pasteOpen && (
+						{/* The other way: paste ready text or JSON. Folded until asked
+						    for, except while there are no blocks yet. */}
+						{pasteShown && (
 							<section
 								id={pastePanelId}
 								aria-label="Wklej tekst"
@@ -720,10 +729,13 @@ export function ContentEditor({
 									<p className="text-xs text-muted">
 										Bloki oddzielasz pustą linią. Jednolinijkowy akapit do
 										podanej liczby znaków staje się tytułem, pozostałe blokami
-										tekstu. Pojedynczy enter zostaje w tekście, a tagi{" "}
-										<code>&lt;b&gt;</code> i <code>&lt;a&gt;</code> zostają.
-										JSON skopiowany ze starego panelu (albo z podglądu „JSON”)
-										też można wkleić: rozpoznamy go sami.
+										tekstu. Taka krótka linia nad dłuższym tekstem (bez pustej
+										linii między nimi) staje się tytułem, a tekst pod nią
+										osobnym blokiem. Podgląd pokazuje, co powstanie, zanim
+										cokolwiek się zmieni. Pojedynczy enter zostaje w tekście, a
+										tagi <code>&lt;b&gt;</code> i <code>&lt;a&gt;</code>{" "}
+										zostają. JSON skopiowany ze starego panelu (albo z podglądu
+										„JSON”) też można wkleić: rozpoznamy go sami.
 									</p>
 								</div>
 							</section>
@@ -759,12 +771,17 @@ export function ContentEditor({
 						<div className="flex flex-col gap-2 p-3">
 							{previewKind === "look" ? (
 								<>
-									<PhoneFrame>
-										<ContentPreview blocks={blocks} />
-									</PhoneFrame>
-									<p className="text-center text-xs text-muted">
-										widok poglądowy
-									</p>
+									{previewingPaste && (
+										<p className="text-xs text-(--tone-ink)" data-tone="amber">
+											Wklejany tekst: tak będzie wyglądał po utworzeniu bloków.
+											Treść jeszcze się nie zmieniła.
+										</p>
+									)}
+									<AppScreen>
+										<ContentPreview
+											blocks={previewingPaste ? incoming : blocks}
+										/>
+									</AppScreen>
 								</>
 							) : (
 								<>

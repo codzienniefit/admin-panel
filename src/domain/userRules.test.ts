@@ -10,12 +10,11 @@ import {
 	isRevocable,
 	isSearchable,
 	normalizeEmail,
+	parseUserQuery,
 	progressSummary,
 	revokeIssues,
 	searchQueryProblem,
-	USER_QUERY_MIN,
 	USER_SEARCH_LIMIT,
-	USER_TERM_MIN,
 	userMatches,
 } from "./userRules";
 
@@ -45,61 +44,66 @@ const held = (
 ): UserBadge => ({ badgeId, earnedAtUtc, grantId });
 
 describe("user search", () => {
-	it("does not search for fewer than three characters", () => {
-		expect(USER_QUERY_MIN).toBe(3);
-		expect(isSearchable("an")).toBe(false);
-		expect(isSearchable("  an  ")).toBe(false);
-		expect(isSearchable("ann")).toBe(true);
-		expect(searchQueryProblem("")).toContain("Wpisz");
-		expect(searchQueryProblem("an")).toBe("Wpisz co najmniej 3 znaki");
-		expect(searchQueryProblem("ann")).toBeNull();
+	it("searches by a whole e-mail address", () => {
+		expect(parseUserQuery("  anna.testowa@example.test ")).toEqual({
+			kind: "email",
+			email: "anna.testowa@example.test",
+		});
+		expect(searchQueryProblem("anna@example.test")).toBeNull();
+		expect(isSearchable("anna+pl@mail.example.co.uk")).toBe(true);
 	});
 
-	it("needs words the backend will search for: each of two characters, one of three", () => {
+	it("searches by a Firebase id", () => {
+		const uid = "a4bHlAZCVtX9iJQeIHe702r5jhd2";
+		expect(parseUserQuery(uid)).toEqual({ kind: "uid", uid });
+		expect(searchQueryProblem(uid)).toBeNull();
+	});
+
+	it("never searches by name or part of an address", () => {
 		for (const query of [
-			"anna",
+			"Michał",
 			"anna nowak",
-			"an nowak",
-			"żół",
-			"a-b",
-			"anna@example.test",
+			"Nowak",
+			"abc123",
+			"testowa@",
+			"@example.test",
+			"anna@example",
+			"anna @example.test",
+			"anna@example.test, jan@example.test",
 		]) {
-			expect(searchQueryProblem(query), query).toBeNull();
-			expect(isSearchable(query), query).toBe(true);
-		}
-		for (const query of ["a nowak", "anna k", "ab, c", "anna;b"]) {
-			expect(searchQueryProblem(query), query).toBe(
-				"Wpisz słowa po co najmniej 2 znaki",
-			);
 			expect(isSearchable(query), query).toBe(false);
+			expect(parseUserQuery(query), query).toBeNull();
 		}
-		for (const query of ["an no", "ab cd ef", "ab,cd"]) {
-			expect(searchQueryProblem(query), query).toBe(
-				"Wpisz przynajmniej jedno słowo o co najmniej 3 znakach",
-			);
-			expect(isSearchable(query), query).toBe(false);
-		}
-		// A letter with its accents is one character, as the backend counts it.
-		expect(isSearchable("a\u0328\u0308 nowak")).toBe(false);
+		expect(searchQueryProblem("")).toBe(
+			"Wpisz adres e-mail albo identyfikator użytkownika",
+		);
+		expect(searchQueryProblem("Michał")).toContain("nie po imieniu");
+		expect(searchQueryProblem("anna@example")).toBe(
+			"Wpisz cały adres e-mail, np. jan.kowalski@example.com",
+		);
 	});
 
 	it("never asks for more rows than the backend lets the panel have", () => {
 		expect(USER_SEARCH_LIMIT).toBe(20);
-		expect(USER_TERM_MIN).toBe(2);
 	});
 
-	it("matches the e-mail, the name or the id", () => {
-		expect(userMatches(person, "anna.testowa@")).toBe(true);
-		expect(userMatches(person, "TESTOWA")).toBe(true);
-		expect(userMatches(person, "abc123")).toBe(true);
-		expect(userMatches(person, "testowa anna")).toBe(true);
-		expect(userMatches(person, "maria")).toBe(false);
-	});
-
-	it("copes with an account that has no name or address", () => {
-		const bare = { uid: "test-xyz", email: null, displayName: null };
-		expect(userMatches(bare, "xyz")).toBe(true);
-		expect(userMatches(bare, "null")).toBe(false);
+	it("matches the one account with that address or id", () => {
+		const byEmail = parseUserQuery(" Anna.Testowa@Example.test ");
+		const byUid = parseUserQuery("test-abc123defghijklmnopq");
+		if (!byEmail || !byUid) throw new Error("test: queries not parsed");
+		expect(userMatches(person, byEmail)).toBe(true);
+		expect(
+			userMatches({ ...person, uid: "test-abc123defghijklmnopq" }, byUid),
+		).toBe(true);
+		expect(userMatches(person, byUid)).toBe(false);
+		expect(
+			userMatches(
+				{ ...person, email: "anna.testowa@example.test.pl" },
+				byEmail,
+			),
+		).toBe(false);
+		// an account with no address is found by its id only
+		expect(userMatches({ ...person, email: null }, byEmail)).toBe(false);
 	});
 });
 

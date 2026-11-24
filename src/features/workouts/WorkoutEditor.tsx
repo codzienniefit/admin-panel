@@ -155,6 +155,7 @@ export function WorkoutEditor({
 				missingTitle="Nie ma takiego treningu"
 				missingText={`Trening ${workoutId} nie istnieje albo został usunięty na stałe.`}
 				onClose={onClose}
+				size="full"
 			/>
 		);
 	}
@@ -344,7 +345,7 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 					? `${workout.id} · zmieniono ${formatDateTime(workout.updatedAtUtc)}`
 					: "Zapisz jako szkic i dokończ później albo opublikuj od razu."
 			}
-			size="lg"
+			size="full"
 			footer={
 				isDeleted ? (
 					<>

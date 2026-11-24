@@ -376,11 +376,37 @@ export const DEFAULT_TITLE_MAX = 20;
  * paragraph of up to `titleMax` characters that does not end a sentence
  * becomes a Title; everything else is Text, with single line breaks and the
  * <b> and <a> tags kept.
+ *
+ * A paragraph whose first line is such a title and whose next lines are
+ * longer text ("Dla kogo" and a sentence under it, with no blank line
+ * between) becomes a Title and a Text. A paragraph of short lines only (a
+ * list: "Hantle", "Mata", "Roller") stays one Text.
  */
 export function textToBlocks(
 	text: string,
 	titleMax = DEFAULT_TITLE_MAX,
 ): ContentBlock[] {
+	const max = Math.max(1, titleMax);
+	const plainOf = (line: string) => line.replace(/<[^>]+>/g, "");
+	const titleLike = (plain: string) =>
+		plain.length > 0 && plain.length <= max && !/[.!?…]$/.test(plain);
+	// what may stand under a heading: more than a heading-sized line
+	const headedBy = (line: string) => {
+		const plain = plainOf(line);
+		// "Potrzebujesz:" or "Hantle," leads into what follows
+		return titleLike(plain) && !/[:,;]$/.test(plain);
+	};
+	const toTitle = (line: string): ContentBlock => ({
+		type: "Title",
+		content: plainOf(line),
+		metadata: null,
+	});
+	const toText = (content: string): ContentBlock => ({
+		type: "Text",
+		content,
+		metadata: null,
+	});
+
 	return text
 		.replace(/\r\n?/g, "\n")
 		.split(/\n[ \t]*\n+/)
@@ -392,15 +418,16 @@ export function textToBlocks(
 				.trim(),
 		)
 		.filter(Boolean)
-		.map((paragraph) => {
-			const plain = paragraph.replace(/<[^>]+>/g, "");
-			const isTitle =
-				!plain.includes("\n") &&
-				plain.length <= Math.max(1, titleMax) &&
-				!/[.!?…]$/.test(plain);
-			return isTitle
-				? { type: "Title", content: plain, metadata: null }
-				: { type: "Text", content: paragraph, metadata: null };
+		.flatMap((paragraph): ContentBlock[] => {
+			const [first = "", ...rest] = paragraph.split("\n");
+			if (rest.length === 0) {
+				return titleLike(plainOf(first)) ? [toTitle(first)] : [toText(first)];
+			}
+			const body = rest.join("\n").trim();
+			const bodyIsText = rest.some((line) => !titleLike(plainOf(line)));
+			return headedBy(first) && body !== "" && bodyIsText
+				? [toTitle(first), toText(body)]
+				: [toText(paragraph)];
 		});
 }
 

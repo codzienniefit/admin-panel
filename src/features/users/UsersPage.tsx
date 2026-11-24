@@ -3,11 +3,7 @@ import { errorMessage } from "@/data/api/errors";
 import type { UserSummary } from "@/data/schemas/user";
 import { formatDate } from "@/domain/dates";
 import { plural } from "@/domain/text";
-import {
-	isSearchable,
-	searchQueryProblem,
-	USER_QUERY_MIN,
-} from "@/domain/userRules";
+import { isSearchable, searchQueryProblem } from "@/domain/userRules";
 import { Button } from "@/ui/Button";
 import { EmptyState } from "@/ui/EmptyState";
 import { TextField } from "@/ui/Field";
@@ -26,8 +22,8 @@ interface UsersPageProps {
 }
 
 /**
- * Looking a person up. There is no list of everyone: the panel shows only
- * what a search of at least three characters returns.
+ * Looking a person up. There is no list of everyone, and no search by name:
+ * one person, by their whole e-mail address or their id.
  */
 export function UsersPage({ query, onSearch, onOpen }: UsersPageProps) {
 	return (
@@ -71,8 +67,8 @@ function SearchForm({
 				<TextField
 					label="Kogo szukasz?"
 					type="search"
-					placeholder="Adres e-mail, imię i nazwisko albo identyfikator"
-					hint={`Co najmniej ${USER_QUERY_MIN} znaki. Wyszukiwanie zaczyna się po kliknięciu „Szukaj”.`}
+					placeholder="Cały adres e-mail albo identyfikator użytkownika"
+					hint="Np. jan.kowalski@example.com albo identyfikator z 28 liter i cyfr. Po imieniu i nazwisku nie szukamy: to za wolne i zawodne."
 					error={form.formState.errors.q?.message}
 					autoComplete="off"
 					spellCheck={false}
@@ -112,8 +108,8 @@ function SearchResults({
 	}
 	if (!isSearchable(query)) {
 		return (
-			<EmptyState title="Za krótkie zapytanie">
-				{searchQueryProblem(query)}, żeby wyszukać.
+			<EmptyState title="Tego nie wyszukamy">
+				{searchQueryProblem(query)}.
 			</EmptyState>
 		);
 	}

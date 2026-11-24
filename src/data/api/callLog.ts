@@ -1,4 +1,5 @@
 import { createStore, type Store } from "@/lib/store";
+import { runInCall } from "./callContext";
 import { type ApiErrorKind, isApiError } from "./errors";
 
 // The developer's register of every call the panel makes to the backend:
@@ -169,10 +170,11 @@ export function withCallLog<T extends object>(
 		(name: string, area: object, method: (...args: unknown[]) => unknown) =>
 		(...args: unknown[]) => {
 			const started = now();
-			const answer = method.apply(area, args);
+			// numbered first, so the requests it starts carry the number
+			const id = nextId++;
+			const answer = runInCall(id, () => method.apply(area, args));
 			if (!(answer instanceof Promise)) return answer;
 
-			const id = nextId++;
 			log.set((current) => ({
 				...current,
 				entries: [

@@ -6,8 +6,10 @@ import {
 	BODY_LIMIT,
 	type Exchange,
 	exchangesDuring,
+	exchangesOf,
 	keptBody,
 	recordExchange,
+	shownUrl,
 } from "./exchangeLog";
 import {
 	buildIssueReport,
@@ -60,6 +62,7 @@ function call(patch: Partial<CallEntry>): CallEntry {
 function exchange(patch: Partial<Exchange>): Exchange {
 	return {
 		id: 1,
+		callId: null,
 		startedAt: T0 + 5,
 		durationMs: 420,
 		request: {
@@ -161,6 +164,32 @@ describe("the exchange log", () => {
 			exchange({ id: 1, startedAt: T0 - 1 }),
 		];
 		expect(exchangesDuring(all, T0, T0 + 438).map((e) => e.id)).toEqual([2]);
+	});
+
+	it("gives a call its own exchanges, and never another call's", () => {
+		const all = [
+			// sent in this call's name, even after it ended by the clock
+			exchange({ id: 1, callId: 1, startedAt: T0 + 900 }),
+			// another call's, though it started while this one ran
+			exchange({ id: 2, callId: 2, startedAt: T0 + 10 }),
+			// no one's name, while this call ran: a later request of its own
+			exchange({ id: 3, callId: null, startedAt: T0 + 300 }),
+			// no one's name, after this call ended
+			exchange({ id: 4, callId: null, startedAt: T0 + 600 }),
+		];
+		expect(
+			exchangesOf(all, { id: 1, at: T0 }, T0 + 438).map((e) => e.id),
+		).toEqual([3, 1]);
+	});
+
+	it("shows an address without the origin and with the query readable", () => {
+		expect(shownUrl("/api/files?path=workouts%2Fa%20b.webp")).toBe(
+			"/api/files?path=workouts/a b.webp",
+		);
+		expect(shownUrl("https://panel.example/api/panel/manageWorkouts/W89")).toBe(
+			"/api/panel/manageWorkouts/W89",
+		);
+		expect(shownUrl("/api/x?q=100%")).toBe("/api/x?q=100%");
 	});
 });
 

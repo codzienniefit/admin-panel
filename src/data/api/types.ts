@@ -103,9 +103,9 @@ export interface ApiClient {
 	};
 	users: {
 		/**
-		 * Accounts whose e-mail, name or id contains the query. Never the whole
-		 * user base: nothing for a query shorter than USER_QUERY_MIN characters,
-		 * and at most USER_SEARCH_LIMIT rows (domain/userRules).
+		 * The account with this whole e-mail address or this id. Nothing for
+		 * any other query, names included (domain/userRules, parseUserQuery),
+		 * and never more than USER_SEARCH_LIMIT rows.
 		 */
 		search(query: string): Promise<UserSearchResult>;
 		get(uid: string): Promise<UserAccount>;

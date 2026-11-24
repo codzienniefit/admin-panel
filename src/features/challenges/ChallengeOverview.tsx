@@ -6,8 +6,8 @@ import { formatDateTime } from "@/domain/dates";
 import { availablePlanTypes, PREP_LABELS } from "@/domain/planningRules";
 import { plural } from "@/domain/text";
 import { trainingTypeIdsOf } from "@/features/config/useConfig";
+import { AppScreen } from "@/features/content/AppScreen";
 import { ContentPreview } from "@/features/content/ContentPreview";
-import { PhoneFrame } from "@/features/content/PhoneFrame";
 import { MediaImage } from "@/features/media/MediaImage";
 import { applyPlanningChange } from "@/features/planner/planningActions";
 import { usePlanning } from "@/features/planner/usePlanning";
@@ -262,12 +262,12 @@ export function ChallengeOverview({ challenge }: { challenge: Challenge }) {
 				</Card>
 				<Card>
 					<h2 className="mb-3 text-sm font-semibold">Opis w aplikacji</h2>
-					<PhoneFrame screenClassName="h-80">
+					<AppScreen screenClassName="h-80">
 						<ContentPreview
 							blocks={challenge.descriptionFancyContent}
 							compact
 						/>
-					</PhoneFrame>
+					</AppScreen>
 				</Card>
 			</aside>
 

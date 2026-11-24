@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { currentEnvironment } from "@/data/environment";
+import { currentCall } from "./callContext";
 import { withCallLog } from "./callLog";
 import { capabilitiesFor } from "./capabilities";
 import { recordExchange } from "./exchangeLog";
@@ -34,7 +35,8 @@ function createApi(): ApiClient {
 			baseUrl: API_BASE,
 			getToken: (options) => auth.getToken(options),
 			onUnauthorized: sessionEnded,
-			record: (request) => recordExchange(request),
+			record: (request, { callId }) => recordExchange(request, { callId }),
+			currentCall,
 		}),
 	});
 }

@@ -160,7 +160,9 @@ describe("Produkcja today: everything can be read", () => {
 		expect((await client.media.list()).map((item) => item.path)).toEqual([
 			"workouts/a.webp",
 		]);
-		expect((await client.users.search("anna")).totalMatches).toBe(1);
+		expect((await client.users.search("anna@example.com")).totalMatches).toBe(
+			1,
+		);
 		expect((await client.users.get(UID)).uid).toBe(UID);
 		expect(await client.users.badges(UID)).toEqual([]);
 		expect(await client.users.progress(UID)).toEqual({

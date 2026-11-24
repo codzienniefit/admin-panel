@@ -108,7 +108,25 @@ Order: 4.1, 4.2, 4.3, 4.4, 4.5. What they blocked: **Security → Events**.
 
 ## 5. Rate limiting (Security → WAF → Rate limiting rules)
 
-The Free plan allows one rule. Put it on sign-in, the part worth guessing at:
+**The zone already has one rule for the app's API**, and it must not count the panel. It was
+`http.request.uri wildcard "*/api/*"`: every host of the zone, the panel's own `/api/...`
+included, 200 requests per 10 seconds per IP, then blocked for an hour. A media page full of
+thumbnails tripped it and locked the panel out (2026-11-24). It is now limited to the API host
+and leaves out the panel's routes there, which only the Worker can call (each call is signed and
+the backend refuses the rest at once):
+
+```
+(http.host eq "api.codzienniefitapp.com"
+ and starts_with(http.request.uri.path, "/api/")
+ and not starts_with(http.request.uri.path, "/api/panel/"))
+```
+
+The Worker also asks the backend for a file only once per instance, then fetches files straight
+from the storage address it was given (`worker/proxy.ts`, `Deps.fileBase`), so pictures do not
+count against this rule either.
+
+For the panel's own sign-in, a second rule if the plan allows one more (the guessing worth
+stopping is there):
 
 - If incoming requests match:
 

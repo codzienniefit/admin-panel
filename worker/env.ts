@@ -174,9 +174,30 @@ export interface Deps {
 	now(): number;
 	randomBytes(length: number): Uint8Array;
 	log(entry: LogEntry): void;
+	/**
+	 * Where the public files are stored, as the backend's redirect showed it
+	 * (proxy.ts): files are then fetched from there directly, without asking
+	 * the backend for each one. Kept for the life of the Worker instance.
+	 */
+	fileBase?: {
+		get(): string | null;
+		set(base: string): void;
+		forget(): void;
+	};
 }
 
+let learnedFileBase: string | null = null;
+
 export const realDeps: Deps = {
+	fileBase: {
+		get: () => learnedFileBase,
+		set: (base) => {
+			learnedFileBase = base;
+		},
+		forget: () => {
+			learnedFileBase = null;
+		},
+	},
 	fetch: (input, init) => fetch(input, init),
 	now: () => Date.now(),
 	randomBytes: (length) => crypto.getRandomValues(new Uint8Array(length)),

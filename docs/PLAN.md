@@ -360,11 +360,15 @@ challenge) and the **planning document** (notes, tints, scratchpad, plan types).
 | ---------------- | ------------------------- | ----------------------------------------------------- |
 | Opublikuj        | draft, hidden → published | full validation; no draft or deleted workouts inside  |
 | Ukryj            | published → hidden        |                                                       |
-| Cofnij do szkicu | hidden → draft            |                                                       |
 | Usuń             | any → deleted             | confirm; for a workout, lists the challenges using it |
-| Przywróć         | deleted → draft           |                                                       |
+| Przywróć         | deleted → draft or hidden | a draft if the app never showed it, hidden if it did  |
 
 A draft can be saved incomplete; problems are listed as "do uzupełnienia przed publikacją".
+
+**A draft means "not published yet"** (2026-11-24). Something the app has shown (published or
+hidden, now or before: the backend's `wasPublic`) is never a draft again; it can be hidden. The
+old "Cofnij do szkicu" is gone, and a deleted item that was once live comes back hidden
+(`domain/statusRules.ts`, the same rule as the backend's `contentStatus.ts`).
 
 **Conflicts.** Every entity carries the server's etag. A save with a stale etag returns 409 with the
 current version. The panel then takes the server's version and re-applies only the fields this user

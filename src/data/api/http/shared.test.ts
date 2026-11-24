@@ -1047,6 +1047,7 @@ describe("READ_ONLY_FIELDS", () => {
 			"deletedAtUtc",
 			"deletedBy",
 			"warnings",
+			"wasPublic",
 		]);
 	});
 });

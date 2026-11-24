@@ -86,6 +86,8 @@ export const READ_ONLY_FIELDS = [
 	"warnings",
 	"deletedAtUtc",
 	"deletedBy",
+	// a backend that does not send it would refuse it
+	"wasPublic",
 ] as const;
 
 /**

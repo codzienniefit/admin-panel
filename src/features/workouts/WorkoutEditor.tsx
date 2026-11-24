@@ -17,6 +17,7 @@ import {
 	type Workout,
 } from "@/data/schemas/workout";
 import { formatDateTime } from "@/domain/dates";
+import { restoredAs, restoreStatusFor } from "@/domain/statusRules";
 import { challengesUsing } from "@/domain/workoutFilters";
 import {
 	DURATION_MAX,
@@ -271,7 +272,10 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 		}
 		if (applied.value.changed) {
 			toast({
-				title: "Trening zapisany",
+				title:
+					workout?.status === "deleted"
+						? restoredAs(workout, "workout")
+						: "Trening zapisany",
 				description: applied.value.merged
 					? "Połączono ze zmianami innej osoby."
 					: undefined,
@@ -313,15 +317,11 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 			: { before: undefined, after: { ...base, ...values } };
 	});
 
+	// a workout the app has shown comes back hidden, never as a draft
+	const restoreTarget = workout ? restoreStatusFor(workout) : "draft";
 	const more: MenuAction[] = [json.action];
 	if (status === "published") {
 		more.push({ label: "Ukryj", onSelect: () => void save("hidden") });
-	}
-	if (status === "hidden") {
-		more.push({
-			label: "Cofnij do szkicu",
-			onSelect: () => void save("draft"),
-		});
 	}
 	if (workout && !isDeleted) {
 		more.push({
@@ -355,9 +355,11 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 							size="md"
 							variant="primary"
 							disabled={busy}
-							onClick={() => void save("draft")}
+							onClick={() => void save(restoreTarget)}
 						>
-							Przywróć jako szkic
+							{restoreTarget === "hidden"
+								? "Przywróć jako ukryty"
+								: "Przywróć jako szkic"}
 						</Button>
 					</>
 				) : (
@@ -443,8 +445,10 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 				<IssuesNotice title="Nie można zapisać" issues={problems} />
 				{isDeleted && (
 					<Notice tone="grey" title="Ten trening jest w koszu">
-						Nie widać go w aplikacji i nie można go edytować. Przywrócenie
-						zamienia go w szkic.
+						Nie widać go w aplikacji i nie można go edytować.{" "}
+						{restoreTarget === "hidden"
+							? "Był już opublikowany, więc wraca jako ukryty: osoby, które go miały, nadal go widzą, nowe go nie znajdą. Opublikujesz go ponownie, kiedy będzie gotowy."
+							: "Nigdy nie był opublikowany, więc wraca jako szkic."}
 					</Notice>
 				)}
 

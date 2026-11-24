@@ -76,10 +76,13 @@ export function WorkoutsPage({
 						imageClassName="bg-hover object-cover"
 					/>
 					<span className="min-w-0">
-						<span className="block truncate">
+						<span className="block truncate" title={workout.title}>
 							{workout.title || "Bez nazwy"}
 						</span>
-						<span className="block truncate text-xs font-normal text-muted">
+						<span
+							className="block truncate text-xs font-normal text-muted"
+							title={workout.internalTitle ?? undefined}
+						>
 							{workout.id}
 							{workout.internalTitle ? ` · ${workout.internalTitle}` : ""}
 						</span>

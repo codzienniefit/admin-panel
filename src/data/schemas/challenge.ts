@@ -41,6 +41,12 @@ export const challengeSchema = z.looseObject({
 	/** Comment for the team; not shown in the app. */
 	internalTitle: optionalText,
 	status: contentStatusSchema,
+	/**
+	 * Read only, from the backend: the app has shown it (published or hidden,
+	 * now or before). Never a draft again; restored from the bin as hidden.
+	 * Absent on a backend that does not send it. Never sent back.
+	 */
+	wasPublic: z.boolean().optional().catch(undefined),
 	pro: z.boolean().default(false),
 	lengthDays: z.number().int().min(1),
 	/** How many days ahead a participant can see. */

@@ -372,12 +372,21 @@ describe("failureFrom", () => {
 			expect(failure.issues).toEqual([{ path: "", message: said }]);
 		});
 
-		it("is the backend being busy when nothing says why", () => {
+		it("is a rate limit on the way when nothing says why", () => {
 			const failure = failureFrom(429, undefined);
 			expect(failure.kind).toBe("server");
 			expect(failure.message).toBe(
-				"Backend jest chwilowo niedostępny. Spróbuj za chwilę. (Szczegóły: HTTP 429, odpowiedź bez treści)",
+				"Za dużo zapytań w krótkim czasie: Cloudflare albo backend chwilowo je blokuje. Poczekaj minutę i odśwież stronę. (Szczegóły: HTTP 429, odpowiedź bez treści)",
 			);
+		});
+
+		it("explains Cloudflare's English 429 in Polish and keeps its words in the details", () => {
+			const failure = failureFrom(429, {
+				error: "Too many requests, slow down",
+			});
+			expect(failure.kind).toBe("server");
+			expect(failure.message).toMatch(/^Za dużo zapytań w krótkim czasie/);
+			expect(failure.details).toContain("Too many requests, slow down");
 		});
 	});
 

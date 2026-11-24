@@ -124,8 +124,9 @@ Mapping, both ways (`challenges.ts`):
   its id). Saving a challenge as hidden when it was published or hidden needs only a structurally
   sound one, and hiding a published one with the status call needs nothing: taking something
   down does not wait for old content to meet newer rules. The panel checks nothing of this
-  before it asks. A deleted challenge can only be restored, and comes
-  back as a draft.
+  before it asks. A deleted challenge can only be restored: as a draft if the app never
+  showed it, as hidden if it did (`wasPublic`). Nothing published or hidden goes back to a
+  draft (422 `ONCE_PUBLISHED`).
 - **The promoted challenge stays published.** Hiding it, moving it back to a draft or deleting
   it is refused by every route, the status call included (422 `PROMOTED` at `status`), with the
   backend's message naming the way out: promote another challenge, or none, first.

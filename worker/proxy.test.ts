@@ -28,6 +28,7 @@ import {
 	navigation,
 	ORIGIN,
 	PASS_COOKIE,
+	rememberingFileBase,
 	SESSION_COOKIE,
 	SESSION_S,
 	SIGNING_SECRET,
@@ -2045,6 +2046,48 @@ describe("GET /api/files", () => {
 				"if-range": '"0x8DFAKE"',
 			});
 		}
+	});
+
+	it("asks the backend once, then fetches files straight from the storage it named", async () => {
+		const { world, cookies } = await withAdmin();
+		world.deps.fileBase = rememberingFileBase();
+		world.media.put("audio/marszobieg 25 (1).m4a", "audio/mp4");
+		const first = await file(world, cookies);
+		expect(await first.text()).toBe("bytes of covers/spring.png");
+		const asked = world.calls.length;
+		expect(
+			world.calls.some((call) => call.url.startsWith(`${API}/api/files`)),
+		).toBe(true);
+
+		const second = await file(
+			world,
+			cookies,
+			"/api/files?path=audio%2Fmarszobieg%2025%20(1).m4a",
+		);
+		expect(second.status).toBe(200);
+		const later = world.calls.slice(asked);
+		// one call, to the storage, with the name encoded as the backend writes it
+		expect(later.map((call) => call.url)).toEqual([
+			"https://files.example.test/public/audio/marszobieg%2025%20(1).m4a",
+		]);
+	});
+
+	it("asks the backend again when the storage it named does not have a file", async () => {
+		const { world, cookies } = await withAdmin();
+		world.deps.fileBase = rememberingFileBase();
+		await file(world, cookies);
+		const asked = world.calls.length;
+		const response = await file(
+			world,
+			cookies,
+			"/api/files?path=covers%2Fgone.png",
+		);
+		expect(response.status).toBe(404);
+		expect(world.calls.slice(asked).map((call) => call.url)).toEqual([
+			"https://files.example.test/public/covers/gone.png",
+			`${API}/api/files?path=covers%2Fgone.png`,
+			"https://files.example.test/public/covers/gone.png",
+		]);
 	});
 
 	it("serves what the backend answers itself, when it does not redirect", async () => {

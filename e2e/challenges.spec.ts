@@ -222,3 +222,29 @@ test("a published challenge is hidden only after a confirmation", async ({
 	await expect(toast(page, "Wyzwanie ukryte")).toBeVisible();
 	await expect(page.getByText("Ukryte", { exact: true }).first()).toBeVisible();
 });
+
+test("something once published is never a draft again, and comes back from the bin hidden", async ({
+	page,
+}) => {
+	// C7 is published and not the promoted one.
+	await open(page, "/challenges/C7");
+	await pick(page, "Więcej akcji", "Ukryj");
+	await confirm(page, "Ukryć wyzwanie?", "Ukryj");
+	await expect(toast(page, "Wyzwanie ukryte")).toBeVisible();
+
+	// hidden: no way back to a draft
+	await page.getByRole("button", { name: "Więcej akcji", exact: true }).click();
+	await expect(
+		page.getByRole("menuitem", { name: "Cofnij do szkicu" }),
+	).toHaveCount(0);
+	await page.getByRole("menuitem", { name: /^Usuń/ }).click();
+	await confirm(page, "Usunąć wyzwanie?", "Usuń");
+	await expect(toast(page, "Wyzwanie w koszu")).toBeVisible();
+
+	await expect(
+		page.getByText(/Było już opublikowane, więc wraca jako ukryte/),
+	).toBeVisible();
+	await page.getByRole("button", { name: "Przywróć jako ukryte" }).click();
+	await expect(toast(page, "Wyzwanie przywrócone jako ukryte")).toBeVisible();
+	await expect(page.getByText("Ukryte", { exact: true }).first()).toBeVisible();
+});

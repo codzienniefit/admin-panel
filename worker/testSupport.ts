@@ -1065,3 +1065,21 @@ export async function signedIn(
 	world.forget();
 	return run.cookies;
 }
+
+/**
+ * A memory for where files are stored, as the real Worker keeps one
+ * (Deps.fileBase). Off in a plain test world, so that every file call there
+ * goes through the backend.
+ */
+export function rememberingFileBase(): NonNullable<Deps["fileBase"]> {
+	let base: string | null = null;
+	return {
+		get: () => base,
+		set: (next) => {
+			base = next;
+		},
+		forget: () => {
+			base = null;
+		},
+	};
+}

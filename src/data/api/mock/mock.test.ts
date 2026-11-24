@@ -340,6 +340,34 @@ describe("workouts contract", () => {
 			),
 		).rejects.toMatchObject({ kind: "validation" });
 
+		// It was published once: it comes back hidden, never as a draft.
+		await expect(
+			api.workouts.save(
+				{ ...deleted, status: "draft" },
+				{ etag: deleted.etag },
+			),
+		).rejects.toMatchObject({ kind: "validation" });
+		const restored = await api.workouts.save(
+			{ ...deleted, status: "hidden" },
+			{ etag: deleted.etag },
+		);
+		expect(restored).toMatchObject({ status: "hidden", wasPublic: true });
+	});
+
+	it("restores a workout that was never published as a draft", async () => {
+		const { api } = setup();
+		const created = await api.workouts.create({ ...complete, status: "draft" });
+		expect(created.wasPublic).toBe(false);
+		const deleted = await api.workouts.save(
+			{ ...created, status: "deleted" },
+			{ etag: created.etag },
+		);
+		await expect(
+			api.workouts.save(
+				{ ...deleted, status: "hidden" },
+				{ etag: deleted.etag },
+			),
+		).rejects.toMatchObject({ kind: "validation" });
 		const restored = await api.workouts.save(
 			{ ...deleted, status: "draft" },
 			{ etag: deleted.etag },
@@ -535,10 +563,16 @@ describe("challenges contract", () => {
 		if (!published) throw new Error("no published challenge");
 
 		// A short subtitle as a draft, then published with it unchanged.
-		const draft = await api.challenges.save(
-			{ ...published, status: "draft", subtitle: "Ab" },
-			{ etag: published.etag },
-		);
+		const {
+			id: _publishedId,
+			etag: _publishedEtag,
+			...publishedFields
+		} = published;
+		const draft = await api.challenges.create({
+			...publishedFields,
+			status: "draft",
+			subtitle: "Ab",
+		});
 		const republished = await api.challenges.save(
 			{ ...draft, status: "published" },
 			{ etag: draft.etag },
@@ -601,7 +635,7 @@ describe("challenges contract", () => {
 		expect(hidden.status).toBe("hidden");
 	});
 
-	it("will not send a workout back to draft while a published challenge uses it", async () => {
+	it("never sends something published back to draft: it can be hidden", async () => {
 		const { api } = setup();
 		const used = (await api.workouts.list()).find((w) => w.id === "W10");
 		if (!used) throw new Error("W10 missing");
@@ -612,7 +646,20 @@ describe("challenges contract", () => {
 			kind: "validation",
 			issues: [{ path: "status" }],
 		});
-		expect((error as ApiError).message).toContain("Mocne plecy w 7 dni");
+		expect((error as ApiError).message).toContain(
+			"można go ukryć, ale nie cofnąć do szkicu",
+		);
+
+		const challenge = (await api.challenges.list()).find(
+			(c) => c.status === "published",
+		);
+		if (!challenge) throw new Error("no published challenge");
+		const refused = await api.challenges
+			.save({ ...challenge, status: "draft" }, { etag: challenge.etag })
+			.catch((e: ApiError) => e);
+		expect((refused as ApiError).message).toContain(
+			"można je ukryć, ale nie cofnąć do szkicu",
+		);
 	});
 
 	it("deletes a challenge, then only lets it be restored", async () => {

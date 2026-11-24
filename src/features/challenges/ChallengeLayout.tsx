@@ -13,6 +13,7 @@ import {
 	KIND_LABELS,
 } from "@/domain/challengeRules";
 import { formatDateTime } from "@/domain/dates";
+import { restoredAs, restoreStatusFor } from "@/domain/statusRules";
 import { usePlanning } from "@/features/planner/usePlanning";
 import { settleChange } from "@/features/saving/applyChange";
 import { HeldEditsNotice } from "@/features/saving/HeldEditsNotice";
@@ -197,18 +198,6 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 				}),
 		});
 	}
-	if (status === "hidden") {
-		more.push({
-			label: "Cofnij do szkicu",
-			disabled: !ready,
-			onSelect: () =>
-				void setStatus(
-					"draft",
-					"Wyzwanie jest szkicem",
-					"Nie można cofnąć do szkicu",
-				),
-		});
-	}
 	if (status !== "deleted") {
 		more.push({
 			label: promoted ? "Usuń (jest promowane)" : "Usuń",
@@ -257,13 +246,15 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 								disabled={waiting}
 								onClick={() =>
 									void setStatus(
-										"draft",
-										"Wyzwanie przywrócone jako szkic",
+										restoreStatusFor(challenge),
+										restoredAs(challenge, "challenge"),
 										"Nie można przywrócić",
 									)
 								}
 							>
-								Przywróć jako szkic
+								{restoreStatusFor(challenge) === "hidden"
+									? "Przywróć jako ukryte"
+									: "Przywróć jako szkic"}
 							</Button>
 						) : (
 							(status === "draft" || status === "hidden") && (
@@ -355,8 +346,10 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 			)}
 			{status === "deleted" && (
 				<Notice tone="grey" title="To wyzwanie jest w koszu">
-					Nie widać go w aplikacji i nie można go edytować. Przywrócenie
-					zamienia je w szkic.
+					Nie widać go w aplikacji i nie można go edytować.{" "}
+					{restoreStatusFor(challenge) === "hidden"
+						? "Było już opublikowane, więc wraca jako ukryte: osoby, które je miały, nadal je widzą, nowe go nie znajdą. Opublikujesz je ponownie, kiedy będzie gotowe."
+						: "Nigdy nie było opublikowane, więc wraca jako szkic."}
 				</Notice>
 			)}
 

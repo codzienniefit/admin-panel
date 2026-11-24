@@ -41,6 +41,8 @@ const TEXT = {
 		"Panel nie podał wersji, na której opiera się ta zmiana, więc backend jej nie przyjął. To błąd panelu, nie konflikt: odśwież stronę i spróbuj ponownie.",
 	failed: "Backend napotkał błąd. Spróbuj ponownie za chwilę.",
 	unavailable: "Backend jest chwilowo niedostępny. Spróbuj za chwilę.",
+	tooMany:
+		"Za dużo zapytań w krótkim czasie: Cloudflare albo backend chwilowo je blokuje. Poczekaj minutę i odśwież stronę.",
 	network: "Brak połączenia z backendem. Sprawdź internet i spróbuj ponownie.",
 	timeout: "Backend nie odpowiedział na czas. Spróbuj ponownie.",
 	unexpected: "Backend odpowiedział w nieoczekiwany sposób.",
@@ -225,9 +227,16 @@ export function failureFrom(
 	// shown, not merged like a conflict and not tried again.
 	if (status === 428)
 		return refusal(status, said ?? own(TEXT.noVersion), [], details);
-	// "Too soon": something the person can wait out, when the backend says so.
-	if (status === 429 && said) return refusal(status, said, [], details);
-	if (status === 429 || status === 502 || status === 503 || status === 504) {
+	// "Too soon": something the person can wait out, when the backend says so
+	// in its own words (with its own code). Any other 429 is a rate limit on
+	// the way (Cloudflare), whose text is not written for the person.
+	if (status === 429 && said && errorCode) {
+		return refusal(status, said, [], details);
+	}
+	if (status === 429) {
+		return new ApiError("server", own(TEXT.tooMany), { status, details });
+	}
+	if (status === 502 || status === 503 || status === 504) {
 		return new ApiError("server", said ?? own(TEXT.unavailable), {
 			status,
 			details,

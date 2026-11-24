@@ -272,12 +272,35 @@ async function serveFile(
 		if (value !== null) headers.set(name, value);
 	}
 
-	let upstream: Response;
+	// The stored name, each segment encoded the way the backend writes it
+	// (its MediaService.encodeBlobPath).
+	const encoded = path.split("/").map(encodeURIComponent).join("/");
+	let upstream: Response | null = null;
 	try {
-		upstream = await deps.fetch(
-			`${origin}/api/files?path=${encodeURIComponent(path)}`,
-			{ method: "GET", headers, redirect: "manual" },
-		);
+		// Where files are stored is known from an earlier redirect: straight
+		// there, one call instead of two, and none counted against the API's
+		// rate limit. A file the storage does not have there is asked of the
+		// backend after all, in case the storage moved.
+		const known = deps.fileBase?.get() ?? null;
+		if (known && mediaOrigins(env).has(new URL(known).origin)) {
+			const direct = await deps.fetch(`${known}/${encoded}`, {
+				method: "GET",
+				headers,
+				redirect: "manual",
+			});
+			if (direct.ok || direct.status === 304) upstream = direct;
+			else deps.fileBase?.forget();
+		}
+	} catch {
+		deps.fileBase?.forget();
+	}
+	try {
+		if (upstream === null) {
+			upstream = await deps.fetch(
+				`${origin}/api/files?path=${encodeURIComponent(path)}`,
+				{ method: "GET", headers, redirect: "manual" },
+			);
+		}
 		// The backend answers with a redirect to where the file is stored.
 		// It is followed once, and only to a storage address that is set.
 		if (upstream.status >= 300 && upstream.status < 400) {
@@ -290,6 +313,11 @@ async function serveFile(
 			}
 			if (!target || !mediaOrigins(env).has(target.origin)) {
 				return refuse(502, TEXT.unreachable, "FILE_REDIRECT_REFUSED");
+			}
+			// remembered for the next files: everything before the name
+			const href = target.toString();
+			if (href.endsWith(`/${encoded}`)) {
+				deps.fileBase?.set(href.slice(0, -(encoded.length + 1)));
 			}
 			upstream = await deps.fetch(target.toString(), {
 				method: "GET",

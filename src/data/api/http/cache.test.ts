@@ -78,7 +78,7 @@ describe("cache.purge", () => {
 	);
 
 	it("has general words for a failure that says nothing, with its status", async () => {
-		for (const status of [502, 503, 429]) {
+		for (const status of [502, 503]) {
 			const backend = fakeBackend().on("POST", PURGE, { status, text: "" });
 			const error = await failure(area(backend).purge());
 			expect(error.kind, String(status)).toBe("server");

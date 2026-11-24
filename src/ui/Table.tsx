@@ -22,6 +22,11 @@ interface TableProps<T> {
 /**
  * A list of records. A real table from tablet width up; on a phone each row
  * becomes a card with the primary column as its title.
+ *
+ * The primary column takes the room the others leave and cuts long text
+ * ("…"); the others are as wide as what they hold. So a long name never
+ * pushes the other columns out of sight, and when even that does not fit,
+ * the table scrolls sideways instead of hiding columns.
  */
 export function Table<T>({
 	columns,
@@ -38,7 +43,7 @@ export function Table<T>({
 
 	return (
 		<>
-			<div className="hidden overflow-hidden rounded-card border border-line bg-surface md:block">
+			<div className="hidden overflow-x-auto rounded-card border border-line bg-surface md:block">
 				<table className="w-full border-collapse text-sm">
 					<thead>
 						<tr className="border-line border-b bg-surface-alt text-left text-xs text-muted">
@@ -46,7 +51,7 @@ export function Table<T>({
 								<th
 									key={column.key}
 									scope="col"
-									className={`px-4 py-2.5 font-semibold ${column.align === "end" ? "text-right" : ""}`}
+									className={`px-4 py-2.5 font-semibold ${column.align === "end" ? "text-right" : "whitespace-nowrap"} ${column === primary ? "w-full" : ""}`}
 								>
 									{column.header}
 								</th>
@@ -76,9 +81,14 @@ export function Table<T>({
 								{columns.map((column) => (
 									<td
 										key={column.key}
-										className={`px-4 py-3 align-middle ${column.align === "end" ? "whitespace-nowrap text-right" : ""} ${column === primary ? "font-semibold" : ""}`}
+										className={`px-4 py-3 align-middle ${column.align === "end" ? "whitespace-nowrap text-right" : ""} ${column === primary ? "w-full max-w-0 font-semibold" : ""}`}
 									>
-										{column.cell(row)}
+										{column === primary ? (
+											// a floor, so on a narrow screen the name is still readable
+											<div className="min-w-56">{column.cell(row)}</div>
+										) : (
+											column.cell(row)
+										)}
 									</td>
 								))}
 							</tr>

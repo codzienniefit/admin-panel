@@ -103,10 +103,13 @@ export function ChallengesPage({
 			primary: true,
 			cell: (challenge) => (
 				<span className="block min-w-0">
-					<span className="block truncate">
+					<span className="block truncate" title={challenge.title}>
 						{challenge.title || "Bez nazwy"}
 					</span>
-					<span className="block truncate text-xs font-normal text-muted">
+					<span
+						className="block truncate text-xs font-normal text-muted"
+						title={challenge.subtitle ?? undefined}
+					>
 						{challenge.id}
 						{challenge.subtitle ? ` · ${challenge.subtitle}` : ""}
 					</span>

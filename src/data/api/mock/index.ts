@@ -5,6 +5,7 @@ import {
 	challengeSchema,
 	newChallengeSchema,
 } from "@/data/schemas/challenge";
+import type { ContentStatus } from "@/data/schemas/common";
 import {
 	internalConfigSchema,
 	workoutConfigSchema,
@@ -21,6 +22,7 @@ import {
 } from "@/data/schemas/workout";
 import { challengeIssues } from "@/domain/challengeRules";
 import { extensionOf } from "@/domain/mediaRules";
+import { statusMoveProblem, wasShown } from "@/domain/statusRules";
 import { slugify } from "@/domain/text";
 import { statusChangeFrom, workoutIssues } from "@/domain/workoutRules";
 import { badgesArea } from "./badges";
@@ -146,6 +148,17 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 		},
 	};
 
+	/** The mark the backend keeps: the app has shown it, now or before. */
+	function shownBefore(
+		stored: { status: ContentStatus; wasPublic?: boolean } | undefined,
+		incoming: { status: ContentStatus },
+	): boolean {
+		return (
+			(stored ? wasShown(stored) : false) ||
+			wasShown({ status: incoming.status })
+		);
+	}
+
 	function workoutProblems(
 		incoming: Workout,
 		stored: Workout | undefined,
@@ -197,16 +210,9 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 				});
 			}
 		}
-		if (incoming.status === "draft" && stored && stored.status !== "draft") {
-			// A challenge that users can see must not point at an unfinished workout.
-			const users = usedBy(["hidden", "published"]);
-			if (users.length) {
-				issues.push({
-					path: "status",
-					message: `Trening jest w opublikowanych wyzwaniach, więc nie może wrócić do szkicu: ${names(users)}`,
-				});
-			}
-		}
+		// As the backend: a draft means "not published yet".
+		const move = statusMoveProblem(stored, incoming.status, "workout");
+		if (move) issues.push({ path: "status", message: move });
 		return issues;
 	}
 
@@ -233,6 +239,9 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 				message: "Usunięte wyzwanie można tylko przywrócić",
 			});
 		}
+		// As the backend: a draft means "not published yet".
+		const move = statusMoveProblem(stored, incoming.status, "challenge");
+		if (move) issues.push({ path: "status", message: move });
 		return issues;
 	}
 
@@ -286,6 +295,7 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 				if (stored) takeConcurrentChange(stored, incoming, challengeChange);
 				checkEtag(stored, options.etag);
 				reject(challengeProblems(incoming, stored));
+				incoming.wasPublic = shownBefore(stored, incoming);
 				return store(challenges, incoming);
 			},
 			async create(challenge) {
@@ -300,6 +310,7 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 					[UNKNOWN_FIELD]: "challenge:new",
 				};
 				reject(challengeProblems(incoming, undefined));
+				incoming.wasPublic = shownBefore(undefined, incoming);
 				return store(challenges, incoming);
 			},
 		},
@@ -321,6 +332,7 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 					[UNKNOWN_FIELD]: "workout:new",
 				};
 				reject(workoutProblems(incoming, undefined));
+				incoming.wasPublic = shownBefore(undefined, incoming);
 				return store(workouts, incoming);
 			},
 			async save(workout, options: SaveOptions) {
@@ -332,6 +344,7 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 				takeConcurrentChange(stored, incoming, workoutChange);
 				checkEtag(stored, options.etag);
 				reject(workoutProblems(incoming, stored));
+				incoming.wasPublic = shownBefore(stored, incoming);
 				return store(workouts, incoming);
 			},
 		},

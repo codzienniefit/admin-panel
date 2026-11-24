@@ -9,7 +9,11 @@ export const segmentedItem =
 interface SegmentedProps<T extends string> {
 	/** Accessible name of the group. */
 	label: string;
-	options: ReadonlyArray<{ value: T; label: ReactNode }>;
+	/**
+	 * `disabled`: why this one cannot be picked now. It stays visible and says
+	 * why on hover, instead of vanishing.
+	 */
+	options: ReadonlyArray<{ value: T; label: ReactNode; disabled?: string }>;
 	value: T;
 	onChange: (value: T) => void;
 	/** Buttons share the width evenly; for a bar that spans its container. */
@@ -38,8 +42,12 @@ export function Segmented<T extends string>({
 					key={option.value}
 					type="button"
 					aria-pressed={option.value === value}
-					onClick={() => onChange(option.value)}
-					className={`${segmentedItem} ${stretch ? "flex-1" : ""}`}
+					aria-disabled={option.disabled ? true : undefined}
+					title={option.disabled}
+					onClick={() => {
+						if (!option.disabled) onChange(option.value);
+					}}
+					className={`${segmentedItem} ${stretch ? "flex-1" : ""} aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:text-subtle`}
 				>
 					{option.label}
 				</button>

@@ -24,6 +24,8 @@ interface ContentPreviewProps {
 	numbered?: boolean;
 	/** A click on a block's number: the editor selects that block. */
 	onPick?: (index: number) => void;
+	/** Blocks the JSON describes wrongly, by position: what is wrong. */
+	problems?: ReadonlyMap<number, string>;
 }
 
 /** The tint reaches a little beyond the block, without moving anything. */
@@ -58,6 +60,7 @@ export function ContentPreview({
 	highlightIndex = null,
 	numbered = false,
 	onPick,
+	problems,
 }: ContentPreviewProps) {
 	const side = compact ? "mx-4" : "mx-[45px]";
 	const root = useRef<HTMLDivElement>(null);
@@ -78,6 +81,17 @@ export function ContentPreview({
 
 	const drawn = blocks.map((block, index) => {
 		const gap = index === highlightIndex ? HIGHLIGHT : "";
+		const problem = problems?.get(index);
+		if (problem !== undefined) {
+			return (
+				<div
+					data-block-index={index}
+					className={`${side} rounded-chip border border-danger border-dashed bg-[#fff5f5] p-2 text-xs text-danger`}
+				>
+					<b className="font-semibold">Błąd w JSON-ie:</b> {problem}
+				</div>
+			);
+		}
 		// The list only changes as a whole; position is a stable key here.
 		const key = `${index}-${block.type}`;
 
@@ -158,7 +172,8 @@ export function ContentPreview({
 				data-block-index={index}
 				className={`${side} ${gap} rounded-chip border border-danger border-dashed p-2 text-xs text-danger`}
 			>
-				Nieznany blok „{block.type}” (aplikacja go pominie)
+				Nieznany rodzaj bloku „{block.type}”. Popraw „type” w JSON-ie (Title,
+				Text albo Image) albo usuń ten blok.
 			</div>
 		);
 	});

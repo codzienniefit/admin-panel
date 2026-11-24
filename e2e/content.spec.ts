@@ -187,6 +187,47 @@ test("JSON typed where the blocks are reaches the preview, and a mistake is show
 	).toHaveValue("");
 });
 
+test("JSON with an incomplete block keeps the JSON on screen and marks the block", async ({
+	page,
+}) => {
+	const { description } = await openWorkout(page);
+	const preview = description.getByRole("region", {
+		name: "Podgląd",
+		exact: true,
+	});
+	const json = await showJson(description);
+	await json.fill(
+		JSON.stringify([
+			{ type: "Title" },
+			{ type: "Text", content: "Ten jest dobry.", metadata: null },
+		]),
+	);
+
+	await expect(description.getByRole("alert")).toContainText(
+		"Blok 1: brakuje pola „content”",
+	);
+	await expect(preview.getByText("Błąd w JSON-ie:")).toBeVisible();
+	await expect(preview.getByText("Ten jest dobry.")).toBeVisible();
+	// the blocks would be out of date: they cannot be opened until it is fixed
+	const toBlocks = contentView(description).getByRole("button", {
+		name: "Bloki",
+		exact: true,
+	});
+	await expect(toBlocks).toHaveAttribute("aria-disabled", "true");
+	await expect(toBlocks).toHaveAttribute("title", /Najpierw popraw JSON/);
+	await toBlocks.dispatchEvent("click");
+	await expect(json).toBeVisible();
+
+	await json.fill(
+		JSON.stringify([{ type: "Title", content: "Naprawione", metadata: null }]),
+	);
+	await expect(toBlocks).not.toHaveAttribute("aria-disabled", "true");
+	await showBlocks(description);
+	await expect(
+		description.getByRole("textbox", { name: "Tytuł, blok 1" }),
+	).toHaveValue("Naprawione");
+});
+
 test("the block being edited is marked in the preview", async ({ page }) => {
 	const { description } = await openWorkout(page);
 	const preview = description.getByRole("region", {

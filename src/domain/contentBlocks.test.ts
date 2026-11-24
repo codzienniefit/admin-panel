@@ -6,6 +6,7 @@ import {
 	contentExcerpt,
 	contentIssues,
 	formattingBlockers,
+	inspectContentJson,
 	linkAddressIn,
 	linkAddressProblem,
 	looksLikeJson,
@@ -561,5 +562,62 @@ describe("formattingBlockers: what the editor's Bold and Link buttons refuse", (
 		});
 		expect(blockers.bold).toMatch(/nową linię/);
 		expect(blockers.link).toMatch(/nową linię/);
+	});
+});
+
+describe("inspectContentJson", () => {
+	it("says which block lacks what, and keeps the good ones in place", () => {
+		const inspected = inspectContentJson(
+			JSON.stringify([
+				{ type: "Title" },
+				{ type: "Text", content: "Dobrze." },
+				{ content: 5 },
+				"tekst",
+			]),
+		);
+		if (inspected.kind !== "blocks") throw new Error("test: expected blocks");
+		expect(inspected.blocks.map((block) => block?.content ?? null)).toEqual([
+			null,
+			"Dobrze.",
+			null,
+			null,
+		]);
+		expect(inspected.problems).toEqual([
+			{
+				index: 0,
+				reason: "brakuje pola „content”",
+				message: "Blok 1: brakuje pola „content”",
+			},
+			{
+				index: 2,
+				reason:
+					"brakuje pola „type”, pole „content” musi być tekstem w cudzysłowie",
+				message:
+					"Blok 3: brakuje pola „type”, pole „content” musi być tekstem w cudzysłowie",
+			},
+			{
+				index: 3,
+				reason: "to nie jest obiekt { … }",
+				message: "Blok 4: to nie jest obiekt { … }",
+			},
+		]);
+	});
+
+	it("points near the line of a syntax mistake", () => {
+		const inspected = inspectContentJson(
+			'[\n  {\n    "type": "Title",\n  }\n]',
+		);
+		expect(inspected.kind).toBe("syntax");
+		if (inspected.kind !== "syntax") return;
+		expect(inspected.problem).toMatch(/^To nie jest poprawny JSON/);
+		expect(inspected.problem).toMatch(/linii \d+/);
+	});
+
+	it("is ok for good blocks and refuses what is not a list", () => {
+		expect(
+			inspectContentJson('[{"type":"Text","content":"a","metadata":null}]')
+				.kind,
+		).toBe("ok");
+		expect(inspectContentJson('{"type":"Text"}').kind).toBe("notList");
 	});
 });

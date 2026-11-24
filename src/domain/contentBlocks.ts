@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { type ContentBlock, contentBlockSchema } from "@/data/schemas/workout";
 
 /**
@@ -299,7 +298,10 @@ function blockProblems(
 	}
 
 	return [
-		["error", `Nieznany rodzaj bloku „${block.type}”; aplikacja go pominie`],
+		[
+			"error",
+			`Nieznany rodzaj bloku „${block.type}”. Popraw „type” w JSON-ie (Title, Text albo Image) albo usuń ten blok`,
+		],
 	];
 }
 
@@ -438,40 +440,114 @@ export type ParsedJson =
 	| { ok: true; blocks: ContentBlock[] }
 	| { ok: false; problem: string };
 
+/** What is wrong with one block of JSON, for the list and the preview. */
+export interface BlockJsonProblem {
+	index: number;
+	/** What is wrong, without the block's number: "brakuje pola „content”". */
+	reason: string;
+	/** With the number, for a list: "Blok 1: brakuje pola „content”". */
+	message: string;
+}
+
+/**
+ * JSON looked at as it is typed: not JSON at all, not a list, a list where
+ * some blocks are not blocks (each with what it lacks, and the good ones kept
+ * in place, null for the others), or all good.
+ */
+export type InspectedJson =
+	| { kind: "ok"; blocks: ContentBlock[] }
+	| { kind: "syntax"; problem: string }
+	| { kind: "notList"; problem: string }
+	| {
+			kind: "blocks";
+			blocks: (ContentBlock | null)[];
+			problems: BlockJsonProblem[];
+	  };
+
+const SYNTAX =
+	"To nie jest poprawny JSON. Sprawdź przecinki, cudzysłowy i nawiasy";
+
+/** Where the browser says the JSON broke, as a line number, when it says. */
+function syntaxProblem(error: unknown, text: string): string {
+	const said = error instanceof Error ? error.message : "";
+	const line = /line (\d+)/.exec(said)?.[1];
+	const position = /position (\d+)/.exec(said)?.[1];
+	const at = line
+		? Number(line)
+		: position
+			? text.slice(0, Number(position)).split("\n").length
+			: null;
+	return at ? `${SYNTAX} (w okolicy linii ${at})` : SYNTAX;
+}
+
+/** Why a value is not a block, in words; null when it is one. */
+function blockReason(raw: unknown): string | null {
+	if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+		return "to nie jest obiekt { … }";
+	}
+	const value = raw as Record<string, unknown>;
+	const reasons: string[] = [];
+	for (const field of ["type", "content"] as const) {
+		if (!(field in value)) reasons.push(`brakuje pola „${field}”`);
+		else if (typeof value[field] !== "string") {
+			reasons.push(`pole „${field}” musi być tekstem w cudzysłowie`);
+		}
+	}
+	if (reasons.length === 0 && !contentBlockSchema.safeParse(raw).success) {
+		reasons.push(
+			"pole „metadata” musi mieć „imageRelativePath” (tekst) i „heightToWidthRatio” (liczbę) albo być null",
+		);
+	}
+	return reasons.length > 0 ? reasons.join(", ") : null;
+}
+
+export function inspectContentJson(text: string): InspectedJson {
+	let raw: unknown;
+	try {
+		raw = JSON.parse(text);
+	} catch (error) {
+		return { kind: "syntax", problem: syntaxProblem(error, text) };
+	}
+	if (!Array.isArray(raw)) {
+		return {
+			kind: "notList",
+			problem: "JSON musi być listą bloków: [ { … }, { … } ]",
+		};
+	}
+	const blocks: (ContentBlock | null)[] = [];
+	const problems: BlockJsonProblem[] = [];
+	raw.forEach((item: unknown, index) => {
+		const reason = blockReason(item);
+		if (reason === null) {
+			blocks.push(contentBlockSchema.parse(item));
+		} else {
+			blocks.push(null);
+			problems.push({
+				index,
+				reason,
+				message: `Blok ${index + 1}: ${reason}`,
+			});
+		}
+	});
+	if (problems.length > 0) return { kind: "blocks", blocks, problems };
+	return { kind: "ok", blocks: blocks as ContentBlock[] };
+}
+
 /**
  * Blocks from their JSON form (what the old panel's editor held). Fields this
  * panel does not know are kept on each block.
  */
 export function parseContentJson(text: string): ParsedJson {
-	let raw: unknown;
-	try {
-		raw = JSON.parse(text);
-	} catch {
-		return {
-			ok: false,
-			problem:
-				"To nie jest poprawny JSON. Sprawdź przecinki, cudzysłowy i nawiasy",
-		};
+	const inspected = inspectContentJson(text);
+	if (inspected.kind === "ok") return { ok: true, blocks: inspected.blocks };
+	if (inspected.kind !== "blocks") {
+		return { ok: false, problem: inspected.problem };
 	}
-	if (!Array.isArray(raw)) {
-		return {
-			ok: false,
-			problem: "JSON musi być listą bloków: [ { … }, { … } ]",
-		};
-	}
-	const parsed = z.array(contentBlockSchema).safeParse(raw);
-	if (!parsed.success) {
-		const first = parsed.error.issues[0];
-		const position =
-			typeof first?.path[0] === "number" ? first.path[0] + 1 : null;
-		return {
-			ok: false,
-			problem: position
-				? `Blok ${position} nie ma wymaganych pól „type” i „content”`
-				: "Każdy blok musi mieć pola „type” i „content”",
-		};
-	}
-	return { ok: true, blocks: parsed.data };
+	const [first, ...more] = inspected.problems;
+	return {
+		ok: false,
+		problem: `${first?.message ?? "Któryś blok jest niepełny"}${more.length > 0 ? ` (i ${more.length} więcej)` : ""}`,
+	};
 }
 
 /** The JSON form of blocks, for copying out. */

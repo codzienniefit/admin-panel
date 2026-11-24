@@ -108,8 +108,10 @@ export function Dialog({
 							// overscroll-contain: reaching the end does not hand the
 							// scroll on to the page underneath
 							// --sticky-top: what sticks inside (the content editor's preview)
-							// sticks to the top of this box, not under the page's top bar
-							<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 [--sticky-top:0px] md:px-6">
+							// sticks to the very top of this box, not under the page's top
+							// bar. Minus the padding: a sticky element stops at the padding's
+							// edge, while what scrolls past it goes up to the top.
+							<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 [--sticky-top:-1rem] md:px-6">
 								{children}
 							</div>
 						)}

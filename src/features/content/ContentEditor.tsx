@@ -7,6 +7,7 @@ import {
 	type ContentIssue,
 	contentIssues,
 	DEFAULT_TITLE_MAX,
+	inspectContentJson,
 	looksLikeJson,
 	newBlock,
 	parseContentJson,
@@ -89,6 +90,13 @@ const CONTENT_VIEWS: Array<{ value: ContentView; label: string }> = [
 	{ value: "json", label: "JSON" },
 ];
 
+/** Why "Bloki" cannot be opened while the JSON has a mistake. */
+const JSON_FIRST =
+	"Najpierw popraw JSON: bloki pokazałyby starszą wersję treści.";
+
+/** Stands in for a block the JSON describes wrongly; never saved. */
+const BROKEN_BLOCK: ContentBlock = { type: "", content: "", metadata: null };
+
 // One height for both, so the two titles sit on the same line whatever is
 // beside them.
 const paneHead =
@@ -115,6 +123,8 @@ export function ContentEditor({
 	// a colleague's change): then the rows start again from it.
 	// The JSON as typed: it can be invalid for a while, the blocks never are.
 	const [jsonText, setJsonText] = useState("");
+	// Typed into since it was last written from the blocks.
+	const [jsonEdited, setJsonEdited] = useState(false);
 	const [inStep, setInStep] = useState(value);
 	if (value !== inStep) {
 		setInStep(value);
@@ -128,6 +138,7 @@ export function ContentEditor({
 			setRowsState(fresh);
 			setSelectedKey(fresh[0]?.key ?? null);
 			setJsonText(formatJson(value));
+			setJsonEdited(false);
 		}
 	}
 	// Read-only content is there to be looked at, so it opens on the preview.
@@ -325,20 +336,36 @@ export function ContentEditor({
 		pane === which ? "" : "hidden @4xl:block";
 
 	// --- the JSON view --------------------------------------------------------
-	const parsedJson = view === "json" ? parseContentJson(jsonText) : null;
-	const jsonProblem = parsedJson && !parsedJson.ok ? parsedJson.problem : null;
-	const jsonBad = jsonProblem !== null || errorCount > 0;
+	const inspected =
+		view === "json" || jsonEdited ? inspectContentJson(jsonText) : null;
+	// JSON with a mistake in it: the blocks are then the last good version,
+	// older than what is typed, so the JSON stays on screen until it is fixed.
+	const jsonBroken = inspected !== null && inspected.kind !== "ok";
+	const jsonMessages =
+		inspected === null || inspected.kind === "ok"
+			? []
+			: inspected.kind === "blocks"
+				? inspected.problems.map((problem) => problem.message)
+				: [inspected.problem];
+	const jsonBad = jsonBroken || errorCount > 0;
+	// Good blocks drawn as they are, the broken ones marked in the preview.
+	const draft = inspected?.kind === "blocks" ? inspected : null;
 
 	const showView = (next: ContentView) => {
-		// Always from the blocks as they are now, never a stale draft.
-		if (next === "json") setJsonText(formatJson(blocks));
+		if (next === "blocks" && jsonBroken) return;
+		// From the blocks as they are now, unless a broken draft waits there.
+		if (next === "json" && !jsonBroken) {
+			setJsonText(formatJson(blocks));
+			setJsonEdited(false);
+		}
 		setView(next);
 	};
 
 	const editJson = (text: string) => {
 		setJsonText(text);
-		const parsed = parseContentJson(text);
-		if (parsed.ok && !deepEqual(parsed.blocks, blocks)) {
+		setJsonEdited(true);
+		const parsed = inspectContentJson(text);
+		if (parsed.kind === "ok" && !deepEqual(parsed.blocks, blocks)) {
 			setRows(toRows(parsed.blocks));
 			setSelectedKey(null);
 		}
@@ -442,7 +469,11 @@ export function ContentEditor({
 						<Segmented
 							label="Widok treści"
 							className="font-normal"
-							options={CONTENT_VIEWS}
+							options={CONTENT_VIEWS.map((option) =>
+								option.value === "blocks" && jsonBroken
+									? { ...option, disabled: JSON_FIRST }
+									: option,
+							)}
 							value={view}
 							onChange={showView}
 						/>
@@ -463,11 +494,23 @@ export function ContentEditor({
 								className={`h-[min(34rem,60vh)] w-full resize-y rounded-cell border bg-surface-alt p-3 font-mono text-xs leading-relaxed text-ink outline-none focus:shadow-focus ${jsonBad ? "border-danger" : "border-line focus:border-primary"}`}
 							/>
 							<div id={jsonCheckId}>
-								{jsonProblem ? (
-									<p role="alert" className="text-sm text-danger">
-										{jsonProblem}. Podgląd i formularz mają ostatnią poprawną
-										wersję.
-									</p>
+								{jsonMessages.length > 0 ? (
+									<div
+										role="alert"
+										className="flex flex-col gap-1 text-sm text-danger"
+									>
+										<ul className="flex flex-col gap-0.5">
+											{jsonMessages.map((message) => (
+												<li key={message}>{message}</li>
+											))}
+										</ul>
+										<p className="text-xs">
+											{draft
+												? "Podgląd pokazuje te bloki na czerwono; formularz ma ostatnią poprawną wersję."
+												: "Podgląd i formularz mają ostatnią poprawną wersję."}{" "}
+											Do bloków wrócisz po poprawieniu JSON-a.
+										</p>
+									</div>
 								) : (
 									validation
 								)}
@@ -479,10 +522,25 @@ export function ContentEditor({
 							</p>
 						</div>
 					)}
+					{view === "blocks" && jsonBroken && (
+						<div
+							role="alert"
+							data-tone="red"
+							className="m-3 flex flex-col items-start gap-2 rounded-control border border-danger bg-(--tone-soft) p-4 text-sm"
+						>
+							<b className="text-danger">
+								JSON ma błędy, więc bloki byłyby nieaktualne.
+							</b>
+							<span>Popraw JSON: bloki odświeżą się same.</span>
+							<Button variant="primary" onClick={() => setView("json")}>
+								Wróć do JSON-a
+							</Button>
+						</div>
+					)}
 					{/* One switch locks every control inside, the browser's own way. */}
 					<fieldset
 						disabled={disabled}
-						hidden={view === "json"}
+						hidden={view === "json" || jsonBroken}
 						className="flex min-w-0 flex-col gap-3 p-3"
 					>
 						{rows.map((row, index) => {
@@ -875,7 +933,7 @@ export function ContentEditor({
 					{/* Beside a long list of blocks the preview stays in view, level
 					    with the top of what scrolls: under the panel's top bar on a
 					    page, at the very top inside a window (Dialog sets
-					    --sticky-top to 0). */}
+					    --sticky-top). */}
 					<div className="@4xl:sticky @4xl:top-[var(--sticky-top,4rem)]">
 						<div className={`flex ${paneHead}`}>Podgląd</div>
 						<div className="flex flex-col gap-2 p-3">
@@ -887,10 +945,26 @@ export function ContentEditor({
 							)}
 							<AppScreen>
 								<ContentPreview
-									blocks={previewingPaste ? incoming : blocks}
+									blocks={
+										previewingPaste
+											? incoming
+											: draft
+												? draft.blocks.map((block) => block ?? BROKEN_BLOCK)
+												: blocks
+									}
+									problems={
+										draft && !previewingPaste
+											? new Map(
+													draft.problems.map((problem) => [
+														problem.index,
+														problem.reason,
+													]),
+												)
+											: undefined
+									}
 									numbered
 									onPick={
-										previewingPaste
+										previewingPaste || jsonBroken
 											? undefined
 											: (index) => {
 													const row = rows[index];

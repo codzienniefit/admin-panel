@@ -4,12 +4,11 @@ Everything needed to put the backend's panel routes and the panel itself into pr
 what is done already. Marks: ✅ done (checked), ⬜ to do, ❓ done by hand, cannot be checked from
 outside (confirm it yourself).
 
-**Where we are (2026-11-23, evening):** the panel is live at `https://panel.codzienniefitapp.com`,
-fully configured, and its code is served only after sign-in. **Sign-in does not work yet because
-the backend's panel routes are not deployed** (`/api/panel/…` answers 404; the PR is not merged).
-Production runs the backend's `main` (`31cc84c`); the backend deploy adds only the panel work.
-
-Both launch **read-only**: in Produkcja only "Wyczyść cache backendu" writes. Retool keeps working.
+**Where we are (2026-11-24):** the backend's panel routes are deployed and the panel is in use at
+`https://panel.codzienniefitapp.com`: sign-in works, every section loads, and its code is served only
+after sign-in. Production is **read-only** in the panel (only "Wyczyść cache backendu" writes);
+Retool keeps working. Merged since: default plan recommendations (backend #237) and "a draft means
+not published yet" (#238), each live after its manual deploy (`docs/release.md` in the backend).
 **v1 does not use Cloudflare Access** (Part 10, later).
 
 **Before changing the panel's Worker, read [ACCESS-MODES.md](ACCESS-MODES.md)**: what a signed-out
@@ -18,61 +17,86 @@ from leaking.
 
 You create and paste every secret yourself. None goes in a file, a commit or a chat.
 
+Checked from outside on 2026-11-24: panel routes answer `401` (deployed, secret set); HTTP redirects
+to HTTPS; TLS 1.0 and 1.1 are refused; **no HSTS header, no DNSSEC, no mail records, the panel's
+WAF rules are not on** (plain `curl` gets `200`, scanner paths and `PATCH` reach the Worker).
+
 ---
 
 ## A. Done ✅
 
-1. ✅ Panel admin `6bt7loE8cCgfvRTeir9pdlXSETN2` in the backend's code; three Wrapped testers in
-   code (1.2).
-2. ✅ The panel's code on `admin-panel` `main`; Cloudflare deploys every push (Part 4).
-3. ✅ `wrangler.json`: custom domain, `workers_dev` off, `keep_vars`, logs and traces at 100%, the
-   `ASSETS` binding and `run_worker_first: true` (1.4).
-4. ✅ DNS record and certificate for `panel.codzienniefitapp.com`, made by Cloudflare (5.1).
-5. ✅ `admin-panel.marta-100.workers.dev` switched off (404).
-6. ✅ Google OAuth client with the redirect `https://panel.codzienniefitapp.com/auth/google/callback`
-   (Part 3); sign-in reaches Google and comes back.
-7. ✅ The Worker's eight values set and valid (5.2).
-8. ✅ Search engines and AI crawlers turned away (`robots.txt`, `noindex`/`noai` everywhere); the
-   sign-in page says nothing about what is behind it.
-9. ✅ **The panel's code only after sign-in**: without a pass, every page is the Worker's own
-   sign-in page and every file of the panel answers 404; a deployed Worker with a setting missing
-   stays closed (ACCESS-MODES.md). Live once its push is deployed.
+1. ✅ **Backend deployed** with the panel routes (Part 2), `PANEL_SIGNING_SECRET` set in Azure; the
+   app and Retool work.
+2. ✅ **First sign-in and checks** (5.3): only "Zaloguj się przez Google"; an account not on the list
+   is refused; every section loads; saves refused in Produkcja.
+3. ✅ Panel admins in the backend's code (`src/config/panelAdmins.ts`): Michał, Marek. Michał's second
+   account, Patryk, Marta and Monika are added on the backend branch `feat/user-search-exact-only`
+   and can sign in once it is deployed. Three Wrapped testers in code (1.2).
+4. ✅ The panel's code on `admin-panel` `main`; Cloudflare deploys every push (Part 4).
+5. ✅ `wrangler.json`: custom domain, `workers_dev` off, `keep_vars`, logs and traces at 100%, the
+   `ASSETS` binding and `run_worker_first: true` (1.4). `admin-panel.marta-100.workers.dev` off (404).
+6. ✅ DNS record and certificate for `panel.codzienniefitapp.com`, made by Cloudflare (5.1).
+7. ✅ Google OAuth client with the redirect `https://panel.codzienniefitapp.com/auth/google/callback`
+   (Part 3).
+8. ✅ The Worker's eight values set and valid (5.2).
+9. ✅ **The panel's code only after sign-in**: without a pass, every page is the Worker's own sign-in
+   page and every file of the panel answers 404 (ACCESS-MODES.md). Search engines and AI crawlers
+   turned away by the panel itself (`robots.txt`, `noindex`/`noai`).
 10. ✅ Readable logs: `[ADMIN_ACTION]` and `[SECURITY_ALERT]` in the Worker (Cloudflare Observability)
-    and in the backend (Application Insights, after the backend deploy).
+    and in the backend (Application Insights).
+11. ✅ **API rate limit** reworked so the panel is never locked out (6.3): app traffic limited, the
+    panel's own `/api/panel/` calls not counted.
+12. ✅ Always Use HTTPS; TLS 1.0 and 1.1 refused (6.4, partly).
+13. ✅ User search only by a whole e-mail address or a user id (panel live; backend side on the same
+    branch as item 3): no screen can list people by name.
 
-**Confirm yourself** (cannot be checked from outside) ❓
+## B. Security: the few steps that give most of the protection ⬜
 
-- ❓ `PANEL_SIGNING_SECRET` and `SIGN_IN_COOKIE_KEY` show as type **Secret** in the Worker, and were
-  regenerated after being plain Variables at first (5.2).
-- ❓ Worker build settings: production branch `main`, deploy command `npx wrangler deploy`, no
-  branch builds (1.5).
-- ❓ Your admin account signs in to Firebase **only with Google**, 2-Step Verification on (Part 3).
-- ❓ Two-factor sign-in on Cloudflare, Azure, Google Cloud / Firebase and GitHub; branch protection
-  on `main` in both repositories (6.7).
+The panel already lets nobody in without Google sign-in, an account on the list and the Worker's
+signature, and production is read-only. What is left that matters most is **the accounts and keys
+around it**: whoever takes over one of them gets the panel, or more. In this order:
 
-## B. To do now, in this order ⬜
+1. ❓ **Every panel admin's account** (six after the next backend deploy): in the Firebase console,
+   Google is the account's **only** sign-in method, and the person has **2-Step Verification** on
+   their Google account. One weak admin account is the whole panel. Check each before deploying
+   the list; repeat for anyone added later (Part 8).
+2. ❓ **Two-factor sign-in and few members** on Cloudflare, Azure, Google Cloud / Firebase and
+   GitHub (6.7). Each of these can change the panel, the backend or the secrets directly.
+3. ❓ **`main` protected in both repositories** (6.7): a push to the panel's `main` deploys it to
+   production. Only you can push; no force-push.
+4. ❓ **The two Worker secrets** (`PANEL_SIGNING_SECRET`, `SIGN_IN_COOKIE_KEY`) show as type
+   **Secret** and were **regenerated** after being plain Variables at first (5.2). If either value
+   was ever seen outside Cloudflare and Azure, rotate it (Part 8).
+5. ⬜ **Alert on `[SECURITY_ALERT]`** in Application Insights, e-mail to you (2.6): otherwise a
+   refused stranger, a bad signature or a probe is only a log line nobody reads.
+6. ❓ **Retool's key is not the master key** (BACKEND-SCOPE B0.3): Retool's routes accept the
+   Function App's master key, which unlocks every function and the host itself and never expires.
+   Move Retool to `ADMIN_FUNCTIONS_KEY` with its own value; renew the master key when Retool goes
+   (Part 9).
+7. ✅ Keep it as it is: production read-only; sections opened for writing one at a time, `[TEST]`
+   items first; messages and accounts only after the rate limit and second confirmation (Part 8).
 
-1. ⬜ **Merge** the backend PR "Feat/admin panel backend" (2.1).
-2. ⬜ **Run all backend tests** on `main` (2.2).
-3. ⬜ **Azure**: `PANEL_SIGNING_SECRET` = the same value as in the Worker; go through table 1.1 (2.3).
-4. ⬜ **Deploy the backend** at a quiet hour: build, dry run, deploy, purge Cloudflare (2.4).
-5. ⬜ **Check the backend and Retool** (2.5): panel route `401`, app `200`, Wrapped `401`,
-   recommendations; the mobile app; Retool's lists without saving anything.
-6. ⬜ **First sign-in** and the panel checks (5.3). Everyone signs in once more after the gate's
-   deploy (sessions from before have no pass).
-7. ⬜ **Alert** on `[SECURITY_ALERT]` in Application Insights (2.6).
-8. ⬜ **Cloudflare security**: Block AI bots, five WAF rules, the sign-in rate limit (6.1–6.3).
-9. ⬜ **HSTS and TLS** settings (6.4). No HSTS header yet.
-10. ⬜ **DNSSEC** (6.5). No DS record yet.
-11. ⬜ **E-mail anti-spoofing records** after checking nothing sends mail as the domain (6.6).
+## C. Security: nice to have
 
-## C. Later
+Each helps a little more; none changes who can get in.
 
+- ⬜ **HSTS** (6.4): 6 months, no preload. One switch; the panel already redirects HTTP to HTTPS.
+- ⬜ **WAF custom rules a–e** (6.2): bots, scanner paths, methods, countries, scripts. Before sign-in
+  the panel serves only its sign-in page, so these mostly cut noise in the logs.
+- ❓ **Block AI bots** (6.1): cannot be checked from outside.
+- ❓ **Sign-in rate limit** on `/auth/` (6.3): Google already limits sign-in attempts.
+- ⬜ **DNSSEC** (6.5).
+- ⬜ **E-mail anti-spoofing records** (6.6), after checking nothing sends mail as the domain: stops
+  others sending mail as @codzienniefitapp.com (protects users from phishing more than the panel).
+- ❓ Login notifications on, least-privilege API tokens (6.7).
+- **Cloudflare Access** in front of the panel (Part 10): a second gate with its own one-time code.
+
+## D. Later
+
+- **Deploy the backend branch** `feat/user-search-exact-only` (new admins, user search by address
+  only; `searchAll=true` on the plain admin route for searching names from Postman).
 - **Opening sections for writing**, one at a time, `[TEST]` items first (Part 8).
-- **Before opening messages and accounts**: the rate limit and second confirmation step in the
-  backend (Part 8).
 - **After Retool is retired**: the numbered steps in Part 9.
-- **Cloudflare Access** in front of the panel, if wanted (Part 10).
 
 ---
 
@@ -194,7 +218,7 @@ with logs (including request logs) and traces at 100%, and `assets` with `"bindi
 
 ---
 
-## Part 2. Backend ⬜
+## Part 2. Backend ✅
 
 ### 2.1 Merge
 
@@ -359,7 +383,7 @@ cd /Users/mzolnieruk/github/admin-panel && openssl rand -base64 32 | npx wrangle
 pbcopy < /dev/null
 ```
 
-### 5.3 First sign-in and checks ⬜ (after Part 2)
+### 5.3 First sign-in and checks ✅
 
 0. Before signing in, only the sign-in page, `robots.txt` and the icons can be downloaded
    ([ACCESS-MODES.md](ACCESS-MODES.md)). In a private window, View Source of
@@ -391,12 +415,12 @@ refusing the Worker (then `PANEL_SIGNING_SECRET` differs between Azure and the W
 
 ---
 
-## Part 6. Cloudflare security settings (v1) ⬜
+## Part 6. Cloudflare security settings (v1)
 
 On the zone `codzienniefitapp.com`. **The API shares this zone**: the app cannot pass a challenge,
 so every rule is limited to `panel.codzienniefitapp.com` and nothing zone-wide challenges traffic.
 
-### 6.1 AI crawlers and bots ⬜
+### 6.1 AI crawlers and bots ❓
 
 - Security → Bots → **Block AI bots**: on, all pages (known AI crawlers only; safe for the app).
 - **Bot Fight Mode / Super Bot Fight Mode: leave off** (cannot be limited to one hostname on the Free
@@ -439,7 +463,20 @@ e. Scripts. **Managed Challenge** (it also catches your own `curl` checks; use a
 (http.host eq "panel.codzienniefitapp.com" and (http.user_agent eq "" or http.user_agent contains "curl" or http.user_agent contains "python" or http.user_agent contains "Go-http-client" or http.user_agent contains "wget"))
 ```
 
-### 6.3 Rate limiting (Security → WAF → Rate limiting rules) ⬜
+### 6.3 Rate limiting (Security → WAF → Rate limiting rules)
+
+**API ✅** (the one rule the Free plan allows per zone, so the panel's sign-in rule below cannot be
+added next to it):
+
+```
+(http.host eq "api.codzienniefitapp.com" and starts_with(http.request.uri.path, "/api/") and not starts_with(http.request.uri.path, "/api/panel/"))
+```
+
+200 requests per 10 seconds per IP and data centre, block for 600 seconds, a JSON 429. The panel's
+own calls are signed by its Worker and not counted; its pictures (`/api/files`) still are, and are
+retried by the panel when refused.
+
+**Panel sign-in ❓**
 
 ```
 (http.host eq "panel.codzienniefitapp.com" and starts_with(http.request.uri.path, "/auth/"))
@@ -447,7 +484,7 @@ e. Scripts. **Managed Challenge** (it also catches your own `curl` checks; use a
 
 Characteristics: IP; 20 requests per 10 seconds; **Block**, the longest duration offered.
 
-### 6.4 TLS (SSL/TLS → Edge Certificates) ⬜
+### 6.4 TLS (SSL/TLS → Edge Certificates): HTTPS and TLS 1.2 ✅, HSTS ⬜
 
 Always Use HTTPS on; **HSTS** on (6 months, no preload; include subdomains only if every subdomain
 is https, which `api` and `blobs` are); Minimum TLS 1.2; TLS 1.3 on.
@@ -471,7 +508,7 @@ DNS → Records → Add, each **DNS only**:
 | `TXT` | `_dmarc` | `v=DMARC1; p=reject; adkim=s; aspf=s` |
 | `TXT` | `*._domainkey` | `v=DKIM1; p=` |
 
-### 6.7 Accounts ❓
+### 6.7 Accounts ❓ (section B)
 
 Two-factor sign-in on Cloudflare, Azure, Google Cloud / Firebase, GitHub and the admin's Google
 account; no Cloudflare members you do not need; login notifications on; least-privilege API tokens.

@@ -598,7 +598,7 @@ changes a shape, the mock and the conformance tests change with it.
 | 7   | ~~Stack option A or B~~                                                                                                                                                 | **Decided: B**, gated by the Phase 0 spike                                            |
 | 8   | **Route language**: English paths (`/challenges/C12`) or Polish (`/wyzwania/C12`)                                                                                       | English paths, Polish labels                                                          |
 | 9   | **Sign-in methods and first admins**: e-mail and password, Google, or both; which accounts                                                                              | Whatever the admins' existing Firebase accounts use; list needed for B0.5             |
-| 10  | **Workouts per day**: Retool allows three, the planner any number                                                                                                       | Ask mobile whether the app handles more than three; keep three until confirmed        |
+| 10  | **Workouts per day**: Retool allows three, the planner any number | **Decided 2026-11-24: four** (`MAX_WORKOUTS_PER_DAY`). Check in the app that a day with four shows them all |
 | 11  | **Requirement rule quirk**: "min. N dni między" counts differently inside a week and across a week boundary in Patryk's app                                             | Fix it to count the same way; confirm with Patryk                                     |
 
 ## 10. Risks

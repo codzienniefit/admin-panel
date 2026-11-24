@@ -8,6 +8,7 @@ import { plural } from "@/domain/text";
 import { Button } from "@/ui/Button";
 import { EmptyState } from "@/ui/EmptyState";
 import { ListPage, SearchInput } from "@/ui/ListPage";
+import { refreshing } from "@/ui/RefreshButton";
 import { Select, type SelectOption } from "@/ui/Select";
 import { type Column, Table } from "@/ui/Table";
 import { Tag } from "@/ui/Tag";
@@ -104,6 +105,7 @@ export function OffersPage({
 
 	return (
 		<ListPage
+			onRefresh={refreshing(offersCollection)}
 			title="Oferty specjalne"
 			action={
 				<Button variant="primary" size="md" onClick={onCreate}>

@@ -13,6 +13,7 @@ import { Button } from "@/ui/Button";
 import { Card } from "@/ui/Card";
 import { EmptyState } from "@/ui/EmptyState";
 import { levelMeta } from "@/ui/enums";
+import { JsonView } from "@/ui/JsonView";
 import { Loading, useDelayedLoading } from "@/ui/Loading";
 import { Notice } from "@/ui/Notice";
 import { type Column, Table } from "@/ui/Table";
@@ -65,6 +66,23 @@ export function UserProgressTab({ uid }: { uid: string }) {
 		);
 	}
 
+	// What the backend sent, as it sent it (the tables above are built from
+	// it): for support, when a count looks wrong.
+	const rawJson = (
+		<details className="rounded-control border border-line p-3">
+			<summary className="cursor-pointer text-sm font-semibold">
+				Surowy JSON z backendu
+			</summary>
+			<div className="mt-3">
+				<JsonView
+					value={progress.data.raw ?? progress.data}
+					label="Postępy jako JSON"
+					height="h-96"
+				/>
+			</div>
+		</details>
+	);
+
 	const summary = progressSummary(progress.data);
 	const workoutTitle = new Map((workouts ?? []).map((w) => [w.id, w.title]));
 	const challengeById = new Map((challenges ?? []).map((c) => [c.id, c]));
@@ -73,10 +91,13 @@ export function UserProgressTab({ uid }: { uid: string }) {
 
 	if (summary.workoutsDone === 0 && summary.challengesStarted === 0) {
 		return (
-			<EmptyState title="Jeszcze nic tu nie ma">
-				Ta osoba nie wykonała dotąd żadnego treningu i nie zaczęła żadnego
-				wyzwania. Wykonania pojawią się tu same, gdy zacznie ćwiczyć.
-			</EmptyState>
+			<div className="flex flex-col gap-4">
+				<EmptyState title="Jeszcze nic tu nie ma">
+					Ta osoba nie wykonała dotąd żadnego treningu i nie zaczęła żadnego
+					wyzwania. Wykonania pojawią się tu same, gdy zacznie ćwiczyć.
+				</EmptyState>
+				{rawJson}
+			</div>
 		);
 	}
 
@@ -221,6 +242,8 @@ export function UserProgressTab({ uid }: { uid: string }) {
 					</div>
 				)}
 			</section>
+
+			{rawJson}
 		</div>
 	);
 }

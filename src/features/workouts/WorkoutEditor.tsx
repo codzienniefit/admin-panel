@@ -41,8 +41,13 @@ import {
 	EditorPlaceholder,
 	MoreActions,
 } from "@/ui/EditorParts";
-import { levelMeta, trainingTypeMeta } from "@/ui/enums";
-import { Field, TextField } from "@/ui/Field";
+import {
+	FORMAT_META,
+	levelMeta,
+	RECORDING_STATUS_META,
+	trainingTypeMeta,
+} from "@/ui/enums";
+import { Field, TextAreaField, TextField } from "@/ui/Field";
 import { generalIssue, IssuesNotice, placeIssues } from "@/ui/formIssues";
 import type { MenuAction } from "@/ui/Menu";
 import { MultiSelect } from "@/ui/MultiSelect";
@@ -52,6 +57,7 @@ import { StatusBadge } from "@/ui/StatusBadge";
 import { Switch } from "@/ui/Switch";
 import { attempt, whileBusy } from "@/ui/tasks";
 import { toast } from "@/ui/toast";
+import type { Tone } from "@/ui/tones";
 
 /** The fields the form edits. Everything else on a workout passes through. */
 type FormValues = Pick<
@@ -71,6 +77,9 @@ type FormValues = Pick<
 	| "liveAtUtc"
 	| "availableAtUtc"
 	| "descriptionFancyContent"
+	| "recordingStatus"
+	| "format"
+	| "runningDescription"
 >;
 
 const FIELDS: ReadonlyArray<keyof FormValues> = [
@@ -89,6 +98,9 @@ const FIELDS: ReadonlyArray<keyof FormValues> = [
 	"liveAtUtc",
 	"availableAtUtc",
 	"descriptionFancyContent",
+	"recordingStatus",
+	"format",
+	"runningDescription",
 ];
 
 const FIELD_LABELS: Record<string, string> = {
@@ -107,8 +119,29 @@ const FIELD_LABELS: Record<string, string> = {
 	liveAtUtc: "Data live",
 	availableAtUtc: "Data premiery",
 	descriptionFancyContent: "Opis",
+	recordingStatus: "Status nagrania",
+	format: "Format",
+	runningDescription: "Opis biegania",
 	status: "Status",
 };
+
+/** Longest running description the backend takes (PANEL_MAX there). */
+const RUNNING_DESCRIPTION_MAX = 2000;
+
+/** The options of a choice, plus a stored value this build does not know. */
+function withStored(
+	meta: Record<string, { label: string; tone: Tone }>,
+	stored: string | null | undefined,
+) {
+	const options = Object.entries(meta).map(([value, item]) => ({
+		value,
+		label: item.label,
+		tone: item.tone,
+	}));
+	return stored && !(stored in meta)
+		? [...options, { value: stored, label: stored, tone: "grey" as Tone }]
+		: options;
+}
 
 function pickFields(source: NewWorkout): FormValues {
 	const values = {} as Record<string, unknown>;
@@ -125,6 +158,10 @@ function normalise(values: FormValues): FormValues {
 		internalTitle: blank(values.internalTitle),
 		videoUrl: blank(values.videoUrl),
 		durationMinutes: Number(values.durationMinutes) || 0,
+		// Absent stays absent: a backend without these fields refuses them.
+		...(values.runningDescription === undefined
+			? {}
+			: { runningDescription: blank(values.runningDescription) }),
 	};
 }
 
@@ -189,6 +226,8 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 	const [base] = useState<NewWorkout>(() => workout ?? blankWorkout());
 	const form = useForm<FormValues>({ defaultValues: pickFields(base) });
 	const { control, register, formState } = form;
+	const format = form.watch("format");
+	const runningDescription = form.watch("runningDescription");
 	const [busy, setBusy] = useState(false);
 	const [problems, setProblems] = useState<readonly ApiIssue[]>([]);
 	const leave = useUnsavedGuard(
@@ -571,6 +610,68 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 							</Field>
 						)}
 					/>
+
+					<Controller
+						control={control}
+						name="recordingStatus"
+						render={({ field }) => (
+							<Field
+								label="Status nagrania"
+								hint="Dla zespołu; aplikacja tego nie pokazuje."
+								error={error("recordingStatus")}
+							>
+								{() => (
+									<Select
+										label="Status nagrania"
+										placeholder="Nie ustawiono"
+										options={withStored(RECORDING_STATUS_META, field.value)}
+										value={field.value ?? null}
+										onChange={field.onChange}
+										disabled={isDeleted}
+										clearable
+										className="w-full"
+									/>
+								)}
+							</Field>
+						)}
+					/>
+					<Controller
+						control={control}
+						name="format"
+						render={({ field }) => (
+							<Field
+								label="Format"
+								hint="Premiera, live albo bieganie; dla zespołu."
+								error={error("format")}
+							>
+								{() => (
+									<Select
+										label="Format"
+										placeholder="Nie ustawiono"
+										options={withStored(FORMAT_META, field.value)}
+										value={field.value ?? null}
+										onChange={field.onChange}
+										disabled={isDeleted}
+										clearable
+										className="w-full"
+									/>
+								)}
+							</Field>
+						)}
+					/>
+					{(format === "running" || runningDescription) && (
+						<div className="md:col-span-2">
+							<TextAreaField
+								label="Opis biegania"
+								hint="Dla zespołu: tempo, dystans, jak biec."
+								maxLength={RUNNING_DESCRIPTION_MAX}
+								rows={3}
+								error={error("runningDescription")}
+								disabled={isDeleted}
+								{...register("runningDescription")}
+							/>
+						</div>
+					)}
 
 					<div className="md:col-span-2">
 						<Controller

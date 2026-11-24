@@ -1,11 +1,14 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { Loading, useDelayedLoading } from "./Loading";
 import { Page } from "./Page";
+import type { Refresh } from "./RefreshButton";
 
 interface ListPageProps {
 	title: string;
 	/** The main button, top right: "Nowa wiadomość". */
 	action?: ReactNode;
+	/** Fetches the list again (see RefreshButton). */
+	onRefresh?: Refresh;
 	/** Search box and selects; they wrap onto more lines on a phone. */
 	filters?: ReactNode;
 	/** One line under the filters, e.g. "12 wiadomości". */
@@ -27,6 +30,7 @@ interface ListPageProps {
 export function ListPage({
 	title,
 	action,
+	onRefresh,
 	filters,
 	summary,
 	loading,
@@ -35,7 +39,7 @@ export function ListPage({
 	const showLoading = useDelayedLoading(loading);
 
 	return (
-		<Page title={title} action={action}>
+		<Page title={title} action={action} onRefresh={onRefresh}>
 			{filters && <div className="mb-3 flex flex-wrap gap-2">{filters}</div>}
 			{summary !== undefined && (
 				<p className="mb-3 text-xs text-muted">

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+	closeTo,
+	editDistance,
 	expandQuery,
 	type SearchableWorkout,
 	searchWorkouts,
@@ -330,5 +332,57 @@ describe("searching a full library", () => {
 				.sort((a, b) => a.length - b.length || a.localeCompare(b)),
 		);
 		expect(found.length).toBeGreaterThanOrEqual(cardio.length);
+	});
+});
+
+describe("searchWorkouts: typos and descriptions", () => {
+	const library = [
+		make("T1", "Poranna mobilność bioder"),
+		make("T2", "Rozciąganie pleców"),
+		make("T3", "Siła nóg", {
+			descriptionFancyContent: [
+				{ type: "Title", content: "Dla kogo" },
+				{ type: "Text", content: "Dla osób z <b>kolanami</b> po kontuzji." },
+			],
+		}),
+		make("T4", "Kolana i biodra"),
+		make("T5", "Box"),
+	];
+	const ids = (query: string) =>
+		searchWorkouts(library, { query }).map((workout) => workout.id);
+
+	it("finds a title typed with a slip, after exact matches", () => {
+		expect(ids("mobilnsoc")).toEqual(["T1"]);
+		expect(ids("rozciagnaie plecow")).toEqual(["T2"]);
+		// a word typed only partly, with a slip
+		expect(ids("mobilmo")).toEqual(["T1"]);
+	});
+
+	it("does not guess short words", () => {
+		expect(ids("bix")).toEqual([]);
+	});
+
+	it("matches the description last", () => {
+		// "kolan" is in T4's title and in T3's description
+		expect(ids("kolan")).toEqual(["T4", "T3"]);
+		expect(ids("kontuzji")).toEqual(["T3"]);
+		// the bold tag does not glue the word to its neighbours
+		expect(ids("z kolanami po")).toEqual(["T3"]);
+	});
+});
+
+describe("editDistance and closeTo", () => {
+	it("counts letters added, removed, changed and swapped", () => {
+		expect(editDistance("brzuch", "brzuch", 2)).toBe(0);
+		expect(editDistance("brzuh", "brzuch", 2)).toBe(1);
+		expect(editDistance("brzcuh", "brzuch", 2)).toBe(1);
+		expect(editDistance("abcdef", "uvwxyz", 2)).toBe(3);
+	});
+
+	it("allows more typos in longer words", () => {
+		expect(closeTo("nogi", "nagi")).toBe(true);
+		expect(closeTo("nogi", "naga")).toBe(false);
+		expect(closeTo("rozciaganie", "rozciagnaie")).toBe(true);
+		expect(closeTo("bok", "box")).toBe(false);
 	});
 });

@@ -12,6 +12,8 @@ export interface SearchableWorkout {
 	durationMinutes: number;
 	trainingTypeIds: readonly string[];
 	status: string;
+	/** The description in the app: matched after the title and comment. */
+	descriptionFancyContent?: ReadonlyArray<{ type: string; content: string }>;
 }
 
 export interface WorkoutSearch {
@@ -135,12 +137,90 @@ interface PreparedQuery {
 	synonyms: string[];
 }
 
+// --- typo tolerance -----------------------------------------------------------
+
+/**
+ * How many letters a word may differ by and still count: none for short
+ * words (they would match half the library), one from four letters, two from
+ * eight.
+ */
+export const typosAllowed = (word: string): number =>
+	word.length >= 8 ? 2 : word.length >= 4 ? 1 : 0;
+
+/**
+ * Edits between two words (a letter added, removed, changed, or two
+ * neighbours swapped), or `limit + 1` as soon as it is clearly more.
+ */
+export function editDistance(a: string, b: string, limit: number): number {
+	if (Math.abs(a.length - b.length) > limit) return limit + 1;
+	let before: number[] = [];
+	let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+	for (let i = 1; i <= a.length; i += 1) {
+		const current = [i];
+		let best = i;
+		for (let j = 1; j <= b.length; j += 1) {
+			const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+			let value = Math.min(
+				(previous[j] ?? 0) + 1,
+				(current[j - 1] ?? 0) + 1,
+				(previous[j - 1] ?? 0) + cost,
+			);
+			if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+				value = Math.min(value, (before[j - 2] ?? 0) + 1);
+			}
+			current[j] = value;
+			best = Math.min(best, value);
+		}
+		if (best > limit) return limit + 1;
+		before = previous;
+		previous = current;
+	}
+	return previous[b.length] ?? limit + 1;
+}
+
+/**
+ * True when a query word is a title word with a typo, or the start of one
+ * ("mobilnsc" for "mobilnosc", "rozciag" for "rozciaganie" typed with a slip).
+ */
+export function closeTo(word: string, titleWord: string): boolean {
+	const limit = typosAllowed(word);
+	if (limit === 0) return false;
+	if (editDistance(word, titleWord, limit) <= limit) return true;
+	// a word typed only partly: compare with as much of the title word
+	return (
+		titleWord.length > word.length &&
+		editDistance(word, titleWord.slice(0, word.length), limit) <= limit
+	);
+}
+
+// --- description ----------------------------------------------------------------
+
+const descriptions = new WeakMap<object, string>();
+
+/** The description's words, tags left out, worked out once per workout. */
+function descriptionOf(workout: SearchableWorkout): string {
+	const blocks = workout.descriptionFancyContent;
+	if (!blocks?.length) return "";
+	const known = descriptions.get(blocks);
+	if (known !== undefined) return known;
+	const text = tidy(
+		blocks
+			.filter((block) => block.type === "Title" || block.type === "Text")
+			.map((block) => block.content.replace(/<[^>]+>/g, " "))
+			.join(" "),
+	);
+	descriptions.set(blocks, text);
+	return text;
+}
+
 /**
  * How well a workout matches; lower is better, null is no match.
  * 0 title equals the query; 1 starts with it; 2 contains the phrase;
  * 3 has every word as a whole word; 4 has every word somewhere;
  * 5 the id is the query, or the comment contains the phrase;
- * 6 the title has a synonym of the query.
+ * 6 every word is in the title, some with a typo;
+ * 7 the title has a synonym of the query;
+ * 8 the description has every word.
  */
 function rankOf(
 	workout: SearchableWorkout,
@@ -162,8 +242,22 @@ function rankOf(
 	if (workout.internalTitle && tidy(workout.internalTitle).includes(phrase)) {
 		return { tier: 5, position: 0 };
 	}
-	if (synonyms.some((term) => title.includes(term))) {
+	const titleWords = title.split(WORD_BREAK).filter(Boolean);
+	if (
+		words.every(
+			(word) =>
+				title.includes(word) ||
+				titleWords.some((titleWord) => closeTo(word, titleWord)),
+		)
+	) {
 		return { tier: 6, position: 0 };
+	}
+	if (synonyms.some((term) => title.includes(term))) {
+		return { tier: 7, position: 0 };
+	}
+	const description = descriptionOf(workout);
+	if (description && words.every((word) => description.includes(word))) {
+		return { tier: 8, position: 0 };
 	}
 	return null;
 }

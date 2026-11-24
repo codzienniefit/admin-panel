@@ -25,6 +25,7 @@ import {
 	type PlannerStep,
 	removeFromScratchpadStep,
 	removeWorkoutStep,
+	replaceWorkoutStep,
 	setCardStep,
 	setDayStep,
 	toScratchpadStep,
@@ -54,6 +55,7 @@ import { DetailsDialog } from "./DetailsDialog";
 import type { DragSource, DropTarget } from "./dragTypes";
 import { MoveDialog } from "./MoveDialog";
 import { type DayHandlers, PlannerDay } from "./PlannerDay";
+import { plannerThumbnail } from "./PlannerThumbnail";
 import { PlannerToolbar } from "./PlannerToolbar";
 import {
 	discardStaged,
@@ -73,7 +75,10 @@ import { WeekSection } from "./WeekSection";
 type DialogState =
 	| {
 			kind: "add";
-			target: { kind: "day"; dayIndex: number } | { kind: "scratchpad" };
+			target:
+				| { kind: "day"; dayIndex: number }
+				| { kind: "scratchpad" }
+				| { kind: "replace"; dayIndex: number; index: number };
 	  }
 	| { kind: "day"; dayIndex: number }
 	| { kind: "card"; dayIndex: number; workoutId: string }
@@ -288,6 +293,8 @@ export function PlannerPage({
 		cardDetails: (dayIndex, workoutId) =>
 			setDialog({ kind: "card", dayIndex, workoutId }),
 		cardMove: (dayIndex, index) => setDialog({ kind: "move", dayIndex, index }),
+		cardReplace: (dayIndex, index) =>
+			setDialog({ kind: "add", target: { kind: "replace", dayIndex, index } }),
 		cardCopy: (workoutId) => {
 			plannerClipboard.set(workoutId);
 			toast({
@@ -573,6 +580,7 @@ export function PlannerPage({
 					) : dragging ? (
 						<WorkoutCard
 							workout={workoutById.get(dragging.workoutId)}
+							thumbnail={plannerThumbnail(workoutById.get(dragging.workoutId))}
 							fallbackTitle={dragging.workoutId}
 							className="w-48 shadow-menu"
 						/>
@@ -583,15 +591,25 @@ export function PlannerPage({
 			{dialog?.kind === "add" && (
 				<AddWorkoutDialog
 					targetLabel={
-						dialog.target.kind === "day"
-							? `dzień ${dialog.target.dayIndex}`
-							: "brudnopis"
+						dialog.target.kind === "scratchpad"
+							? "brudnopis"
+							: `dzień ${dialog.target.dayIndex}`
+					}
+					replacing={
+						dialog.target.kind === "replace"
+							? (() => {
+									const id = dayOf(dialog.target.dayIndex)?.workoutIds[
+										dialog.target.index
+									];
+									return id ? workoutById.get(id)?.title || id : undefined;
+								})()
+							: undefined
 					}
 					presentIds={
 						new Set(
-							dialog.target.kind === "day"
-								? (dayOf(dialog.target.dayIndex)?.workoutIds ?? [])
-								: (planning?.scratchpad ?? []),
+							dialog.target.kind === "scratchpad"
+								? (planning?.scratchpad ?? [])
+								: (dayOf(dialog.target.dayIndex)?.workoutIds ?? []),
 						)
 					}
 					hasRoom={
@@ -599,19 +617,22 @@ export function PlannerPage({
 						(dayOf(dialog.target.dayIndex)?.workoutIds.length ?? 0) <
 							MAX_WORKOUTS_PER_DAY
 					}
-					onPick={(workoutId) =>
-						dispatchStep(
+					onPick={(workoutId) => {
+						const target = dialog.target;
+						return dispatchStep(
 							challengeId,
-							dialog.target.kind === "day"
-								? addWorkoutStep(
-										state,
-										path.pathId,
-										dialog.target.dayIndex,
-										workoutId,
-									)
-								: addToScratchpadStep(state, workoutId),
-						)
-					}
+							target.kind === "day"
+								? addWorkoutStep(state, path.pathId, target.dayIndex, workoutId)
+								: target.kind === "replace"
+									? replaceWorkoutStep(
+											state,
+											path.pathId,
+											{ dayIndex: target.dayIndex, index: target.index },
+											workoutId,
+										)
+									: addToScratchpadStep(state, workoutId),
+						);
+					}}
 					onClose={() => setDialog(null)}
 				/>
 			)}

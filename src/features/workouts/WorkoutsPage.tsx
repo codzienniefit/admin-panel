@@ -13,8 +13,14 @@ import { useConfig } from "@/features/config/useConfig";
 import { MediaImage } from "@/features/media/MediaImage";
 import { Button } from "@/ui/Button";
 import { EmptyState } from "@/ui/EmptyState";
-import { levelMeta, STATUS_META, trainingTypeMeta } from "@/ui/enums";
+import {
+	levelMeta,
+	recordingStatusMeta,
+	STATUS_META,
+	trainingTypeMeta,
+} from "@/ui/enums";
 import { ListPage, SearchInput } from "@/ui/ListPage";
+import { refreshing } from "@/ui/RefreshButton";
 import { Select, type SelectOption } from "@/ui/Select";
 import { StatusBadge } from "@/ui/StatusBadge";
 import { type Column, Table } from "@/ui/Table";
@@ -98,6 +104,12 @@ export function WorkoutsPage({
 					<StatusBadge status={workout.status} />
 					{workout.pro && <Tag tone="indigo">Pro</Tag>}
 					{workout.liveAtUtc && <Tag tone="red">LIVE</Tag>}
+					{workout.recordingStatus &&
+						workout.recordingStatus !== "published" && (
+							<Tag tone={recordingStatusMeta(workout.recordingStatus).tone}>
+								{recordingStatusMeta(workout.recordingStatus).label}
+							</Tag>
+						)}
 					{workout.availableAtUtc && <Tag tone="orange">PREMIERA</Tag>}
 				</span>
 			),
@@ -145,6 +157,16 @@ export function WorkoutsPage({
 			cell: (workout) => `${workout.durationMinutes} min`,
 		},
 		{
+			key: "added",
+			header: "Dodano",
+			align: "end",
+			cell: (workout) => (
+				<span className="text-subtle" title="Data dodania">
+					{formatDate(workout.addedAtUtc)}
+				</span>
+			),
+		},
+		{
 			key: "updated",
 			header: "Zmieniono",
 			align: "end",
@@ -156,6 +178,7 @@ export function WorkoutsPage({
 
 	return (
 		<ListPage
+			onRefresh={refreshing(workoutsCollection)}
 			title="Treningi"
 			action={
 				<Button variant="primary" size="md" onClick={onCreate}>

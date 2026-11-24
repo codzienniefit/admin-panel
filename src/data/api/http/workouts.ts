@@ -36,11 +36,10 @@ import type { Transport } from "./transport";
 // WorkoutResultAdminDto out; src/handlers/admin/manageWorkoutsHandler.ts for
 // what a save does).
 //
-// `recordingStatus` and `format` (the production fields the planner shows)
-// have no place in the panel's schema yet. They are kept on the workout as
-// they came and sent back as they were, like any field this build does not
-// know: left out of a save the backend would keep them, sent as null it
-// would clear them, and the panel never does the second by accident.
+// `recordingStatus`, `format` and `runningDescription` (the team's production
+// fields, backend B3.4) are sent only when the workout has them: a backend
+// from before them answers without, and refuses a field it does not know.
+// Left out of a save the backend keeps them; null clears them.
 
 export const wireWorkoutSchema = z.looseObject({
 	id: z.string(),

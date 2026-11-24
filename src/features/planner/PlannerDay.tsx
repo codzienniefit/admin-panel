@@ -20,6 +20,8 @@ export interface DayHandlers {
 	clear(dayIndex: number): void;
 	cardDetails(dayIndex: number, workoutId: string): void;
 	cardMove(dayIndex: number, index: number): void;
+	/** "Zamień na inny": another workout in the same place. */
+	cardReplace(dayIndex: number, index: number): void;
 	cardCopy(workoutId: string): void;
 	cardToScratchpad(dayIndex: number, index: number): void;
 	cardShift(dayIndex: number, index: number, by: -1 | 1): void;
@@ -161,6 +163,10 @@ export function PlannerDay({
 					{
 						label: "Przenieś do…",
 						onSelect: () => handlers.cardMove(dayIndex, index),
+					},
+					{
+						label: "Zamień na inny…",
+						onSelect: () => handlers.cardReplace(dayIndex, index),
 					},
 					{ label: "Kopiuj", onSelect: () => handlers.cardCopy(id) },
 					{

@@ -13,6 +13,7 @@ import { useConfig } from "@/features/config/useConfig";
 import { Button } from "@/ui/Button";
 import { EmptyState } from "@/ui/EmptyState";
 import { ListPage, SearchInput } from "@/ui/ListPage";
+import { refreshing } from "@/ui/RefreshButton";
 import { Select, type SelectOption } from "@/ui/Select";
 import { type Column, Table } from "@/ui/Table";
 import { Tag } from "@/ui/Tag";
@@ -134,6 +135,7 @@ export function MessagesPage({
 
 	return (
 		<ListPage
+			onRefresh={refreshing(messagesCollection)}
 			title="Wiadomości"
 			action={
 				<Button variant="primary" size="md" onClick={onCreate}>

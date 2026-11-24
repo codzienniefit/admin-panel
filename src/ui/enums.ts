@@ -24,6 +24,28 @@ export const STATUS_META: Record<ContentStatus, EnumMeta> = {
 	deleted: { label: "Usunięte", tone: "red" },
 };
 
+/** Where the recording of a workout is: the team's own field, not the app's. */
+export const RECORDING_STATUS_META: Record<string, EnumMeta> = {
+	not_recorded: { label: "Nienagrany", tone: "grey" },
+	recorded: { label: "Nagrany", tone: "blue" },
+	in_editing: { label: "W montażu", tone: "amber" },
+	published: { label: "Opublikowany", tone: "green" },
+	live: { label: "Na żywo", tone: "red" },
+};
+
+/** How a workout is delivered, for the team. */
+export const FORMAT_META: Record<string, EnumMeta> = {
+	premiere: { label: "Premiera", tone: "orange" },
+	live: { label: "Live", tone: "red" },
+	running: { label: "Bieganie", tone: "teal" },
+};
+
+/** A stored value this build does not know is shown as it is. */
+export const recordingStatusMeta = (id: string): EnumMeta =>
+	RECORDING_STATUS_META[id] ?? { label: id, tone: "grey" };
+export const formatMeta = (id: string): EnumMeta =>
+	FORMAT_META[id] ?? { label: id, tone: "grey" };
+
 /** How far the preparation of a variant is; the colours of Patryk's planner. */
 export const PREP_TONES: Record<PrepStatus, Tone> = {
 	not_started: "red",

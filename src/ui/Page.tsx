@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { type Refresh, RefreshButton } from "./RefreshButton";
 
 // The frame of every section page (Wyzwania, Treningi, Media, Użytkownicy,
 // Ustawienia, …): one width and one title row, so switching tabs never moves
@@ -15,6 +16,8 @@ interface PageProps {
 	action?: ReactNode;
 	/** One line under the title. */
 	description?: ReactNode;
+	/** Fetches what the page shows again: an "Odśwież" button beside the action. */
+	onRefresh?: Refresh;
 	children: ReactNode;
 }
 
@@ -23,6 +26,7 @@ export function Page({
 	beside,
 	action,
 	description,
+	onRefresh,
 	children,
 }: PageProps) {
 	return (
@@ -33,7 +37,12 @@ export function Page({
 				<div className="flex min-h-10 flex-wrap items-center gap-3">
 					<h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
 					{beside}
-					{action && <div className="ml-auto">{action}</div>}
+					{(onRefresh || action) && (
+						<div className="ml-auto flex items-center gap-2">
+							{onRefresh && <RefreshButton onRefresh={onRefresh} />}
+							{action}
+						</div>
+					)}
 				</div>
 				{description && <p className="text-sm text-muted">{description}</p>}
 			</header>

@@ -19,6 +19,7 @@ import {
 	prunePlanning,
 	removeFromScratchpadStep,
 	removeWorkoutStep,
+	replaceWorkoutStep,
 	setCardStep,
 	setDayStep,
 	stepRejectReason,
@@ -43,7 +44,7 @@ function build(): { paths: SchedulePath[]; planning: Planning } {
 				days: [
 					{ dayIndex: 1, workoutIds: ["A", "B"] },
 					{ dayIndex: 2, workoutIds: [] },
-					{ dayIndex: 3, workoutIds: ["C", "D", "E"] },
+					{ dayIndex: 3, workoutIds: ["C", "D", "E", "F"] },
 				],
 			},
 		],
@@ -146,10 +147,37 @@ describe("planner steps", () => {
 		expect(state.planning?.scratchpad).toEqual(["S1", "B", "A"]);
 	});
 
-	it("refuses a fourth workout in a day and a duplicate", () => {
+	it("replaces a workout in place, keeping the card's note and colour", () => {
+		const state = build();
+		const before = cardPlanningOf(state.planning, P, 1, "A");
+		expect(before).toBeDefined();
+		run(state, replaceWorkoutStep(state, P, { dayIndex: 1, index: 0 }, "Z"));
+		expect(day(state, 1)).toEqual(["Z", "B"]);
+		expect(cardPlanningOf(state.planning, P, 1, "Z")).toEqual(before);
+		expect(cardPlanningOf(state.planning, P, 1, "A")).toBeUndefined();
+		// nothing to do for the same workout, and no duplicate in a day
+		expect(
+			replaceWorkoutStep(state, P, { dayIndex: 1, index: 0 }, "Z"),
+		).toEqual([]);
+		expect(
+			stepRejectReason(
+				state,
+				replaceWorkoutStep(state, P, { dayIndex: 1, index: 0 }, "B"),
+			),
+		).toContain("już w tym dniu");
+		// a full day can still swap one for another
+		expect(
+			stepRejectReason(
+				state,
+				replaceWorkoutStep(state, P, { dayIndex: 3, index: 1 }, "Y"),
+			),
+		).toBeNull();
+	});
+
+	it("refuses a fifth workout in a day and a duplicate", () => {
 		const state = build();
 		expect(stepRejectReason(state, addWorkoutStep(state, P, 3, "Z"))).toContain(
-			"najwyżej 3",
+			"najwyżej 4",
 		);
 		expect(stepRejectReason(state, addWorkoutStep(state, P, 1, "A"))).toContain(
 			"już w tym dniu",
@@ -164,7 +192,7 @@ describe("planner steps", () => {
 					{ dayIndex: 3, index: 0 },
 				),
 			),
-		).toContain("najwyżej 3");
+		).toContain("najwyżej 4");
 		expect(stepRejectReason(state, addToScratchpadStep(state, "S1"))).toContain(
 			"brudnopisie",
 		);

@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { challengesCollection } from "@/data/collections/challenges";
+import { planningCollection } from "@/data/collections/planning";
 import type { Challenge } from "@/data/schemas/challenge";
 import {
 	addDays,
@@ -34,6 +36,7 @@ import { Dialog } from "@/ui/Dialog";
 import { EmptyState } from "@/ui/EmptyState";
 import { Loading } from "@/ui/Loading";
 import { Page } from "@/ui/Page";
+import { refreshing } from "@/ui/RefreshButton";
 import { Segmented } from "@/ui/Segmented";
 import { StatusBadge } from "@/ui/StatusBadge";
 import { Tag } from "@/ui/Tag";
@@ -142,7 +145,11 @@ export function CalendarPage({
 	);
 
 	return (
-		<Page title="Wyzwania" beside={<ChallengesViewSwitch />}>
+		<Page
+			title="Wyzwania"
+			beside={<ChallengesViewSwitch />}
+			onRefresh={refreshing(challengesCollection, planningCollection)}
+		>
 			<div className="flex flex-col gap-4">
 				<div className="flex flex-wrap items-center gap-2">
 					<Button onClick={() => step(-1)} aria-label="Wcześniej">

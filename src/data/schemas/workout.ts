@@ -36,6 +36,15 @@ export const workoutSchema = z.looseObject({
 	liveAtUtc: optionalText,
 	availableAtUtc: optionalText,
 	updatedAtUtc: z.string(),
+	// The team's production fields (backend B3.4): never seen by the app.
+	// Absent until the backend has them; then null or a value. A value this
+	// build does not know is kept and shown as it is, never cleared.
+	/** not_recorded, recorded, in_editing, published, live */
+	recordingStatus: z.string().nullish(),
+	/** premiere, live, running */
+	format: z.string().nullish(),
+	/** What to say about a running session (format "running"). */
+	runningDescription: z.string().nullish(),
 });
 export type Workout = z.infer<typeof workoutSchema>;
 

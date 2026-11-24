@@ -225,6 +225,48 @@ export function removeWorkoutStep(
 	return step;
 }
 
+/**
+ * Puts another workout in the same place of the same day ("Zamień na inny").
+ * The card's note and colour stay with the place, so they move to the new
+ * workout.
+ */
+export function replaceWorkoutStep(
+	state: PlannerState,
+	pathId: string,
+	slot: DaySlot,
+	workoutId: string,
+): PlannerStep {
+	const old = workoutAt(state.paths, pathId, slot);
+	if (old === undefined || old === workoutId) return [];
+	const { dayIndex, index } = slot;
+	const step: PlannerOp[] = [
+		{ type: "remove", pathId, dayIndex, index, workoutId: old },
+		{ type: "add", pathId, dayIndex, index, workoutId },
+	];
+	const card = cardPlanningOf(state.planning, pathId, dayIndex, old);
+	if (card) {
+		step.push(
+			{
+				type: "cardSet",
+				pathId,
+				dayIndex,
+				workoutId: old,
+				from: card,
+				to: undefined,
+			},
+			{
+				type: "cardSet",
+				pathId,
+				dayIndex,
+				workoutId,
+				from: cardPlanningOf(state.planning, pathId, dayIndex, workoutId),
+				to: card,
+			},
+		);
+	}
+	return step;
+}
+
 /** Moves a workout; its card note and colour travel with it to another day. */
 export function moveWorkoutStep(
 	state: PlannerState,

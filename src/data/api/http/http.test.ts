@@ -168,6 +168,8 @@ describe("Produkcja today: everything can be read", () => {
 		expect(await client.users.progress(UID)).toEqual({
 			workouts: [],
 			challenges: [],
+			// the answer as it came, for the raw JSON view
+			raw: { workouts: [], challenges: [] },
 		});
 
 		expect(backend.requests.every((request) => request.method === "GET")).toBe(

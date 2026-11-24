@@ -69,5 +69,7 @@ export const userProgressSchema = z.looseObject({
 	/** Newest first. */
 	workouts: z.array(userWorkoutCompletionSchema).default([]),
 	challenges: z.array(userChallengeAttemptSchema).default([]),
+	/** The backend's answer as it came, for the raw JSON view; absent in the mock. */
+	raw: z.unknown().optional(),
 });
 export type UserProgress = z.infer<typeof userProgressSchema>;

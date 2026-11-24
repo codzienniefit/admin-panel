@@ -348,9 +348,11 @@ export function usersArea(
 			);
 		},
 		async progress(uid) {
-			return toUserProgress(
-				await transport.request({ path: ["manageUserProgress", segment(uid)] }),
-			);
+			const raw = await transport.request({
+				path: ["manageUserProgress", segment(uid)],
+			});
+			// the answer as it came, beside what the screen is built from
+			return { ...toUserProgress(raw), raw };
 		},
 		async changeEmail(uid, email) {
 			assertWritable(capabilities, "users", null);

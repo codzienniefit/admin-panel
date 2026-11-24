@@ -36,10 +36,10 @@ export type ScheduleOp =
 	| { type: "move"; pathId: string; from: DaySlot; to: DaySlot };
 
 /**
- * The app shows up to three workouts in a day (the limit Retool enforced).
- * Open decision 10 in docs/PLAN.md: raise it only once the app team confirms.
+ * Up to four workouts in a day (decided 2026-11-24; Retool allowed three).
+ * The backend sets no limit of its own.
  */
-export const MAX_WORKOUTS_PER_DAY = 3;
+export const MAX_WORKOUTS_PER_DAY = 4;
 const DAY_FULL = `W jednym dniu mogą być najwyżej ${MAX_WORKOUTS_PER_DAY} treningi`;
 
 function findDay(

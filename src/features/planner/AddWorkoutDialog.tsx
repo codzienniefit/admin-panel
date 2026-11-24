@@ -27,6 +27,11 @@ interface AddWorkoutDialogProps {
 	/** Returns why the workout was refused, or null when it was added. */
 	onPick: (workoutId: string) => string | null;
 	onClose: () => void;
+	/**
+	 * Picking one replaces a workout ("Zamień na inny"): the window says so
+	 * and closes after a successful pick.
+	 */
+	replacing?: string;
 }
 
 const DEFAULT_MIN = 5;
@@ -42,6 +47,7 @@ export function AddWorkoutDialog({
 	hasRoom,
 	onPick,
 	onClose,
+	replacing,
 }: AddWorkoutDialogProps) {
 	const config = useConfig().workouts;
 	const { data: workouts } = useLiveQuery({
@@ -66,14 +72,22 @@ export function AddWorkoutDialog({
 			: {}),
 	});
 
-	const pick = (workoutId: string) => setProblem(onPick(workoutId));
+	const pick = (workoutId: string) => {
+		const refused = onPick(workoutId);
+		setProblem(refused);
+		if (!refused && replacing) onClose();
+	};
 
 	return (
 		<Dialog
 			open
 			onClose={onClose}
-			title="Dodaj trening"
-			description={`Cel: ${targetLabel}. Okno zostaje otwarte, można dodać kilka.`}
+			title={replacing ? "Zamień na inny trening" : "Dodaj trening"}
+			description={
+				replacing
+					? `Zamiast „${replacing}”, ${targetLabel}. Notatka i kolor karty zostaną.`
+					: `Cel: ${targetLabel}. Okno zostaje otwarte, można dodać kilka.`
+			}
 			size="lg"
 			footer={
 				<Button size="md" variant="primary" onClick={onClose}>
@@ -197,7 +211,7 @@ export function AddWorkoutDialog({
 											</span>
 										</span>
 										<span className="shrink-0 text-xs font-semibold text-primary">
-											{present ? "już jest" : "Dodaj"}
+											{present ? "już jest" : replacing ? "Zamień" : "Dodaj"}
 										</span>
 									</button>
 								</li>

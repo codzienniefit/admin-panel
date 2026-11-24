@@ -4,6 +4,7 @@ import type { Workout } from "@/data/schemas/workout";
 import { Menu, type MenuAction } from "@/ui/Menu";
 import { WorkoutCard } from "@/ui/WorkoutCard";
 import type { DragSource } from "./dragTypes";
+import { plannerThumbnail } from "./PlannerThumbnail";
 
 interface PlannerCardProps {
 	dragId: string;
@@ -50,6 +51,7 @@ export function PlannerCard({
 				fallbackTitle={workoutId}
 				color={card?.color}
 				note={card?.note}
+				thumbnail={plannerThumbnail(workout)}
 				action={
 					!readOnly &&
 					actions.length > 0 && (

@@ -1,4 +1,6 @@
+import { mediaCollection } from "@/data/collections/media";
 import { Page } from "@/ui/Page";
+import { refreshing } from "@/ui/RefreshButton";
 import { MediaBrowser } from "./MediaBrowser";
 
 interface MediaPageProps {
@@ -9,7 +11,7 @@ interface MediaPageProps {
 
 export function MediaPage({ folderId, query, onChange }: MediaPageProps) {
 	return (
-		<Page title="Media">
+		<Page title="Media" onRefresh={refreshing(mediaCollection)}>
 			<MediaBrowser
 				folderId={folderId}
 				onFolderChange={(folder) => onChange({ folder, q: undefined })}

@@ -254,6 +254,39 @@ describe("fromWorkout", () => {
 	const NOW = "2026-11-11T10:00:00.000Z";
 	const now = () => NOW;
 
+	it("sends the production fields only when the workout has them", () => {
+		const without = fromWorkout(toWorkout(wireWorkout({})), SWITCHED_OFF, now);
+		const sent = JSON.parse(JSON.stringify(without));
+		for (const field of ["recordingStatus", "format", "runningDescription"]) {
+			expect(sent).not.toHaveProperty(field);
+		}
+
+		const withThem = fromWorkout(
+			toWorkout(
+				wireWorkout({
+					recordingStatus: "in_editing",
+					format: "running",
+					runningDescription: "5 km spokojnie",
+				}),
+			),
+			SWITCHED_OFF,
+			now,
+		);
+		expect(withThem).toMatchObject({
+			recordingStatus: "in_editing",
+			format: "running",
+			runningDescription: "5 km spokojnie",
+		});
+		// a value this build does not know is kept, not cleared
+		expect(
+			fromWorkout(
+				toWorkout(wireWorkout({ recordingStatus: "reshoot", format: null })),
+				SWITCHED_OFF,
+				now,
+			),
+		).toMatchObject({ recordingStatus: "reshoot", format: null });
+	});
+
 	it("sends back what was loaded, field for field", () => {
 		const wire = wireWorkout({
 			recordingStatus: "published",

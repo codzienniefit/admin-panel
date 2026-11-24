@@ -198,6 +198,29 @@ function buildWorkouts(count: number): Workout[] {
 		};
 	};
 
+	/**
+	 * The team's production fields, read from what the workout already is
+	 * (no new rolls, so the rest of the sample data stays the same).
+	 */
+	const withProduction = (workout: Workout): Workout => ({
+		...workout,
+		format: workout.liveAtUtc
+			? "live"
+			: workout.availableAtUtc
+				? "premiere"
+				: null,
+		recordingStatus: workout.liveAtUtc
+			? "live"
+			: workout.status === "draft"
+				? workout.videoUrl || workout.audioRelativePath
+					? "in_editing"
+					: "not_recorded"
+				: workout.status === "published"
+					? "published"
+					: "recorded",
+		runningDescription: null,
+	});
+
 	hand.forEach(([id, title, minutes, types], index) => {
 		workouts.push(make(index, id, title, minutes, types, true));
 	});
@@ -212,7 +235,7 @@ function buildWorkouts(count: number): Workout[] {
 			second && second !== theme.type ? [theme.type, second] : [theme.type];
 		workouts.push(make(n, `W${n}`, title, rng.int(2, 12) * 5, types, false));
 	}
-	return workouts;
+	return workouts.map(withProduction);
 }
 
 function buildPath(

@@ -1,5 +1,6 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { challengesCollection } from "@/data/collections/challenges";
+import { planningCollection } from "@/data/collections/planning";
 import type { Challenge, ContentStatus } from "@/data/schemas/challenge";
 import {
 	type ChallengeFilters,
@@ -23,6 +24,7 @@ import { STATUS_META } from "@/ui/enums";
 import { SearchInput } from "@/ui/ListPage";
 import { Loading, useDelayedLoading } from "@/ui/Loading";
 import { Page } from "@/ui/Page";
+import { refreshing } from "@/ui/RefreshButton";
 import { Segmented } from "@/ui/Segmented";
 import { Select, type SelectOption } from "@/ui/Select";
 import { StatusBadge } from "@/ui/StatusBadge";
@@ -176,6 +178,7 @@ export function ChallengesPage({
 		<Page
 			title="Wyzwania"
 			beside={<ChallengesViewSwitch />}
+			onRefresh={refreshing(challengesCollection, planningCollection)}
 			action={
 				<Button variant="primary" size="md" onClick={onCreate}>
 					Nowe wyzwanie

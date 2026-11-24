@@ -39,6 +39,7 @@ import { Menu } from "@/ui/Menu";
 import { MultiSelect } from "@/ui/MultiSelect";
 import { Notice } from "@/ui/Notice";
 import { OrderedSelect } from "@/ui/OrderedSelect";
+import { Page } from "@/ui/Page";
 import { Popover } from "@/ui/Popover";
 import { SaveStatusText } from "@/ui/SaveStatusText";
 import { Segmented } from "@/ui/Segmented";
@@ -246,794 +247,797 @@ export function DesignPage() {
 	if (exploded) return <Bomb />;
 
 	return (
-		<div className="mx-auto flex max-w-6xl flex-col gap-4">
-			<header>
-				<h1 className="text-3xl font-semibold tracking-tight">Komponenty</h1>
-				<p className="mt-1 text-sm text-muted">
-					Wszystkie wspólne elementy panelu we wszystkich stanach. Zmiany w
-					wyglądzie sprawdzamy najpierw tutaj.
-				</p>
-			</header>
+		<Page
+			title="Komponenty"
+			description="Wszystkie wspólne elementy panelu we wszystkich stanach. Zmiany w wyglądzie sprawdzamy najpierw tutaj."
+		>
+			<div className="flex flex-col gap-4">
+				<Section title="Kolory podstawowe">
+					<div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3">
+						{SURFACES.map(([name, className]) => (
+							<div key={name}>
+								<div
+									className={`h-12 rounded-control border border-line ${className}`}
+								/>
+								<div className="mt-1 text-xs text-muted">{name}</div>
+							</div>
+						))}
+					</div>
+				</Section>
 
-			<Section title="Kolory podstawowe">
-				<div className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-3">
-					{SURFACES.map(([name, className]) => (
-						<div key={name}>
+				<Section title="Tony">
+					<p className="mb-3 text-sm text-muted">
+						Jedna rodzina koloru na jedno znaczenie. Każdy ton ma kolor pełny,
+						jasne tło i ciemny tekst.
+					</p>
+					<div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
+						{TONES.map((tone) => (
 							<div
-								className={`h-12 rounded-control border border-line ${className}`}
-							/>
-							<div className="mt-1 text-xs text-muted">{name}</div>
-						</div>
-					))}
-				</div>
-			</Section>
+								key={tone}
+								data-tone={tone}
+								className="overflow-hidden rounded-control border border-line"
+							>
+								<div className="h-8 bg-(--tone)" />
+								<div className="bg-(--tone-soft) px-2 py-1.5 text-xs font-semibold text-(--tone-ink)">
+									{tone}
+								</div>
+							</div>
+						))}
+					</div>
+				</Section>
 
-			<Section title="Tony">
-				<p className="mb-3 text-sm text-muted">
-					Jedna rodzina koloru na jedno znaczenie. Każdy ton ma kolor pełny,
-					jasne tło i ciemny tekst.
-				</p>
-				<div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
-					{TONES.map((tone) => (
-						<div
-							key={tone}
-							data-tone={tone}
-							className="overflow-hidden rounded-control border border-line"
+				<Section title="Znaczniki i kategorie">
+					<Row label="Status">
+						{STATUSES.map((status) => (
+							<StatusBadge key={status} status={status} />
+						))}
+					</Row>
+					<Row label="Typ treningu">
+						{KNOWN_TRAINING_TYPE_IDS.map((id) => {
+							const meta = trainingTypeMeta(id);
+							return (
+								<Tag key={id} tone={meta.tone}>
+									{meta.label}
+								</Tag>
+							);
+						})}
+					</Row>
+					<Row label="Typ treningu, kropka">
+						{KNOWN_TRAINING_TYPE_IDS.map((id) => {
+							const meta = trainingTypeMeta(id);
+							return (
+								<Tag key={id} tone={meta.tone} variant="dot">
+									{meta.label}
+								</Tag>
+							);
+						})}
+					</Row>
+					<Row label="Poziom">
+						{KNOWN_LEVEL_IDS.map((id) => {
+							const meta = levelMeta(id);
+							return (
+								<Tag key={id} tone={meta.tone}>
+									{meta.label}
+								</Tag>
+							);
+						})}
+					</Row>
+					<Row label="Nieznana wartość">
+						{["boks", "taniec", "nordic-walking"].map((id) => {
+							const meta = trainingTypeMeta(id);
+							return (
+								<Tag key={id} tone={meta.tone}>
+									{meta.label}
+								</Tag>
+							);
+						})}
+						<span className="text-xs text-muted">
+							kolor przydzielany stale na podstawie identyfikatora
+						</span>
+					</Row>
+				</Section>
+
+				<Section title="Typografia">
+					<div className="flex flex-col gap-2">
+						<div className="text-3xl font-semibold tracking-tight">
+							Tytuł strony
+						</div>
+						<div className="text-2xl font-semibold tracking-tight">
+							Tytuł widoku
+						</div>
+						<div className="text-lg font-semibold">Tytuł sekcji</div>
+						<div>Tekst podstawowy, 15 px, waga 500.</div>
+						<div className="text-sm text-subtle">Tekst pomocniczy, 14 px.</div>
+						<div className="text-xs text-muted">Opis i podpis, 12 px.</div>
+					</div>
+				</Section>
+
+				<Section title="Przyciski">
+					{(["primary", "secondary", "ghost", "danger"] as const).map(
+						(variant) => (
+							<Row key={variant} label={variant}>
+								<Button variant={variant} size="md">
+									Zapisz zmiany
+								</Button>
+								<Button variant={variant}>Mały</Button>
+								<Button variant={variant} size="md" disabled>
+									Niedostępny
+								</Button>
+							</Row>
+						),
+					)}
+				</Section>
+
+				<Section title="Lista wyboru">
+					<p className="mb-3 text-sm text-muted">
+						Jedna lista w całym panelu: po kliknięciu pokazuje wszystkie opcje,
+						a wpisywanie je filtruje (także bez polskich znaków).
+					</p>
+					<Row label="Pusta">
+						<Select
+							label="Trening"
+							options={workoutOptions}
+							value={workout}
+							onChange={setWorkout}
+							placeholder="Wybierz trening"
+							className="w-64"
+						/>
+					</Row>
+					<Row label="Z wybraną wartością">
+						<Select
+							label="Poziom"
+							options={levelOptions}
+							value={level}
+							onChange={setLevel}
+							className="w-64"
+						/>
+					</Row>
+					<Row label="Dużo opcji (60)">
+						<Select
+							label="Długa lista"
+							options={manyOptions}
+							value={many}
+							onChange={setMany}
+							placeholder="Przewiń albo wpisz numer"
+							className="w-64"
+						/>
+					</Row>
+					<Row label="Mała">
+						<Select
+							label="Poziom, mała"
+							options={levelOptions}
+							value={level}
+							onChange={setLevel}
+							size="sm"
+							className="w-48"
+						/>
+					</Row>
+					<Row label="Cicha (akcja w komórce)">
+						<Select
+							label="Dodaj trening"
+							options={workoutOptions}
+							value={null}
+							onChange={() => undefined}
+							placeholder="+ Dodaj"
+							variant="quiet"
+							size="sm"
+							className="w-40"
+						/>
+					</Row>
+					<Row label="Z opcją niedostępną">
+						<Select
+							label="Środowisko"
+							options={[
+								{
+									value: "test",
+									label: "Test",
+									hint: "dane przykładowe",
+									tone: "amber",
+								},
+								{
+									value: "production",
+									label: "Produkcja",
+									hint: "wkrótce",
+									tone: "green",
+									disabled: true,
+								},
+							]}
+							value="test"
+							onChange={() => undefined}
+							className="w-48"
+						/>
+					</Row>
+					<Row label="Bez opcji">
+						<Select
+							label="Pusta lista"
+							options={[]}
+							value={null}
+							onChange={() => undefined}
+							emptyText="Brak treningów do dodania"
+							className="w-64"
+						/>
+					</Row>
+					<Row label="Wyłączona">
+						<Select
+							label="Wyłączona"
+							options={levelOptions}
+							value={level}
+							onChange={setLevel}
+							disabled
+							className="w-64"
+						/>
+					</Row>
+				</Section>
+
+				<Section title="Trening w planie">
+					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+						<WorkoutCard
+							fallbackTitle="W1"
+							workout={{
+								title: "Poranna mobilność bioder",
+								durationMinutes: 15,
+								trainingTypeIds: ["stretching"],
+								status: "published",
+								videoUrl: "https://www.youtube.com/watch?v=x",
+							}}
+						/>
+						<WorkoutCard
+							fallbackTitle="W2"
+							note="Nagrać ponownie, słaby dźwięk."
+							workout={{
+								title: "Interwały HIIT",
+								durationMinutes: 22,
+								trainingTypeIds: ["hiit", "cardio"],
+								status: "draft",
+								audioRelativePath: "audio/hiit.m4a",
+							}}
+						/>
+						<WorkoutCard
+							fallbackTitle="W3"
+							color="#6366f1"
+							workout={{
+								title:
+									"Bardzo długa nazwa treningu, która zajmuje więcej niż dwie linie w wąskiej komórce",
+								durationMinutes: 45,
+								trainingTypeIds: ["strength", "stretching", "yoga"],
+								status: "published",
+							}}
+						/>
+						<WorkoutCard
+							fallbackTitle="W4"
+							color="#facc15"
+							workout={{
+								title: "Na jasnym kolorze tekst jest ciemny",
+								durationMinutes: 30,
+								trainingTypeIds: ["pilates"],
+								status: "hidden",
+							}}
+						/>
+						<WorkoutCard fallbackTitle="W999" workout={undefined} />
+					</div>
+				</Section>
+
+				<Section title="Kolory planera i okienko">
+					<Row label="Paleta">
+						<ColorPalette
+							label="Kolor dnia"
+							value={paletteColor}
+							onChange={setPaletteColor}
+						/>
+					</Row>
+					<Row label="Przełącznik">
+						<Segmented
+							label="Układ listy"
+							options={[
+								{ value: "cards", label: "Karty" },
+								{ value: "table", label: "Tabela" },
+							]}
+							value={layout}
+							onChange={setLayout}
+						/>
+					</Row>
+					<Row label="Okienko">
+						<Popover
+							label="Wymagania tygodnia"
+							title="Wymagania rodzaju planu"
+							trigger={
+								<span className="rounded-control border border-line-input px-3 py-1.5 text-sm">
+									Pokaż wymagania
+								</span>
+							}
 						>
-							<div className="h-8 bg-(--tone)" />
-							<div className="bg-(--tone-soft) px-2 py-1.5 text-xs font-semibold text-(--tone-ink)">
-								{tone}
+							<ul className="flex flex-col gap-1">
+								<li>✓ Min. 2 (wszystkie treningi)</li>
+								<li>✗ Max 3 (Cardio)</li>
+							</ul>
+						</Popover>
+					</Row>
+				</Section>
+
+				<Section title="Części ekranów list i edytorów">
+					<Row label="Wyszukiwarka">
+						<SearchInput
+							label="Szukaj"
+							placeholder="Szukaj po nazwie…"
+							value={search}
+							onChange={setSearch}
+						/>
+					</Row>
+					<Row label="Zakładki">
+						<Tabs
+							label="Przykładowe zakładki"
+							tabs={[
+								{ id: "badges", label: "Odznaki" },
+								{ id: "progress", label: "Wykonania" },
+								{ id: "account", label: "Dane ogólne" },
+							]}
+							value={tabId}
+							onChange={setTabId}
+						/>
+					</Row>
+					<Row label="Fakty">
+						<Facts
+							items={[
+								{ label: "Identyfikator", value: "W12" },
+								{ label: "Zmieniono", value: "10.11.2026, 12:00" },
+							]}
+						/>
+					</Row>
+					<Row label="Problemy bez pola">
+						<IssuesNotice
+							title="Nie można opublikować"
+							issues={[
+								{ path: "paths", message: "Dodaj przynajmniej jeden wariant" },
+								{ path: "image", message: "Wybierz miniaturkę" },
+							]}
+						/>
+					</Row>
+				</Section>
+
+				<Section title="Karta wyzwania">
+					<div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+						{sampleChallenges.map((challenge) => (
+							<ChallengeCard key={challenge.id} challenge={challenge} />
+						))}
+					</div>
+				</Section>
+
+				<Section title="Stan zapisu">
+					{SAVE_STATES.map((status, i) => (
+						<Row
+							// biome-ignore lint/suspicious/noArrayIndexKey: a fixed list
+							key={i}
+							label={
+								status.phase === "saved" && status.mergedWithOthers
+									? "saved + merge"
+									: status.phase
+							}
+						>
+							<SaveStatusText status={status} />
+						</Row>
+					))}
+				</Section>
+
+				<Section title="Komunikaty">
+					<div className="flex flex-col gap-3">
+						<Notice
+							tone="amber"
+							title="Ktoś inny zmienił to samo w międzyczasie"
+							actions={
+								<>
+									<Button variant="primary" size="md">
+										Nadpisz moimi zmianami
+									</Button>
+									<Button size="md">Zostaw wersję z serwera</Button>
+								</>
+							}
+						>
+							Widzisz teraz wersję z serwera. Twoje zmiany nie przepadły.
+							Różnice: dzień 4.
+						</Notice>
+						<Notice
+							tone="red"
+							title="Nie udało się zapisać zmian"
+							actions={
+								<>
+									<Button variant="primary" size="md">
+										Spróbuj ponownie
+									</Button>
+									<Button size="md">Odrzuć moje zmiany</Button>
+								</>
+							}
+						>
+							Serwer nie odpowiada. Twoje zmiany nie przepadły.
+						</Notice>
+						<Notice tone="amber" title="Ten trening jest już w tym dniu" />
+						<Notice tone="blue" title="Informacja">
+							Spokojny komunikat bez akcji.
+						</Notice>
+						<Notice tone="green" title="Opublikowano">
+							Wyzwanie jest widoczne w aplikacji.
+						</Notice>
+					</div>
+				</Section>
+
+				<Section title="Formularz">
+					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<TextField
+							label="Nazwa"
+							required
+							value={name}
+							onChange={(event) => setName(event.target.value)}
+							error={
+								name.trim().length < 4
+									? "Nazwa musi mieć co najmniej 4 znaki"
+									: ""
+							}
+							hint="Widoczna w aplikacji."
+						/>
+						<TextField
+							label="Komentarz"
+							placeholder="Niewidoczny w aplikacji"
+							hint="Tylko dla zespołu."
+						/>
+						<TextField
+							label="Z błędem"
+							defaultValue="abc"
+							error="Nazwa jest wymagana"
+						/>
+						<TextField label="Wyłączone" defaultValue="C12" disabled />
+						<TextAreaField
+							label="Opis"
+							placeholder="Kilka zdań o wyzwaniu"
+							hint="Pole rozciąga się w pionie."
+						/>
+						<div className="flex flex-col gap-4">
+							<Switch
+								label="Ukryj"
+								hint="Ukryte wyzwanie nie pojawia się na listach w aplikacji."
+								checked={hidden}
+								onChange={setHidden}
+							/>
+							<Switch
+								label="Niedostępny przełącznik"
+								checked
+								onChange={() => undefined}
+								disabled
+							/>
+						</div>
+					</div>
+				</Section>
+
+				<Section title="Wybór wielu wartości i data">
+					<Row label="Kilka wartości">
+						<div className="w-80 max-w-full">
+							<MultiSelect
+								label="Typ treningu"
+								options={KNOWN_TRAINING_TYPE_IDS.map((id) => ({
+									value: id,
+									...trainingTypeMeta(id),
+								}))}
+								value={types}
+								onChange={setTypes}
+							/>
+						</div>
+					</Row>
+					<Row label="Kilka wartości w kolejności">
+						<div className="w-96 max-w-full">
+							<OrderedSelect
+								label="Polecane dalej"
+								options={KNOWN_TRAINING_TYPE_IDS.map((id) => ({
+									value: id,
+									...trainingTypeMeta(id),
+								}))}
+								value={ordered}
+								onChange={setOrdered}
+								max={3}
+							/>
+						</div>
+					</Row>
+					<Row label="Lista z czyszczeniem">
+						<Select
+							label="Poziom"
+							placeholder="Poziom: wszystkie"
+							options={levelOptions}
+							value={level}
+							onChange={setLevel}
+							clearable
+							className="w-64"
+						/>
+					</Row>
+					<Row label="Data i godzina">
+						<div className="w-72 max-w-full">
+							<DateTimeField
+								label="Data premiery"
+								value={when}
+								onChange={setWhen}
+								hint="Wpisz albo wybierz z kalendarza. Czas lokalny, zapis w UTC."
+							/>
+						</div>
+					</Row>
+					<Row label="Sam dzień">
+						<div className="w-72 max-w-full">
+							<DateField
+								label="Widoczne od"
+								value={day}
+								onChange={setDay}
+								hint="Święta w kalendarzu są na czerwono."
+							/>
+						</div>
+					</Row>
+				</Section>
+
+				<Section title="JSON: co trafia na serwer">
+					<p className="mb-3 text-sm text-muted">
+						Jeden sposób pokazywania JSON-u, z kopiowaniem. Okno „Podgląd JSON”
+						jest w menu „Więcej” każdego edytora: różnice, wersja przed i wersja
+						po.
+					</p>
+					<Row label="Widok JSON">
+						<div className="w-full max-w-xl">
+							<JsonView
+								value={{ title: name, isHidden: hidden, liveAtUtc: when }}
+								label="Przykładowy JSON"
+								height="h-32"
+							/>
+						</div>
+					</Row>
+					<Row label="Przed, po i różnice">
+						<Button onClick={() => setJsonOpen(true)}>
+							Pokaż podgląd JSON
+						</Button>
+						{jsonOpen && (
+							<JsonPreviewDialog
+								of="przykładu"
+								before={{
+									id: "C1",
+									title: "Wiosenny start",
+									isHidden: false,
+									paths: [
+										{
+											pathId: "p-easy",
+											days: [
+												{ dayIndex: 1, workoutIds: ["W1"] },
+												{ dayIndex: 2, workoutIds: [] },
+											],
+										},
+									],
+								}}
+								after={{
+									id: "C1",
+									title: name,
+									isHidden: hidden,
+									paths: [
+										{
+											pathId: "p-easy",
+											days: [
+												{ dayIndex: 1, workoutIds: ["W1"] },
+												{ dayIndex: 2, workoutIds: ["W5"] },
+											],
+										},
+									],
+								}}
+								onClose={() => setJsonOpen(false)}
+							/>
+						)}
+					</Row>
+				</Section>
+
+				<Section title="Treść blokowa">
+					<p className="mb-3 text-sm text-muted">
+						Opisy treningów i wyzwań oraz treść wiadomości. Podgląd pokazuje to,
+						co wyświetli aplikacja; przykład ma celowo jeden błąd i jedną uwagę.
+					</p>
+					<ContentField
+						label="Opis"
+						editorTitle="Opis (przykład)"
+						value={content}
+						onChange={setContent}
+						imageFolderId="workouts"
+					/>
+				</Section>
+
+				<Section title="Okna dialogowe">
+					<p className="mb-3 text-sm text-muted">
+						Na komputerze okno jest wyśrodkowane, na telefonie wysuwa się od
+						dołu. Pytania o potwierdzenie zastępują systemowe okienka
+						przeglądarki.
+					</p>
+					<Row label="Okno z treścią">
+						<Button onClick={() => setDialogOpen(true)}>Otwórz okno</Button>
+					</Row>
+					<Row label="Potwierdzenie">
+						<Button
+							onClick={async () =>
+								setAnswer(
+									(await confirm({
+										title: "Opublikować wyzwanie?",
+										description:
+											"Wyzwanie stanie się widoczne w aplikacji dla wszystkich.",
+										confirmLabel: "Opublikuj",
+									}))
+										? "potwierdzono"
+										: "anulowano",
+								)
+							}
+						>
+							Zapytaj
+						</Button>
+						<Button
+							onClick={async () =>
+								setAnswer(
+									(await confirm({
+										title: "Usunąć trening?",
+										description:
+											"Trening trafi do kosza. Później można go przywrócić z kosza.",
+										confirmLabel: "Usuń",
+										destructive: true,
+									}))
+										? "potwierdzono"
+										: "anulowano",
+								)
+							}
+						>
+							Zapytaj o usunięcie
+						</Button>
+						{answer && (
+							<span className="text-xs text-muted">Odpowiedź: {answer}</span>
+						)}
+					</Row>
+					<Dialog
+						open={dialogOpen}
+						onOpenChange={setDialogOpen}
+						title="Nowy wariant"
+						description="Wariant to osobna ścieżka wyzwania dla jednego poziomu."
+						footer={
+							<>
+								<Button size="md" onClick={() => setDialogOpen(false)}>
+									Anuluj
+								</Button>
+								<Button
+									size="md"
+									variant="primary"
+									onClick={() => setDialogOpen(false)}
+								>
+									Dodaj wariant
+								</Button>
+							</>
+						}
+					>
+						<div className="flex flex-col gap-4">
+							<TextField label="Nazwa wariantu" placeholder="np. Spokojny" />
+							<div>
+								<div className="mb-1.5 text-sm font-semibold">Poziom</div>
+								<Select
+									label="Poziom"
+									options={levelOptions}
+									value={level}
+									onChange={setLevel}
+									className="w-full"
+								/>
 							</div>
 						</div>
-					))}
-				</div>
-			</Section>
+					</Dialog>
+				</Section>
 
-			<Section title="Znaczniki i kategorie">
-				<Row label="Status">
-					{STATUSES.map((status) => (
-						<StatusBadge key={status} status={status} />
-					))}
-				</Row>
-				<Row label="Typ treningu">
-					{KNOWN_TRAINING_TYPE_IDS.map((id) => {
-						const meta = trainingTypeMeta(id);
-						return (
-							<Tag key={id} tone={meta.tone}>
-								{meta.label}
-							</Tag>
-						);
-					})}
-				</Row>
-				<Row label="Typ treningu, kropka">
-					{KNOWN_TRAINING_TYPE_IDS.map((id) => {
-						const meta = trainingTypeMeta(id);
-						return (
-							<Tag key={id} tone={meta.tone} variant="dot">
-								{meta.label}
-							</Tag>
-						);
-					})}
-				</Row>
-				<Row label="Poziom">
-					{KNOWN_LEVEL_IDS.map((id) => {
-						const meta = levelMeta(id);
-						return (
-							<Tag key={id} tone={meta.tone}>
-								{meta.label}
-							</Tag>
-						);
-					})}
-				</Row>
-				<Row label="Nieznana wartość">
-					{["boks", "taniec", "nordic-walking"].map((id) => {
-						const meta = trainingTypeMeta(id);
-						return (
-							<Tag key={id} tone={meta.tone}>
-								{meta.label}
-							</Tag>
-						);
-					})}
-					<span className="text-xs text-muted">
-						kolor przydzielany stale na podstawie identyfikatora
-					</span>
-				</Row>
-			</Section>
-
-			<Section title="Typografia">
-				<div className="flex flex-col gap-2">
-					<div className="text-3xl font-semibold tracking-tight">
-						Tytuł strony
-					</div>
-					<div className="text-2xl font-semibold tracking-tight">
-						Tytuł widoku
-					</div>
-					<div className="text-lg font-semibold">Tytuł sekcji</div>
-					<div>Tekst podstawowy, 15 px, waga 500.</div>
-					<div className="text-sm text-subtle">Tekst pomocniczy, 14 px.</div>
-					<div className="text-xs text-muted">Opis i podpis, 12 px.</div>
-				</div>
-			</Section>
-
-			<Section title="Przyciski">
-				{(["primary", "secondary", "ghost", "danger"] as const).map(
-					(variant) => (
-						<Row key={variant} label={variant}>
-							<Button variant={variant} size="md">
-								Zapisz zmiany
-							</Button>
-							<Button variant={variant}>Mały</Button>
-							<Button variant={variant} size="md" disabled>
-								Niedostępny
-							</Button>
-						</Row>
-					),
-				)}
-			</Section>
-
-			<Section title="Lista wyboru">
-				<p className="mb-3 text-sm text-muted">
-					Jedna lista w całym panelu: po kliknięciu pokazuje wszystkie opcje, a
-					wpisywanie je filtruje (także bez polskich znaków).
-				</p>
-				<Row label="Pusta">
-					<Select
-						label="Trening"
-						options={workoutOptions}
-						value={workout}
-						onChange={setWorkout}
-						placeholder="Wybierz trening"
-						className="w-64"
-					/>
-				</Row>
-				<Row label="Z wybraną wartością">
-					<Select
-						label="Poziom"
-						options={levelOptions}
-						value={level}
-						onChange={setLevel}
-						className="w-64"
-					/>
-				</Row>
-				<Row label="Dużo opcji (60)">
-					<Select
-						label="Długa lista"
-						options={manyOptions}
-						value={many}
-						onChange={setMany}
-						placeholder="Przewiń albo wpisz numer"
-						className="w-64"
-					/>
-				</Row>
-				<Row label="Mała">
-					<Select
-						label="Poziom, mała"
-						options={levelOptions}
-						value={level}
-						onChange={setLevel}
-						size="sm"
-						className="w-48"
-					/>
-				</Row>
-				<Row label="Cicha (akcja w komórce)">
-					<Select
-						label="Dodaj trening"
-						options={workoutOptions}
-						value={null}
-						onChange={() => undefined}
-						placeholder="+ Dodaj"
-						variant="quiet"
-						size="sm"
-						className="w-40"
-					/>
-				</Row>
-				<Row label="Z opcją niedostępną">
-					<Select
-						label="Środowisko"
-						options={[
-							{
-								value: "test",
-								label: "Test",
-								hint: "dane przykładowe",
-								tone: "amber",
-							},
-							{
-								value: "production",
-								label: "Produkcja",
-								hint: "wkrótce",
-								tone: "green",
-								disabled: true,
-							},
-						]}
-						value="test"
-						onChange={() => undefined}
-						className="w-48"
-					/>
-				</Row>
-				<Row label="Bez opcji">
-					<Select
-						label="Pusta lista"
-						options={[]}
-						value={null}
-						onChange={() => undefined}
-						emptyText="Brak treningów do dodania"
-						className="w-64"
-					/>
-				</Row>
-				<Row label="Wyłączona">
-					<Select
-						label="Wyłączona"
-						options={levelOptions}
-						value={level}
-						onChange={setLevel}
-						disabled
-						className="w-64"
-					/>
-				</Row>
-			</Section>
-
-			<Section title="Trening w planie">
-				<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-					<WorkoutCard
-						fallbackTitle="W1"
-						workout={{
-							title: "Poranna mobilność bioder",
-							durationMinutes: 15,
-							trainingTypeIds: ["stretching"],
-							status: "published",
-							videoUrl: "https://www.youtube.com/watch?v=x",
-						}}
-					/>
-					<WorkoutCard
-						fallbackTitle="W2"
-						note="Nagrać ponownie, słaby dźwięk."
-						workout={{
-							title: "Interwały HIIT",
-							durationMinutes: 22,
-							trainingTypeIds: ["hiit", "cardio"],
-							status: "draft",
-							audioRelativePath: "audio/hiit.m4a",
-						}}
-					/>
-					<WorkoutCard
-						fallbackTitle="W3"
-						color="#6366f1"
-						workout={{
-							title:
-								"Bardzo długa nazwa treningu, która zajmuje więcej niż dwie linie w wąskiej komórce",
-							durationMinutes: 45,
-							trainingTypeIds: ["strength", "stretching", "yoga"],
-							status: "published",
-						}}
-					/>
-					<WorkoutCard
-						fallbackTitle="W4"
-						color="#facc15"
-						workout={{
-							title: "Na jasnym kolorze tekst jest ciemny",
-							durationMinutes: 30,
-							trainingTypeIds: ["pilates"],
-							status: "hidden",
-						}}
-					/>
-					<WorkoutCard fallbackTitle="W999" workout={undefined} />
-				</div>
-			</Section>
-
-			<Section title="Kolory planera i okienko">
-				<Row label="Paleta">
-					<ColorPalette
-						label="Kolor dnia"
-						value={paletteColor}
-						onChange={setPaletteColor}
-					/>
-				</Row>
-				<Row label="Przełącznik">
-					<Segmented
-						label="Układ listy"
-						options={[
-							{ value: "cards", label: "Karty" },
-							{ value: "table", label: "Tabela" },
-						]}
-						value={layout}
-						onChange={setLayout}
-					/>
-				</Row>
-				<Row label="Okienko">
-					<Popover
-						label="Wymagania tygodnia"
-						title="Wymagania rodzaju planu"
-						trigger={
-							<span className="rounded-control border border-line-input px-3 py-1.5 text-sm">
-								Pokaż wymagania
-							</span>
-						}
-					>
-						<ul className="flex flex-col gap-1">
-							<li>✓ Min. 2 (wszystkie treningi)</li>
-							<li>✗ Max 3 (Cardio)</li>
-						</ul>
-					</Popover>
-				</Row>
-			</Section>
-
-			<Section title="Części ekranów list i edytorów">
-				<Row label="Wyszukiwarka">
-					<SearchInput
-						label="Szukaj"
-						placeholder="Szukaj po nazwie…"
-						value={search}
-						onChange={setSearch}
-					/>
-				</Row>
-				<Row label="Zakładki">
-					<Tabs
-						label="Przykładowe zakładki"
-						tabs={[
-							{ id: "badges", label: "Odznaki" },
-							{ id: "progress", label: "Wykonania" },
-							{ id: "account", label: "Dane ogólne" },
-						]}
-						value={tabId}
-						onChange={setTabId}
-					/>
-				</Row>
-				<Row label="Fakty">
-					<Facts
-						items={[
-							{ label: "Identyfikator", value: "W12" },
-							{ label: "Zmieniono", value: "10.11.2026, 12:00" },
-						]}
-					/>
-				</Row>
-				<Row label="Problemy bez pola">
-					<IssuesNotice
-						title="Nie można opublikować"
-						issues={[
-							{ path: "paths", message: "Dodaj przynajmniej jeden wariant" },
-							{ path: "image", message: "Wybierz miniaturkę" },
-						]}
-					/>
-				</Row>
-			</Section>
-
-			<Section title="Karta wyzwania">
-				<div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-					{sampleChallenges.map((challenge) => (
-						<ChallengeCard key={challenge.id} challenge={challenge} />
-					))}
-				</div>
-			</Section>
-
-			<Section title="Stan zapisu">
-				{SAVE_STATES.map((status, i) => (
-					<Row
-						// biome-ignore lint/suspicious/noArrayIndexKey: a fixed list
-						key={i}
-						label={
-							status.phase === "saved" && status.mergedWithOthers
-								? "saved + merge"
-								: status.phase
-						}
-					>
-						<SaveStatusText status={status} />
-					</Row>
-				))}
-			</Section>
-
-			<Section title="Komunikaty">
-				<div className="flex flex-col gap-3">
-					<Notice
-						tone="amber"
-						title="Ktoś inny zmienił to samo w międzyczasie"
-						actions={
-							<>
-								<Button variant="primary" size="md">
-									Nadpisz moimi zmianami
-								</Button>
-								<Button size="md">Zostaw wersję z serwera</Button>
-							</>
-						}
-					>
-						Widzisz teraz wersję z serwera. Twoje zmiany nie przepadły. Różnice:
-						dzień 4.
-					</Notice>
-					<Notice
-						tone="red"
-						title="Nie udało się zapisać zmian"
-						actions={
-							<>
-								<Button variant="primary" size="md">
-									Spróbuj ponownie
-								</Button>
-								<Button size="md">Odrzuć moje zmiany</Button>
-							</>
-						}
-					>
-						Serwer nie odpowiada. Twoje zmiany nie przepadły.
-					</Notice>
-					<Notice tone="amber" title="Ten trening jest już w tym dniu" />
-					<Notice tone="blue" title="Informacja">
-						Spokojny komunikat bez akcji.
-					</Notice>
-					<Notice tone="green" title="Opublikowano">
-						Wyzwanie jest widoczne w aplikacji.
-					</Notice>
-				</div>
-			</Section>
-
-			<Section title="Formularz">
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-					<TextField
-						label="Nazwa"
-						required
-						value={name}
-						onChange={(event) => setName(event.target.value)}
-						error={
-							name.trim().length < 4
-								? "Nazwa musi mieć co najmniej 4 znaki"
-								: ""
-						}
-						hint="Widoczna w aplikacji."
-					/>
-					<TextField
-						label="Komentarz"
-						placeholder="Niewidoczny w aplikacji"
-						hint="Tylko dla zespołu."
-					/>
-					<TextField
-						label="Z błędem"
-						defaultValue="abc"
-						error="Nazwa jest wymagana"
-					/>
-					<TextField label="Wyłączone" defaultValue="C12" disabled />
-					<TextAreaField
-						label="Opis"
-						placeholder="Kilka zdań o wyzwaniu"
-						hint="Pole rozciąga się w pionie."
-					/>
-					<div className="flex flex-col gap-4">
-						<Switch
-							label="Ukryj"
-							hint="Ukryte wyzwanie nie pojawia się na listach w aplikacji."
-							checked={hidden}
-							onChange={setHidden}
-						/>
-						<Switch
-							label="Niedostępny przełącznik"
-							checked
-							onChange={() => undefined}
-							disabled
-						/>
-					</div>
-				</div>
-			</Section>
-
-			<Section title="Wybór wielu wartości i data">
-				<Row label="Kilka wartości">
-					<div className="w-80 max-w-full">
-						<MultiSelect
-							label="Typ treningu"
-							options={KNOWN_TRAINING_TYPE_IDS.map((id) => ({
-								value: id,
-								...trainingTypeMeta(id),
-							}))}
-							value={types}
-							onChange={setTypes}
-						/>
-					</div>
-				</Row>
-				<Row label="Kilka wartości w kolejności">
-					<div className="w-96 max-w-full">
-						<OrderedSelect
-							label="Polecane dalej"
-							options={KNOWN_TRAINING_TYPE_IDS.map((id) => ({
-								value: id,
-								...trainingTypeMeta(id),
-							}))}
-							value={ordered}
-							onChange={setOrdered}
-							max={3}
-						/>
-					</div>
-				</Row>
-				<Row label="Lista z czyszczeniem">
-					<Select
-						label="Poziom"
-						placeholder="Poziom: wszystkie"
-						options={levelOptions}
-						value={level}
-						onChange={setLevel}
-						clearable
-						className="w-64"
-					/>
-				</Row>
-				<Row label="Data i godzina">
-					<div className="w-72 max-w-full">
-						<DateTimeField
-							label="Data premiery"
-							value={when}
-							onChange={setWhen}
-							hint="Wpisz albo wybierz z kalendarza. Czas lokalny, zapis w UTC."
-						/>
-					</div>
-				</Row>
-				<Row label="Sam dzień">
-					<div className="w-72 max-w-full">
-						<DateField
-							label="Widoczne od"
-							value={day}
-							onChange={setDay}
-							hint="Święta w kalendarzu są na czerwono."
-						/>
-					</div>
-				</Row>
-			</Section>
-
-			<Section title="JSON: co trafia na serwer">
-				<p className="mb-3 text-sm text-muted">
-					Jeden sposób pokazywania JSON-u, z kopiowaniem. Okno „Podgląd JSON”
-					jest w menu „Więcej” każdego edytora: różnice, wersja przed i wersja
-					po.
-				</p>
-				<Row label="Widok JSON">
-					<div className="w-full max-w-xl">
-						<JsonView
-							value={{ title: name, isHidden: hidden, liveAtUtc: when }}
-							label="Przykładowy JSON"
-							height="h-32"
-						/>
-					</div>
-				</Row>
-				<Row label="Przed, po i różnice">
-					<Button onClick={() => setJsonOpen(true)}>Pokaż podgląd JSON</Button>
-					{jsonOpen && (
-						<JsonPreviewDialog
-							of="przykładu"
-							before={{
-								id: "C1",
-								title: "Wiosenny start",
-								isHidden: false,
-								paths: [
-									{
-										pathId: "p-easy",
-										days: [
-											{ dayIndex: 1, workoutIds: ["W1"] },
-											{ dayIndex: 2, workoutIds: [] },
-										],
-									},
-								],
-							}}
-							after={{
-								id: "C1",
-								title: name,
-								isHidden: hidden,
-								paths: [
-									{
-										pathId: "p-easy",
-										days: [
-											{ dayIndex: 1, workoutIds: ["W1"] },
-											{ dayIndex: 2, workoutIds: ["W5"] },
-										],
-									},
-								],
-							}}
-							onClose={() => setJsonOpen(false)}
-						/>
-					)}
-				</Row>
-			</Section>
-
-			<Section title="Treść blokowa">
-				<p className="mb-3 text-sm text-muted">
-					Opisy treningów i wyzwań oraz treść wiadomości. Podgląd pokazuje to,
-					co wyświetli aplikacja; przykład ma celowo jeden błąd i jedną uwagę.
-				</p>
-				<ContentField
-					label="Opis"
-					editorTitle="Opis (przykład)"
-					value={content}
-					onChange={setContent}
-					imageFolderId="workouts"
-				/>
-			</Section>
-
-			<Section title="Okna dialogowe">
-				<p className="mb-3 text-sm text-muted">
-					Na komputerze okno jest wyśrodkowane, na telefonie wysuwa się od dołu.
-					Pytania o potwierdzenie zastępują systemowe okienka przeglądarki.
-				</p>
-				<Row label="Okno z treścią">
-					<Button onClick={() => setDialogOpen(true)}>Otwórz okno</Button>
-				</Row>
-				<Row label="Potwierdzenie">
-					<Button
-						onClick={async () =>
-							setAnswer(
-								(await confirm({
-									title: "Opublikować wyzwanie?",
-									description:
-										"Wyzwanie stanie się widoczne w aplikacji dla wszystkich.",
-									confirmLabel: "Opublikuj",
-								}))
-									? "potwierdzono"
-									: "anulowano",
-							)
-						}
-					>
-						Zapytaj
-					</Button>
-					<Button
-						onClick={async () =>
-							setAnswer(
-								(await confirm({
-									title: "Usunąć trening?",
-									description:
-										"Trening trafi do kosza. Można go stamtąd przywrócić.",
-									confirmLabel: "Usuń",
+				<Section title="Menu i powiadomienia">
+					<Row label="Menu akcji">
+						<Menu
+							label="Akcje wyzwania"
+							triggerClassName="rounded-control border border-line-input bg-surface px-3 py-1.5 text-sm hover:border-primary"
+							trigger="Akcje ▾"
+							align="start"
+							actions={[
+								{
+									label: "Duplikuj",
+									onSelect: () => toast({ title: "Zduplikowano" }),
+								},
+								{ label: "Ukryj", onSelect: () => toast({ title: "Ukryto" }) },
+								{
+									label: "Niedostępna akcja",
+									onSelect: () => undefined,
+									disabled: true,
+								},
+								{
+									label: "Usuń",
 									destructive: true,
-								}))
-									? "potwierdzono"
-									: "anulowano",
-							)
-						}
-					>
-						Zapytaj o usunięcie
-					</Button>
-					{answer && (
-						<span className="text-xs text-muted">Odpowiedź: {answer}</span>
-					)}
-				</Row>
-				<Dialog
-					open={dialogOpen}
-					onOpenChange={setDialogOpen}
-					title="Nowy wariant"
-					description="Wariant to osobna ścieżka wyzwania dla jednego poziomu."
-					footer={
-						<>
-							<Button size="md" onClick={() => setDialogOpen(false)}>
-								Anuluj
-							</Button>
-							<Button
-								size="md"
-								variant="primary"
-								onClick={() => setDialogOpen(false)}
-							>
-								Dodaj wariant
-							</Button>
-						</>
-					}
-				>
-					<div className="flex flex-col gap-4">
-						<TextField label="Nazwa wariantu" placeholder="np. Spokojny" />
-						<div>
-							<div className="mb-1.5 text-sm font-semibold">Poziom</div>
-							<Select
-								label="Poziom"
-								options={levelOptions}
-								value={level}
-								onChange={setLevel}
-								className="w-full"
-							/>
-						</div>
+									onSelect: () => toast({ title: "Usunięto", tone: "red" }),
+								},
+							]}
+						/>
+					</Row>
+					<Row label="Powiadomienia">
+						<Button
+							onClick={() =>
+								toast({ title: "Trening zapisany", tone: "green" })
+							}
+						>
+							Sukces
+						</Button>
+						<Button
+							onClick={() =>
+								toast({
+									title: "Połączono ze zmianami innej osoby",
+									description: "Ktoś zmienił tytuł, gdy edytowałaś plan.",
+									tone: "blue",
+								})
+							}
+						>
+							Informacja
+						</Button>
+						<Button
+							onClick={() =>
+								toast({
+									title: "Nie udało się zapisać",
+									description: "Serwer nie odpowiada. Spróbuj ponownie.",
+									tone: "red",
+								})
+							}
+						>
+							Błąd
+						</Button>
+					</Row>
+				</Section>
+
+				<Section title="Tabela">
+					<p className="mb-3 text-sm text-muted">
+						Na telefonie każdy wiersz staje się kartą, a pierwsza kolumna jej
+						tytułem.
+					</p>
+					<Table
+						columns={challengeColumns}
+						rows={sampleChallenges}
+						rowKey={(challenge) => challenge.id}
+						onRowClick={(challenge) => toast({ title: challenge.title })}
+					/>
+				</Section>
+
+				<Section title="Karta i pusty stan">
+					<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+						<Card>
+							<h3 className="font-semibold">Karta</h3>
+							<p className="mt-1 text-sm text-muted">
+								Biała powierzchnia z ramką, na której leży treść.
+							</p>
+						</Card>
+						<EmptyState
+							title="Brak treningów"
+							action={<Button variant="primary">Stwórz nowy trening</Button>}
+						>
+							Katalog jest pusty. Dodaj pierwszy trening, żeby móc układać
+							plany.
+						</EmptyState>
 					</div>
-				</Dialog>
-			</Section>
+				</Section>
 
-			<Section title="Menu i powiadomienia">
-				<Row label="Menu akcji">
-					<Menu
-						label="Akcje wyzwania"
-						triggerClassName="rounded-control border border-line-input bg-surface px-3 py-1.5 text-sm hover:border-primary"
-						trigger="Akcje ▾"
-						align="start"
-						actions={[
-							{
-								label: "Duplikuj",
-								onSelect: () => toast({ title: "Zduplikowano" }),
-							},
-							{ label: "Ukryj", onSelect: () => toast({ title: "Ukryto" }) },
-							{
-								label: "Niedostępna akcja",
-								onSelect: () => undefined,
-								disabled: true,
-							},
-							{
-								label: "Usuń",
-								destructive: true,
-								onSelect: () => toast({ title: "Usunięto", tone: "red" }),
-							},
-						]}
-					/>
-				</Row>
-				<Row label="Powiadomienia">
-					<Button
-						onClick={() => toast({ title: "Trening zapisany", tone: "green" })}
-					>
-						Sukces
+				<Section title="Ładowanie">
+					<p className="mb-3 text-sm text-muted">
+						Jedno kółko na środku strony, w kolorach logo; pojawia się i znika
+						płynnie. Ekran, który jeszcze czeka na dane, zgłasza to znacznikiem
+						Loading i sam nic nie rysuje.
+					</p>
+					<Row label="Kółko">
+						<Spinner />
+						<Spinner className="size-6" />
+					</Row>
+				</Section>
+
+				<Section title="Błąd widoku">
+					<p className="mb-3 text-sm text-muted">
+						Tak wygląda każdy nieoczekiwany błąd: spokojny komunikat, a
+						szczegóły techniczne małym drukiem po rozwinięciu.
+					</p>
+					<div className="rounded-control border border-line border-dashed">
+						<ErrorScreen
+							error={new Error("Przykładowy błąd do podglądu")}
+							onRetry={() => undefined}
+						/>
+					</div>
+					<Button className="mt-3" onClick={() => setExploded(true)}>
+						Wywołaj prawdziwy błąd na tej stronie
 					</Button>
-					<Button
-						onClick={() =>
-							toast({
-								title: "Połączono ze zmianami innej osoby",
-								description: "Ktoś zmienił tytuł, gdy edytowałaś plan.",
-								tone: "blue",
-							})
-						}
-					>
-						Informacja
-					</Button>
-					<Button
-						onClick={() =>
-							toast({
-								title: "Nie udało się zapisać",
-								description: "Serwer nie odpowiada. Spróbuj ponownie.",
-								tone: "red",
-							})
-						}
-					>
-						Błąd
-					</Button>
-				</Row>
-			</Section>
-
-			<Section title="Tabela">
-				<p className="mb-3 text-sm text-muted">
-					Na telefonie każdy wiersz staje się kartą, a pierwsza kolumna jej
-					tytułem.
-				</p>
-				<Table
-					columns={challengeColumns}
-					rows={sampleChallenges}
-					rowKey={(challenge) => challenge.id}
-					onRowClick={(challenge) => toast({ title: challenge.title })}
-				/>
-			</Section>
-
-			<Section title="Karta i pusty stan">
-				<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-					<Card>
-						<h3 className="font-semibold">Karta</h3>
-						<p className="mt-1 text-sm text-muted">
-							Biała powierzchnia z ramką, na której leży treść.
-						</p>
-					</Card>
-					<EmptyState
-						title="Brak treningów"
-						action={<Button variant="primary">Stwórz nowy trening</Button>}
-					>
-						Katalog jest pusty. Dodaj pierwszy trening, żeby móc układać plany.
-					</EmptyState>
-				</div>
-			</Section>
-
-			<Section title="Ładowanie">
-				<p className="mb-3 text-sm text-muted">
-					Jedno kółko na środku strony, w kolorach logo; pojawia się i znika
-					płynnie. Ekran, który jeszcze czeka na dane, zgłasza to znacznikiem
-					Loading i sam nic nie rysuje.
-				</p>
-				<Row label="Kółko">
-					<Spinner />
-					<Spinner className="size-6" />
-				</Row>
-			</Section>
-
-			<Section title="Błąd widoku">
-				<p className="mb-3 text-sm text-muted">
-					Tak wygląda każdy nieoczekiwany błąd: spokojny komunikat, a szczegóły
-					techniczne małym drukiem po rozwinięciu.
-				</p>
-				<div className="rounded-control border border-line border-dashed">
-					<ErrorScreen
-						error={new Error("Przykładowy błąd do podglądu")}
-						onRetry={() => undefined}
-					/>
-				</div>
-				<Button className="mt-3" onClick={() => setExploded(true)}>
-					Wywołaj prawdziwy błąd na tej stronie
-				</Button>
-			</Section>
-		</div>
+				</Section>
+			</div>
+		</Page>
 	);
 }

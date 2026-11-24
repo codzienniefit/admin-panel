@@ -22,6 +22,7 @@ import { EmptyState } from "@/ui/EmptyState";
 import { STATUS_META } from "@/ui/enums";
 import { SearchInput } from "@/ui/ListPage";
 import { Loading, useDelayedLoading } from "@/ui/Loading";
+import { Page } from "@/ui/Page";
 import { Segmented } from "@/ui/Segmented";
 import { Select, type SelectOption } from "@/ui/Select";
 import { StatusBadge } from "@/ui/StatusBadge";
@@ -172,20 +173,15 @@ export function ChallengesPage({
 	];
 
 	return (
-		<div className="mx-auto max-w-[1400px]">
-			<header className="mb-5 flex flex-wrap items-center gap-3">
-				<h1 className="text-3xl font-semibold tracking-tight">Wyzwania</h1>
-				<ChallengesViewSwitch />
-				<Button
-					variant="primary"
-					size="md"
-					className="ml-auto"
-					onClick={onCreate}
-				>
+		<Page
+			title="Wyzwania"
+			beside={<ChallengesViewSwitch />}
+			action={
+				<Button variant="primary" size="md" onClick={onCreate}>
 					Nowe wyzwanie
 				</Button>
-			</header>
-
+			}
+		>
 			<div className="mb-4">
 				<PromotedChallenge
 					// Start again from the saved value when it changes.
@@ -311,6 +307,6 @@ export function ChallengesPage({
 					))}
 				</div>
 			)}
-		</div>
+		</Page>
 	);
 }

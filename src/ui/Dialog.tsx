@@ -61,6 +61,9 @@ export function Dialog({
 	return (
 		<BaseDialog.Root
 			open={open}
+			// A click beside the window never closes it: a form half filled in
+			// is not lost to a stray click. Escape, × and the buttons close it.
+			disablePointerDismissal
 			onOpenChange={(next) => {
 				onOpenChange?.(next);
 				if (!next) onClose?.();
@@ -81,13 +84,15 @@ export function Dialog({
 					<BaseDialog.Popup
 						className={`flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-dialog bg-surface shadow-menu outline-none transition-[opacity,scale] duration-200 data-closed:pointer-events-none data-ending-style:opacity-0 data-starting-style:opacity-0 md:max-w-[calc(100vw-3rem)] md:rounded-dialog md:data-ending-style:scale-95 md:data-starting-style:scale-95 ${WIDTH[size]}`}
 					>
-						<div className="flex shrink-0 items-start gap-4 px-5 pt-5 md:px-6 md:pt-6">
+						<div
+							className={`flex shrink-0 items-start gap-4 px-5 pt-5 md:px-6 md:pt-6 ${children ? "" : "pb-6 md:pb-7"}`}
+						>
 							<div className="min-w-0 flex-1">
 								<BaseDialog.Title className="text-xl font-semibold tracking-tight">
 									{title}
 								</BaseDialog.Title>
 								{description && (
-									<BaseDialog.Description className="mt-1 text-sm text-subtle">
+									<BaseDialog.Description className="mt-2 text-sm leading-relaxed text-subtle">
 										{description}
 									</BaseDialog.Description>
 								)}
@@ -102,12 +107,14 @@ export function Dialog({
 						{children && (
 							// overscroll-contain: reaching the end does not hand the
 							// scroll on to the page underneath
-							<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 md:px-6">
+							// --sticky-top: what sticks inside (the content editor's preview)
+							// sticks to the top of this box, not under the page's top bar
+							<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 [--sticky-top:0px] md:px-6">
 								{children}
 							</div>
 						)}
 						{footer && (
-							<div className="flex shrink-0 flex-col-reverse gap-2 border-line border-t px-5 py-4 md:flex-row md:justify-end md:px-6">
+							<div className="flex shrink-0 flex-col-reverse gap-2 border-line border-t px-5 py-4 md:flex-row md:justify-end md:px-6 md:py-5">
 								{footer}
 							</div>
 						)}

@@ -46,7 +46,7 @@ function question(
 	if (action === "send") {
 		return {
 			title: "Wysłać wiadomość?",
-			description: `Wiadomość „${title}” dostaną: ${recipientsText(groups, message.targetGroup)}. Wysłanej wiadomości nie można poprawić ani cofnąć.`,
+			description: `Wiadomość „${title}” otrzymają: ${recipientsText(groups, message.targetGroup)}. Wysłanej wiadomości nie można już poprawić ani cofnąć.`,
 			confirmLabel: "Wyślij teraz",
 			cancelLabel: "Jeszcze nie",
 		};
@@ -56,8 +56,8 @@ function question(
 			title: "Przenieść do archiwum?",
 			description:
 				message.status === "sent"
-					? `Wiadomość „${title}” zniknie z listy w panelu. Archiwum niczego nie cofa: odbiorcy już ją dostali. Można ją stamtąd przywrócić.`
-					: `Robocza wiadomość „${title}” zniknie z listy i nie zostanie wysłana. Można ją przywrócić z archiwum.`,
+					? `Wiadomość „${title}” zniknie z listy w panelu. Archiwizacja nie cofa wysyłki: odbiorcy już ją otrzymali. Wiadomość można później przywrócić z archiwum.`
+					: `Robocza wiadomość „${title}” zniknie z listy i nie zostanie wysłana. Można ją później przywrócić z archiwum.`,
 			confirmLabel: "Przenieś do archiwum",
 			destructive: true,
 		};

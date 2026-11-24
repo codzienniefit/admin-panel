@@ -52,8 +52,9 @@ export function LoadingOverlay() {
 		<div
 			role="status"
 			// the page under the spinner is dimmed, so a list still on screen from
-			// before does not read as the answer
-			className={`pointer-events-none fixed inset-0 z-[70] flex items-center justify-center bg-bg/60 transition-opacity duration-300 ease-out ${
+			// before does not read as the answer; under any open window (z-50),
+			// so a list loading behind an editor never covers the editor
+			className={`pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-bg/60 transition-opacity duration-300 ease-out ${
 				busy ? "opacity-100 delay-150" : "opacity-0"
 			}`}
 		>

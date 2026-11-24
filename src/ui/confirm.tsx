@@ -42,7 +42,8 @@ export function ConfirmHost() {
 			onClose={() => answer(false)}
 			title={current?.title ?? ""}
 			description={current?.description}
-			size="sm"
+			// wide enough for two or three sentences to read as a paragraph
+			size="md"
 			footer={
 				<>
 					<Button size="md" onClick={() => answer(false)}>

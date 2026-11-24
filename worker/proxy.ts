@@ -165,6 +165,16 @@ const REQUEST_HEADERS = ["accept", "content-type", "if-match", "if-none-match"];
 /** Response headers passed back. The length is the runtime's to state. */
 const RESPONSE_HEADERS = ["content-type", "etag"];
 /** For files only: a player asks for a part of a recording at a time. */
+/**
+ * How long this browser alone keeps a file: a day, and a week more while it
+ * quietly checks for a newer one (the ETag makes that check a 304 with no
+ * body). An upload never overwrites a file (it is renamed instead), so a path
+ * keeps its picture; only a file deleted and uploaded again under the same
+ * name can show the old picture, for at most a day, in a browser that had it.
+ */
+export const FILE_CACHE_CONTROL =
+	"private, max-age=86400, stale-while-revalidate=604800";
+
 const FILE_REQUEST_HEADERS = [
 	"range",
 	"if-range",
@@ -333,7 +343,7 @@ async function serveFile(
 	if (upstream.status === 304) {
 		return new Response(null, {
 			status: 304,
-			headers: { ...SECURITY_HEADERS, "cache-control": "private, max-age=300" },
+			headers: { ...SECURITY_HEADERS, "cache-control": FILE_CACHE_CONTROL },
 		});
 	}
 	if (upstream.status >= 300 && upstream.status < 400) {
@@ -352,8 +362,8 @@ async function serveFile(
 
 	const answer = new Headers({
 		...SECURITY_HEADERS,
-		// By this browser only, for a few minutes.
-		"cache-control": "private, max-age=300",
+		// By this browser only (see FILE_CACHE_CONTROL).
+		"cache-control": FILE_CACHE_CONTROL,
 		"content-disposition": "inline",
 		// Opened on its own, a file is shut in a sandbox.
 		"content-security-policy":

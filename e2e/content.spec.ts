@@ -49,19 +49,24 @@ async function showPane(description: Locator, name: RegExp): Promise<void> {
 	if (await tab.isVisible()) await tab.click();
 }
 
-/** The content as it will be saved, in the preview's JSON view. */
+/** The left side's switch between the blocks and their JSON. */
+const contentView = (description: Locator) =>
+	description.getByRole("group", { name: "Widok treści" });
+
+/** The content as it will be saved, editable, where the blocks are. */
 async function showJson(description: Locator): Promise<Locator> {
-	await showPane(description, /^Podgląd/);
-	const preview = description.getByRole("region", {
-		name: "Podgląd",
-		exact: true,
-	});
-	await preview.getByRole("button", { name: "JSON", exact: true }).click();
-	return preview.getByRole("textbox", { name: "Treść jako JSON" });
+	await showPane(description, /^Bloki/);
+	await contentView(description)
+		.getByRole("button", { name: "JSON", exact: true })
+		.click();
+	return description.getByRole("textbox", { name: "Treść jako JSON" });
 }
 
 async function showBlocks(description: Locator): Promise<void> {
 	await showPane(description, /^Bloki/);
+	await contentView(description)
+		.getByRole("button", { name: "Bloki", exact: true })
+		.click();
 }
 
 /** Extends the selection back from the caret, as Shift + arrow does. */
@@ -123,14 +128,15 @@ test("content is edited in the form, block by block, and saved with it", async (
 	});
 	await expect(preview.getByText("Na koniec napij się wody.")).toBeVisible();
 
-	// The same content as it will be saved.
-	const json = preview.getByRole("textbox", { name: "Treść jako JSON" });
-	await preview.getByRole("button", { name: "JSON", exact: true }).click();
+	// The same content as it will be saved, where the blocks are.
+	const json = await showJson(description);
 	await expect(json).toHaveValue(/"type": "Text"/);
 	await expect(json).toHaveValue(/"content": "Na koniec napij się wody\."/);
-	await preview.getByRole("button", { name: "Wygląd", exact: true }).click();
+	await showBlocks(description);
 	await expect(json).toHaveCount(0);
-	await expect(preview.getByText("Na koniec napij się wody.")).toBeVisible();
+	await expect(
+		description.getByRole("textbox", { name: "Tekst, blok 3" }),
+	).toHaveText("Na koniec napij się wody.");
 
 	await save(page, editor);
 
@@ -138,6 +144,72 @@ test("content is edited in the form, block by block, and saved with it", async (
 	await expect(
 		reopened.description.getByRole("textbox", { name: "Tekst, blok 3" }),
 	).toHaveText("Na koniec napij się wody.");
+});
+
+test("JSON typed where the blocks are reaches the preview, and a mistake is shown under it", async ({
+	page,
+}) => {
+	const { description } = await openWorkout(page);
+	const preview = description.getByRole("region", {
+		name: "Podgląd",
+		exact: true,
+	});
+	const json = await showJson(description);
+
+	await json.fill(
+		JSON.stringify([
+			{ type: "Title", content: "Z JSON-a", metadata: null },
+			{ type: "Text", content: "Prosto do podglądu.", metadata: null },
+		]),
+	);
+	await expect(preview.getByText("Z JSON-a", { exact: true })).toBeVisible();
+	await expect(json).not.toHaveAttribute("aria-invalid", "true");
+
+	// broken JSON: said right under it, the preview keeps the last good one
+	await json.fill('[{ "type": "Title", ');
+	await expect(json).toHaveAttribute("aria-invalid", "true");
+	await expect(description.getByRole("alert")).toContainText(
+		"To nie jest poprawny JSON",
+	);
+	await expect(preview.getByText("Z JSON-a", { exact: true })).toBeVisible();
+
+	// valid JSON with a block the rules refuse: listed under it, border red
+	await json.fill(
+		JSON.stringify([{ type: "Title", content: "", metadata: null }]),
+	);
+	await expect(json).toHaveAttribute("aria-invalid", "true");
+	await expect(description.getByText(/Błędy: 1/)).toBeVisible();
+
+	// back to the blocks: what the JSON said is what they are
+	await showBlocks(description);
+	await expect(
+		description.getByRole("textbox", { name: "Tytuł, blok 1" }),
+	).toHaveValue("");
+});
+
+test("the block being edited is marked in the preview", async ({ page }) => {
+	const { description } = await openWorkout(page);
+	const preview = description.getByRole("region", {
+		name: "Podgląd",
+		exact: true,
+	});
+	await description.getByRole("textbox", { name: "Tekst, blok 2" }).click();
+	const marked = preview.locator('[data-block-index="1"]');
+	await expect(marked).toHaveClass(/bg-\[#eceefa\]/);
+	await expect(preview.locator('[data-block-index="0"]')).not.toHaveClass(
+		/bg-\[#eceefa\]/,
+	);
+
+	// a block's number in the preview leads back to it in the editor
+	await preview
+		.getByRole("button", { name: "Pokaż blok 1 w edytorze" })
+		.click();
+	await expect(
+		description.getByRole("textbox", { name: "Tytuł, blok 1" }),
+	).toBeFocused();
+	await expect(preview.locator('[data-block-index="0"]')).toHaveClass(
+		/bg-\[#eceefa\]/,
+	);
 });
 
 test("ready text is pasted from a panel that stays out of the way", async ({

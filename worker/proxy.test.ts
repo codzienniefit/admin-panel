@@ -1983,7 +1983,7 @@ describe("GET /api/files", () => {
 			"last-modified": "Thu, 12 Nov 2026 10:00:00 GMT",
 			// Kept by this browser for a few minutes; rule 26 excepts media
 			// from no-store.
-			"cache-control": "private, max-age=300",
+			"cache-control": "private, max-age=86400, stale-while-revalidate=604800",
 			"content-disposition": "inline",
 			"content-security-policy":
 				"default-src 'none'; style-src 'unsafe-inline'; sandbox",
@@ -2577,7 +2577,7 @@ describe("GET /api/files", () => {
 		expect(response.status).toBe(304);
 		expect(await response.text()).toBe("");
 		expect(Object.fromEntries(response.headers)).toEqual({
-			"cache-control": "private, max-age=300",
+			"cache-control": "private, max-age=86400, stale-while-revalidate=604800",
 			"x-content-type-options": "nosniff",
 			"cross-origin-resource-policy": "same-origin",
 			"referrer-policy": "no-referrer",

@@ -750,6 +750,7 @@ function OfferForm({
 					/>
 				)}
 			</form>
+			{json.dialog}
 		</Dialog>
 	);
 }

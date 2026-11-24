@@ -17,7 +17,7 @@ import { plural } from "@/domain/text";
 import { MediaSlot } from "@/features/media/MediaSlot";
 import { Button } from "@/ui/Button";
 import { confirm } from "@/ui/confirm";
-import { JsonView } from "@/ui/JsonView";
+import { formatJson } from "@/ui/JsonView";
 import { Segmented } from "@/ui/Segmented";
 import { toast } from "@/ui/toast";
 import { AppScreen } from "./AppScreen";
@@ -37,8 +37,9 @@ import { RichTextEditor } from "./RichTextEditor";
 // elsewhere (or JSON from the old panel) can be pasted and turned into
 // blocks, from a panel that stays folded away until asked for.
 //
-// Where the container is wide, blocks and preview sit side by side; where it
-// is narrow (a dialog, a phone) one of them shows at a time. That is decided
+// Where the container is wide, blocks and preview sit side by side: the
+// preview only as wide as the app's screen needs, the blocks taking the rest;
+// where it is narrow (a phone) one of them shows at a time. That is decided
 // by the container's own width, not the window's, because the same editor
 // lives in a narrow dialog and on a wide page.
 
@@ -77,11 +78,14 @@ const PANES: Array<{ id: Pane; label: string }> = [
 	{ id: "preview", label: "Podgląd" },
 ];
 
-/** The preview as the app draws it, or as it is stored. */
-type PreviewKind = "look" | "json";
+/**
+ * The content edited block by block, or as the JSON that is saved: typed or
+ * pasted there, it reaches the preview and the form as soon as it is valid.
+ */
+type ContentView = "blocks" | "json";
 
-const PREVIEW_KINDS: Array<{ value: PreviewKind; label: string }> = [
-	{ value: "look", label: "Wygląd" },
+const CONTENT_VIEWS: Array<{ value: ContentView; label: string }> = [
+	{ value: "blocks", label: "Bloki" },
 	{ value: "json", label: "JSON" },
 ];
 
@@ -109,6 +113,8 @@ export function ContentEditor({
 	// The value the rows were last known to match. A different one that also
 	// says something else did not come from here (the form was reset, or took
 	// a colleague's change): then the rows start again from it.
+	// The JSON as typed: it can be invalid for a while, the blocks never are.
+	const [jsonText, setJsonText] = useState("");
 	const [inStep, setInStep] = useState(value);
 	if (value !== inStep) {
 		setInStep(value);
@@ -121,6 +127,7 @@ export function ContentEditor({
 			const fresh = toRows(value);
 			setRowsState(fresh);
 			setSelectedKey(fresh[0]?.key ?? null);
+			setJsonText(formatJson(value));
 		}
 	}
 	// Read-only content is there to be looked at, so it opens on the preview.
@@ -131,7 +138,7 @@ export function ContentEditor({
 	// With no blocks yet, pasting ready text is the quickest start, so the
 	// box for it is already open, until someone hides it.
 	const [pasteDismissed, setPasteDismissed] = useState(false);
-	const [previewKind, setPreviewKind] = useState<PreviewKind>("look");
+	const [view, setView] = useState<ContentView>("blocks");
 	const [dragKey, setDragKey] = useState<string | null>(null);
 	const [dropAt, setDropAt] = useState<{ key: string; before: boolean } | null>(
 		null,
@@ -140,6 +147,7 @@ export function ContentEditor({
 	const sourceBox = useRef<HTMLTextAreaElement>(null);
 	const pasteToggleId = useId();
 	const pastePanelId = useId();
+	const jsonCheckId = useId();
 
 	const setRows = (next: Row[]) => {
 		const reported = next.map((row) => row.block);
@@ -163,6 +171,7 @@ export function ContentEditor({
 	const focusRow = (key: string) => {
 		setSelectedKey(key);
 		setPane("blocks");
+		setView("blocks");
 		// After the row is on screen (it may be newly added or on another pane).
 		setTimeout(() => {
 			const element = elements.current.get(key);
@@ -315,6 +324,78 @@ export function ContentEditor({
 	const hiddenUnless = (which: Pane) =>
 		pane === which ? "" : "hidden @4xl:block";
 
+	// --- the JSON view --------------------------------------------------------
+	const parsedJson = view === "json" ? parseContentJson(jsonText) : null;
+	const jsonProblem = parsedJson && !parsedJson.ok ? parsedJson.problem : null;
+	const jsonBad = jsonProblem !== null || errorCount > 0;
+
+	const showView = (next: ContentView) => {
+		// Always from the blocks as they are now, never a stale draft.
+		if (next === "json") setJsonText(formatJson(blocks));
+		setView(next);
+	};
+
+	const editJson = (text: string) => {
+		setJsonText(text);
+		const parsed = parseContentJson(text);
+		if (parsed.ok && !deepEqual(parsed.blocks, blocks)) {
+			setRows(toRows(parsed.blocks));
+			setSelectedKey(null);
+		}
+	};
+
+	const highlighted = rows.findIndex((row) => row.key === selectedKey);
+
+	// What is wrong with the blocks, each problem a button to its block.
+	const validation = (
+		<div className="text-sm">
+			{issues.length === 0 ? (
+				<p className="font-semibold text-(--tone-ink)" data-tone="green">
+					{rows.length === 0
+						? "Brak treści"
+						: `Wszystkie bloki są poprawne (${rows.length})`}
+				</p>
+			) : (
+				<>
+					<p className="mb-2 font-semibold">
+						{errorCount > 0 && (
+							<span className="text-danger">Błędy: {errorCount}</span>
+						)}
+						{errorCount > 0 && warningCount > 0 && " · "}
+						{warningCount > 0 && (
+							<span className="text-(--tone-ink)" data-tone="amber">
+								Uwagi: {warningCount}
+							</span>
+						)}
+					</p>
+					<ul className="flex flex-col gap-1.5">
+						{issues.map((issue) => {
+							const row = rows[issue.index];
+							if (!row) return null;
+							return (
+								<li
+									key={`${row.key}-${issue.message}`}
+									className="flex flex-wrap items-baseline gap-2"
+								>
+									<button
+										type="button"
+										onClick={() => focusRow(row.key)}
+										className={`shrink-0 rounded-chip border px-1.5 py-0.5 text-[11px] font-semibold hover:bg-bg ${issue.severity === "error" ? "border-danger text-danger" : "border-line-input text-subtle"}`}
+									>
+										{BLOCK_LABELS[row.block.type as BlockType] ??
+											row.block.type}{" "}
+										· {issue.index + 1}
+									</button>
+									<span className="min-w-0 flex-1">{issue.message}</span>
+								</li>
+							);
+						})}
+					</ul>
+				</>
+			)}
+		</div>
+	);
+
 	return (
 		// biome-ignore lint/a11y/useSemanticElements: a fieldset would add a legend and its own layout; the group only gives the editor its name
 		<div
@@ -351,21 +432,57 @@ export function ContentEditor({
 				/>
 			</div>
 
-			<div className="grid @4xl:grid-cols-2">
+			<div className="grid @4xl:grid-cols-[minmax(0,1fr)_26rem]">
 				{/* 1. Blocks */}
 				<section
 					aria-label="Bloki"
 					className={`min-w-0 ${hiddenUnless("blocks")}`}
 				>
-					<div className={`hidden @4xl:flex ${paneHead}`}>
-						Bloki
+					<div className={`flex ${paneHead}`}>
+						<Segmented
+							label="Widok treści"
+							className="font-normal"
+							options={CONTENT_VIEWS}
+							value={view}
+							onChange={showView}
+						/>
 						<span className="ml-auto text-xs font-normal text-muted">
 							zmiany widać od razu w podglądzie
 						</span>
 					</div>
+					{view === "json" && (
+						<div className="flex flex-col gap-2 p-3">
+							<textarea
+								aria-label="Treść jako JSON"
+								aria-invalid={jsonBad || undefined}
+								aria-describedby={jsonCheckId}
+								value={jsonText}
+								readOnly={disabled}
+								spellCheck={false}
+								onChange={(event) => editJson(event.target.value)}
+								className={`h-[min(34rem,60vh)] w-full resize-y rounded-cell border bg-surface-alt p-3 font-mono text-xs leading-relaxed text-ink outline-none focus:shadow-focus ${jsonBad ? "border-danger" : "border-line focus:border-primary"}`}
+							/>
+							<div id={jsonCheckId}>
+								{jsonProblem ? (
+									<p role="alert" className="text-sm text-danger">
+										{jsonProblem}. Podgląd i formularz mają ostatnią poprawną
+										wersję.
+									</p>
+								) : (
+									validation
+								)}
+							</div>
+							<p className="text-xs text-muted">
+								Poprawny JSON od razu trafia do podglądu i do formularza, i
+								dokładnie w tej postaci zapisze się razem z nim. Można tu też
+								wkleić JSON ze starego panelu.
+							</p>
+						</div>
+					)}
 					{/* One switch locks every control inside, the browser's own way. */}
 					<fieldset
 						disabled={disabled}
+						hidden={view === "json"}
 						className="flex min-w-0 flex-col gap-3 p-3"
 					>
 						{rows.map((row, index) => {
@@ -755,102 +872,49 @@ export function ContentEditor({
 					aria-label="Podgląd"
 					className={`min-w-0 border-line @4xl:border-l ${hiddenUnless("preview")}`}
 				>
-					{/* Beside a long list of blocks the preview stays in view, below
-					    the panel's top bar when the page itself is what scrolls. */}
-					<div className="@4xl:sticky @4xl:top-16">
-						<div className={`flex ${paneHead}`}>
-							Podgląd
-							<Segmented
-								label="Rodzaj podglądu"
-								className="ml-auto font-normal"
-								options={PREVIEW_KINDS}
-								value={previewKind}
-								onChange={setPreviewKind}
-							/>
-						</div>
+					{/* Beside a long list of blocks the preview stays in view, level
+					    with the top of what scrolls: under the panel's top bar on a
+					    page, at the very top inside a window (Dialog sets
+					    --sticky-top to 0). */}
+					<div className="@4xl:sticky @4xl:top-[var(--sticky-top,4rem)]">
+						<div className={`flex ${paneHead}`}>Podgląd</div>
 						<div className="flex flex-col gap-2 p-3">
-							{previewKind === "look" ? (
-								<>
-									{previewingPaste && (
-										<p className="text-xs text-(--tone-ink)" data-tone="amber">
-											Wklejany tekst: tak będzie wyglądał po utworzeniu bloków.
-											Treść jeszcze się nie zmieniła.
-										</p>
-									)}
-									<AppScreen>
-										<ContentPreview
-											blocks={previewingPaste ? incoming : blocks}
-										/>
-									</AppScreen>
-								</>
-							) : (
-								<>
-									{/* The very list handed to onChange: what the form saves. */}
-									<JsonView
-										value={blocks}
-										label="Treść jako JSON"
-										height="h-72"
-									/>
-									<p className="text-xs text-muted">
-										Dokładnie w tej postaci treść zapisze się razem z
-										formularzem.
-									</p>
-								</>
+							{previewingPaste && (
+								<p className="text-xs text-(--tone-ink)" data-tone="amber">
+									Wklejany tekst: tak będzie wyglądał po utworzeniu bloków.
+									Treść jeszcze się nie zmieniła.
+								</p>
 							)}
+							<AppScreen>
+								<ContentPreview
+									blocks={previewingPaste ? incoming : blocks}
+									numbered
+									onPick={
+										previewingPaste
+											? undefined
+											: (index) => {
+													const row = rows[index];
+													if (row) focusRow(row.key);
+												}
+									}
+									highlightIndex={
+										previewingPaste || view === "json" || highlighted < 0
+											? null
+											: highlighted
+									}
+								/>
+							</AppScreen>
 						</div>
 					</div>
 				</section>
 			</div>
 
-			{/* Validation */}
-			<section aria-label="Walidacja" className="border-line border-t">
-				<div className="p-3 text-sm">
-					{issues.length === 0 ? (
-						<p className="font-semibold text-(--tone-ink)" data-tone="green">
-							{rows.length === 0
-								? "Brak treści"
-								: `Wszystkie bloki są poprawne (${rows.length})`}
-						</p>
-					) : (
-						<>
-							<p className="mb-2 font-semibold">
-								{errorCount > 0 && (
-									<span className="text-danger">Błędy: {errorCount}</span>
-								)}
-								{errorCount > 0 && warningCount > 0 && " · "}
-								{warningCount > 0 && (
-									<span className="text-(--tone-ink)" data-tone="amber">
-										Uwagi: {warningCount}
-									</span>
-								)}
-							</p>
-							<ul className="flex flex-col gap-1.5">
-								{issues.map((issue) => {
-									const row = rows[issue.index];
-									if (!row) return null;
-									return (
-										<li
-											key={`${row.key}-${issue.message}`}
-											className="flex flex-wrap items-baseline gap-2"
-										>
-											<button
-												type="button"
-												onClick={() => focusRow(row.key)}
-												className={`shrink-0 rounded-chip border px-1.5 py-0.5 text-[11px] font-semibold hover:bg-bg ${issue.severity === "error" ? "border-danger text-danger" : "border-line-input text-subtle"}`}
-											>
-												{BLOCK_LABELS[row.block.type as BlockType] ??
-													row.block.type}{" "}
-												· {issue.index + 1}
-											</button>
-											<span className="min-w-0 flex-1">{issue.message}</span>
-										</li>
-									);
-								})}
-							</ul>
-						</>
-					)}
-				</div>
-			</section>
+			{/* Validation: under the JSON while it is edited, here otherwise. */}
+			{view === "blocks" && (
+				<section aria-label="Walidacja" className="border-line border-t">
+					<div className="p-3">{validation}</div>
+				</section>
+			)}
 		</div>
 	);
 }

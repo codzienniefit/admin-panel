@@ -1,3 +1,4 @@
+import { Page } from "@/ui/Page";
 import { MediaBrowser } from "./MediaBrowser";
 
 interface MediaPageProps {
@@ -8,14 +9,13 @@ interface MediaPageProps {
 
 export function MediaPage({ folderId, query, onChange }: MediaPageProps) {
 	return (
-		<div className="mx-auto max-w-6xl">
-			<h1 className="mb-6 text-3xl font-semibold tracking-tight">Media</h1>
+		<Page title="Media">
 			<MediaBrowser
 				folderId={folderId}
 				onFolderChange={(folder) => onChange({ folder, q: undefined })}
 				query={query}
 				onQueryChange={(q) => onChange({ q: q || undefined })}
 			/>
-		</div>
+		</Page>
 	);
 }

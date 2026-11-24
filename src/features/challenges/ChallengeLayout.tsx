@@ -173,7 +173,7 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 		const sure = await confirm({
 			title: "Usunąć wyzwanie?",
 			description:
-				"Wyzwanie trafi do kosza i zniknie z aplikacji. Osoby, które je zaczęły, zachowają je w historii. Można je przywrócić.",
+				"Wyzwanie trafi do kosza i zniknie z aplikacji. Osoby, które je zaczęły, zachowają je w historii. Później można je przywrócić z kosza.",
 			confirmLabel: "Usuń",
 			destructive: true,
 		});

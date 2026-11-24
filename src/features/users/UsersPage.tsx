@@ -9,6 +9,7 @@ import { EmptyState } from "@/ui/EmptyState";
 import { TextField } from "@/ui/Field";
 import { Loading, useDelayedLoading } from "@/ui/Loading";
 import { Notice } from "@/ui/Notice";
+import { Page } from "@/ui/Page";
 import { type Column, Table } from "@/ui/Table";
 import { AccountTags } from "./AccountTags";
 import { personName, providerLabel } from "./userMeta";
@@ -27,12 +28,13 @@ interface UsersPageProps {
  */
 export function UsersPage({ query, onSearch, onOpen }: UsersPageProps) {
 	return (
-		<div className="mx-auto flex max-w-[1400px] flex-col gap-4">
-			<h1 className="text-3xl font-semibold tracking-tight">Użytkownicy</h1>
-			{/* A query that arrives with the address starts a fresh form. */}
-			<SearchForm key={query} query={query} onSearch={onSearch} />
-			<SearchResults query={query} onOpen={onOpen} />
-		</div>
+		<Page title="Użytkownicy">
+			<div className="flex flex-col gap-4">
+				{/* A query that arrives with the address starts a fresh form. */}
+				<SearchForm key={query} query={query} onSearch={onSearch} />
+				<SearchResults query={query} onOpen={onOpen} />
+			</div>
+		</Page>
 	);
 }
 

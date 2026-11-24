@@ -291,7 +291,7 @@ function WorkoutForm({ workout, onClose, onCreated }: WorkoutFormProps) {
 		const sure = await confirm({
 			title: "Usunąć trening?",
 			description:
-				"Trening trafi do kosza i zniknie z aplikacji. Można go przywrócić.",
+				"Trening trafi do kosza i zniknie z aplikacji. Później można go przywrócić z kosza.",
 			confirmLabel: "Usuń",
 			destructive: true,
 		});

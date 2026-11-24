@@ -33,6 +33,7 @@ import { DateField } from "@/ui/DateField";
 import { Dialog } from "@/ui/Dialog";
 import { EmptyState } from "@/ui/EmptyState";
 import { Loading } from "@/ui/Loading";
+import { Page } from "@/ui/Page";
 import { Segmented } from "@/ui/Segmented";
 import { StatusBadge } from "@/ui/StatusBadge";
 import { Tag } from "@/ui/Tag";
@@ -141,136 +142,135 @@ export function CalendarPage({
 	);
 
 	return (
-		<div className="mx-auto flex max-w-[1500px] flex-col gap-4">
-			<header className="flex flex-wrap items-center gap-3">
-				<h1 className="text-3xl font-semibold tracking-tight">Wyzwania</h1>
-				<ChallengesViewSwitch />
-			</header>
-
-			<div className="flex flex-wrap items-center gap-2">
-				<Button onClick={() => step(-1)} aria-label="Wcześniej">
-					‹
-				</Button>
-				<Button onClick={goToday}>Dziś</Button>
-				<Button onClick={() => step(1)} aria-label="Później">
-					›
-				</Button>
-				<h2 className="ml-2 text-xl font-semibold">
-					{view === "year" ? year : monthLabel(year, month0)}
-				</h2>
-				<Segmented
-					label="Zakres kalendarza"
-					className="ml-auto"
-					options={[
-						{ value: "month", label: "Miesiąc" },
-						{ value: "year", label: "Rok" },
-					]}
-					value={view}
-					onChange={(next) => onChange({ view: next })}
-				/>
-			</div>
-
-			{!ready ? (
-				<Loading />
-			) : (
-				// One column that may shrink: without it a long title in the lists
-				// below makes the whole page wider than a phone.
-				<div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-					<div className="min-w-0">
-						{view === "year" ? (
-							<YearGrid
-								year={year}
-								dated={dated}
-								onOpenMonth={(month) =>
-									onChange({ view: "month", month0: month })
-								}
-							/>
-						) : (
-							<>
-								<div className="max-md:hidden">
-									<MonthGrid
-										year={year}
-										month0={month0}
-										dated={dated}
-										onOpen={onOpen}
-										onMove={onMove}
-									/>
-									<p className="mt-2 text-xs text-muted">
-										Przeciągnij pasek, żeby przenieść wyzwanie. Przed zapisaniem
-										panel zapyta o potwierdzenie.
-									</p>
-								</div>
-								{/* On a phone: the month as a list. Dates change in the form. */}
-								<div className="md:hidden">
-									<MonthList items={inMonth} byId={byId} onOpen={onOpen} />
-								</div>
-							</>
-						)}
-					</div>
-
-					<aside>
-						<Card className="flex flex-col gap-3">
-							<h2 className="text-lg font-semibold">
-								Bez daty
-								<span className="ml-2 rounded-full bg-hover px-2 py-0.5 text-xs font-normal text-muted">
-									{undated.length}
-								</span>
-							</h2>
-							{undated.length === 0 ? (
-								<p className="text-sm text-muted">
-									Każde wyzwanie ma datę premiery albo „Widoczne od”.
-								</p>
-							) : (
-								<ul className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto pr-1">
-									{undated.map((item) => {
-										const challenge = byId.get(item.id);
-										if (!challenge) return null;
-										const kind = challengeKind(challenge);
-										return (
-											// Two lines: the name in full, then its kind and the
-											// button. On one line the name had no room left.
-											<li
-												key={item.id}
-												className="flex flex-col gap-1.5 rounded-control px-1.5 py-2 hover:bg-hover"
-											>
-												<div className="flex items-start gap-2">
-													<span
-														aria-hidden="true"
-														className="mt-1.5 size-2.5 shrink-0 rounded-full"
-														style={{ backgroundColor: item.color }}
-													/>
-													<button
-														type="button"
-														onClick={() => onOpen(item.id)}
-														className="min-w-0 flex-1 text-left text-sm [overflow-wrap:anywhere] hover:text-primary"
-													>
-														{item.title}
-													</button>
-												</div>
-												<div className="flex flex-wrap items-center justify-between gap-2 pl-[18px]">
-													<Tag tone={KIND_TONES[kind]}>{KIND_LABELS[kind]}</Tag>
-													<Button onClick={() => setDating(challenge)}>
-														Ustaw datę
-													</Button>
-												</div>
-											</li>
-										);
-									})}
-								</ul>
-							)}
-						</Card>
-					</aside>
+		<Page title="Wyzwania" beside={<ChallengesViewSwitch />}>
+			<div className="flex flex-col gap-4">
+				<div className="flex flex-wrap items-center gap-2">
+					<Button onClick={() => step(-1)} aria-label="Wcześniej">
+						‹
+					</Button>
+					<Button onClick={goToday}>Dziś</Button>
+					<Button onClick={() => step(1)} aria-label="Później">
+						›
+					</Button>
+					<h2 className="ml-2 text-xl font-semibold">
+						{view === "year" ? year : monthLabel(year, month0)}
+					</h2>
+					<Segmented
+						label="Zakres kalendarza"
+						className="ml-auto"
+						options={[
+							{ value: "month", label: "Miesiąc" },
+							{ value: "year", label: "Rok" },
+						]}
+						value={view}
+						onChange={(next) => onChange({ view: next })}
+					/>
 				</div>
-			)}
 
-			{dating && (
-				<SetDateDialog
-					challenge={dating}
-					onSave={(day) => void moveTo(dating, day)}
-					onClose={() => setDating(null)}
-				/>
-			)}
-		</div>
+				{!ready ? (
+					<Loading />
+				) : (
+					// One column that may shrink: without it a long title in the lists
+					// below makes the whole page wider than a phone.
+					<div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+						<div className="min-w-0">
+							{view === "year" ? (
+								<YearGrid
+									year={year}
+									dated={dated}
+									onOpenMonth={(month) =>
+										onChange({ view: "month", month0: month })
+									}
+								/>
+							) : (
+								<>
+									<div className="max-md:hidden">
+										<MonthGrid
+											year={year}
+											month0={month0}
+											dated={dated}
+											onOpen={onOpen}
+											onMove={onMove}
+										/>
+										<p className="mt-2 text-xs text-muted">
+											Przeciągnij pasek, żeby przenieść wyzwanie. Przed
+											zapisaniem panel zapyta o potwierdzenie.
+										</p>
+									</div>
+									{/* On a phone: the month as a list. Dates change in the form. */}
+									<div className="md:hidden">
+										<MonthList items={inMonth} byId={byId} onOpen={onOpen} />
+									</div>
+								</>
+							)}
+						</div>
+
+						<aside>
+							<Card className="flex flex-col gap-3">
+								<h2 className="text-lg font-semibold">
+									Bez daty
+									<span className="ml-2 rounded-full bg-hover px-2 py-0.5 text-xs font-normal text-muted">
+										{undated.length}
+									</span>
+								</h2>
+								{undated.length === 0 ? (
+									<p className="text-sm text-muted">
+										Każde wyzwanie ma datę premiery albo „Widoczne od”.
+									</p>
+								) : (
+									<ul className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto pr-1">
+										{undated.map((item) => {
+											const challenge = byId.get(item.id);
+											if (!challenge) return null;
+											const kind = challengeKind(challenge);
+											return (
+												// Two lines: the name in full, then its kind and the
+												// button. On one line the name had no room left.
+												<li
+													key={item.id}
+													className="flex flex-col gap-1.5 rounded-control px-1.5 py-2 hover:bg-hover"
+												>
+													<div className="flex items-start gap-2">
+														<span
+															aria-hidden="true"
+															className="mt-1.5 size-2.5 shrink-0 rounded-full"
+															style={{ backgroundColor: item.color }}
+														/>
+														<button
+															type="button"
+															onClick={() => onOpen(item.id)}
+															className="min-w-0 flex-1 text-left text-sm [overflow-wrap:anywhere] hover:text-primary"
+														>
+															{item.title}
+														</button>
+													</div>
+													<div className="flex flex-wrap items-center justify-between gap-2 pl-[18px]">
+														<Tag tone={KIND_TONES[kind]}>
+															{KIND_LABELS[kind]}
+														</Tag>
+														<Button onClick={() => setDating(challenge)}>
+															Ustaw datę
+														</Button>
+													</div>
+												</li>
+											);
+										})}
+									</ul>
+								)}
+							</Card>
+						</aside>
+					</div>
+				)}
+
+				{dating && (
+					<SetDateDialog
+						challenge={dating}
+						onSave={(day) => void moveTo(dating, day)}
+						onClose={() => setDating(null)}
+					/>
+				)}
+			</div>
+		</Page>
 	);
 }
 

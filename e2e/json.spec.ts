@@ -150,3 +150,18 @@ test("a badge shows its one changed property", async ({ page }) => {
 		preview.getByRole("textbox", { name: "Zmienione: będzie" }),
 	).toHaveValue('{\n  "isHidden": true\n}');
 });
+
+test("an offer's JSON preview opens, with what a save would send", async ({
+	page,
+}) => {
+	await open(page, "/offers");
+	await page.getByRole("button", { name: "Nowa oferta" }).first().click();
+	const editor = dialog(page, "Nowa oferta");
+	await editor.getByRole("textbox", { name: "Kod" }).fill("podglad2026");
+
+	const preview = await openPreview(editor, "JSON oferty");
+	await show(preview, "Po");
+	await expect(
+		preview.getByRole("textbox", { name: "JSON po zapisie" }),
+	).toHaveValue(/PODGLAD2026|podglad2026/);
+});

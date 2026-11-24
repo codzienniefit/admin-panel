@@ -1,5 +1,6 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { Loading, useDelayedLoading } from "./Loading";
+import { Page } from "./Page";
 
 interface ListPageProps {
 	title: string;
@@ -34,12 +35,7 @@ export function ListPage({
 	const showLoading = useDelayedLoading(loading);
 
 	return (
-		<div className="mx-auto max-w-[1400px]">
-			<header className="mb-5 flex flex-wrap items-center justify-between gap-3">
-				<h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-				{action}
-			</header>
-
+		<Page title={title} action={action}>
 			{filters && <div className="mb-3 flex flex-wrap gap-2">{filters}</div>}
 			{summary !== undefined && (
 				<p className="mb-3 text-xs text-muted">
@@ -56,7 +52,7 @@ export function ListPage({
 						</div>
 					)
 				: children}
-		</div>
+		</Page>
 	);
 }
 

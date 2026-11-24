@@ -211,7 +211,7 @@ Everything that can be looked at has an address that can be sent to a colleague.
 |---|---|
 | `/challenges?q=&status=&kind=&sort=&view=` | challenge list, filters in the address |
 | `/challenges/new` | new challenge |
-| `/challenges/$challengeId` | challenge, Przegląd tab |
+| `/challenges/$challengeId` | challenge, Podgląd tab |
 | `/challenges/$challengeId/content` | challenge, Treść tab |
 | `/challenges/$challengeId/requirements` | challenge, Wymagania tab |
 | `/challenges/$challengeId/plan/$pathId?week=` | the planner for one variant |

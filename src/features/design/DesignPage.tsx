@@ -38,6 +38,7 @@ import { Spinner } from "@/ui/Loading";
 import { Menu } from "@/ui/Menu";
 import { MultiSelect } from "@/ui/MultiSelect";
 import { Notice } from "@/ui/Notice";
+import { OrderedSelect } from "@/ui/OrderedSelect";
 import { Popover } from "@/ui/Popover";
 import { SaveStatusText } from "@/ui/SaveStatusText";
 import { Segmented } from "@/ui/Segmented";
@@ -236,6 +237,7 @@ export function DesignPage() {
 	const [dialogOpen, setDialogOpen] = useState(false);
 	const [content, setContent] = useState<ContentBlock[]>(sampleContent);
 	const [types, setTypes] = useState<string[]>(["strength", "stretching"]);
+	const [ordered, setOrdered] = useState<string[]>(["stretching", "strength"]);
 	const [when, setWhen] = useState<string | null>("2026-11-10T12:00:00.000Z");
 	const [day, setDay] = useState<string | null>("2026-12-24");
 	const [jsonOpen, setJsonOpen] = useState(false);
@@ -718,6 +720,20 @@ export function DesignPage() {
 							}))}
 							value={types}
 							onChange={setTypes}
+						/>
+					</div>
+				</Row>
+				<Row label="Kilka wartości w kolejności">
+					<div className="w-96 max-w-full">
+						<OrderedSelect
+							label="Polecane dalej"
+							options={KNOWN_TRAINING_TYPE_IDS.map((id) => ({
+								value: id,
+								...trainingTypeMeta(id),
+							}))}
+							value={ordered}
+							onChange={setOrdered}
+							max={3}
 						/>
 					</div>
 				</Row>

@@ -215,6 +215,100 @@ describe("buildUrl", () => {
 
 // ─── parseBody ──────────────────────────────────────────────────────────────
 
+describe("createTransport: the developer's record of each exchange", () => {
+	it("is told about the request as it leaves and about the answer", async () => {
+		const seen: unknown[] = [];
+		const wire = recorder({
+			status: 200,
+			text: "[]",
+			etag: '"1"',
+			headers: { "content-type": "application/json", "cf-ray": "r1" },
+		});
+		await transportWith(wire.sender, {
+			record: (request) => {
+				seen.push({ request });
+				return (outcome) => seen.push(outcome);
+			},
+		}).request({
+			method: "POST",
+			path: ["manageWorkouts"],
+			body: { title: "x" },
+		});
+		expect(seen).toEqual([
+			{
+				request: {
+					method: "POST",
+					url: "/api/manageWorkouts",
+					headers: {
+						accept: "application/json",
+						"x-cf-panel": "1",
+						"content-type": "application/json",
+					},
+					body: '{"title":"x"}',
+				},
+			},
+			{
+				response: {
+					status: 200,
+					headers: { "content-type": "application/json", "cf-ray": "r1" },
+					body: "[]",
+				},
+			},
+		]);
+	});
+
+	it("is told why there was no answer, and the failure still comes through", async () => {
+		const outcomes: unknown[] = [];
+		const wire = recorder(new TypeError("Failed to fetch"));
+		await expect(
+			transportWith(wire.sender, {
+				record: () => (outcome) => outcomes.push(outcome),
+			}).request({ path: ["x"] }),
+		).rejects.toMatchObject({ kind: "network" });
+		expect(outcomes).toEqual([{ error: "TypeError: Failed to fetch" }]);
+	});
+
+	it("describes a file instead of carrying it, and a 4xx is recorded too", async () => {
+		const requests: unknown[] = [];
+		const outcomes: unknown[] = [];
+		const upload: Sender = async () => status(422, { error: "zły plik" });
+		await expect(
+			transportWith(async () => ok(), {
+				upload,
+				record: (request) => {
+					requests.push(request);
+					return (outcome) => outcomes.push(outcome);
+				},
+			}).request({
+				method: "POST",
+				path: ["manageMedia", "files"],
+				file: new File(["abc"], "a.png", { type: "image/png" }),
+				onProgress: () => {},
+			}),
+		).rejects.toBeInstanceOf(ApiError);
+		expect(requests[0]).toMatchObject({
+			body: { file: "a.png", type: "image/png", size: 3 },
+		});
+		expect(outcomes[0]).toMatchObject({ response: { status: 422 } });
+	});
+
+	it("an answer the panel cannot read is marked unexpected, not a server error", async () => {
+		const wire = recorder(ok({ notAList: true }));
+		const error = await transportWith(wire.sender)
+			.request({
+				path: ["manageWorkouts"],
+				schema: z.array(z.string()),
+				what: "Treningi",
+			})
+			.catch((caught: unknown) => caught);
+		expect(error).toMatchObject({
+			kind: "server",
+			unexpected: true,
+			status: 200,
+		});
+	});
+});
+
 describe("parseBody", () => {
 	it("parses JSON", () => {
 		expect(parseBody('{"result":"Workout W12 updated"}')).toEqual({
@@ -896,6 +990,7 @@ describe("fetchSender", () => {
 			status: 200,
 			text: '{"result":"ok"}',
 			etag: 'W/"5"',
+			headers: { "content-type": "text/plain;charset=UTF-8", etag: 'W/"5"' },
 		});
 		expect(fetchStub).toHaveBeenCalledTimes(1);
 		expect(fetchStub).toHaveBeenCalledWith("/api/manageChallenges", {
@@ -933,6 +1028,7 @@ describe("fetchSender", () => {
 			status: 404,
 			text: '{"error":"Challenge C99 not found"}',
 			etag: null,
+			headers: { "content-type": "text/plain;charset=UTF-8" },
 		});
 	});
 
@@ -945,6 +1041,7 @@ describe("fetchSender", () => {
 			status: 204,
 			text: "",
 			etag: null,
+			headers: {},
 		});
 	});
 
@@ -1040,6 +1137,12 @@ class FakeXhr {
 		return this.responseHeaders[headerName.toLowerCase()] ?? null;
 	}
 
+	getAllResponseHeaders(): string {
+		return Object.entries(this.responseHeaders)
+			.map(([name, value]) => `${name}: ${value}\r\n`)
+			.join("");
+	}
+
 	send(body: unknown) {
 		this.sent = body;
 	}
@@ -1087,6 +1190,7 @@ describe("xhrSender", () => {
 			status: 200,
 			text: '{"relativePath":"test/a.mp4"}',
 			etag: '"abc"',
+			headers: { etag: '"abc"' },
 		});
 	});
 
@@ -1095,7 +1199,12 @@ describe("xhrSender", () => {
 		expect(xhr.sent).toBeNull();
 		xhr.status = 204;
 		xhr.onload?.();
-		expect(await pending).toEqual({ status: 204, text: "", etag: null });
+		expect(await pending).toEqual({
+			status: 204,
+			text: "",
+			etag: null,
+			headers: {},
+		});
 	});
 
 	it("resolves with a failure status; judging it is the transport's job", async () => {
@@ -1107,6 +1216,7 @@ describe("xhrSender", () => {
 			status: 500,
 			text: '{"error":"Failed to upload file: Error"}',
 			etag: null,
+			headers: {},
 		});
 	});
 

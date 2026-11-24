@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-	contentBlockSchema,
+	contentBlocksSchema,
 	contentStatusSchema,
 	idList,
 	optionalText,
@@ -46,7 +46,7 @@ export const challengeSchema = z.looseObject({
 	/** How many days ahead a participant can see. */
 	visibleDaysUpFront: z.number().nullish().default(null),
 	imageRelativePath: optionalText,
-	descriptionFancyContent: z.array(contentBlockSchema).default([]),
+	descriptionFancyContent: contentBlocksSchema,
 	categoryId: optionalText,
 	goalsIds: idList,
 	difficultyLevelsIds: idList,
@@ -67,6 +67,14 @@ export const challengeSchema = z.looseObject({
 	perfectCompletionBadgeId: optionalText,
 	/** What to suggest after this one, in order. */
 	recommendedNext: z
+		.array(z.looseObject({ id: z.string() }))
+		.nullish()
+		.transform((value) => value ?? []),
+	/**
+	 * Read only: the backend's hard-coded suggestions, used while
+	 * `recommendedNext` is empty (domain/recommendations.ts). Never sent back.
+	 */
+	defaultRecommendedNext: z
 		.array(z.looseObject({ id: z.string() }))
 		.nullish()
 		.transform((value) => value ?? []),
@@ -107,6 +115,7 @@ export function blankChallenge(now = new Date().toISOString()): NewChallenge {
 		badgeId: null,
 		perfectCompletionBadgeId: null,
 		recommendedNext: [],
+		defaultRecommendedNext: [],
 		paths: [],
 	};
 }

@@ -1,4 +1,5 @@
 import type { SaveStatus } from "@/data/collections/saver";
+import { POLISH_TIME_ZONE } from "@/domain/polishTime";
 import type { Tone } from "./tones";
 
 function describe(status: SaveStatus | undefined): {
@@ -11,7 +12,9 @@ function describe(status: SaveStatus | undefined): {
 		case "saving":
 			return { text: "Zapisywanie…", tone: "blue" };
 		case "saved": {
-			const time = new Date(status.at).toLocaleTimeString("pl-PL");
+			const time = new Date(status.at).toLocaleTimeString("pl-PL", {
+				timeZone: POLISH_TIME_ZONE,
+			});
 			return {
 				text: status.mergedWithOthers
 					? `Zapisano ${time} · połączono ze zmianami innej osoby`

@@ -276,6 +276,13 @@ const EMPTY_SEARCH: UserSearchResult = {
 	truncated: false,
 };
 
+/**
+ * The first search on a fresh backend instance lists every account to build
+ * its index (about a call per thousand accounts) and can take a minute; later
+ * ones read the index. Below Cloudflare's 100 s limit for an answer.
+ */
+export const USER_SEARCH_TIMEOUT_MS = 90_000;
+
 /** Firebase ids are 28 letters and digits; anything close is worth a direct look. */
 const looksLikeUid = (query: string): boolean =>
 	/^[A-Za-z0-9]{20,40}$/.test(query);
@@ -321,24 +328,27 @@ export function usersArea(
 			// Too short as a whole or word by word (domain/userRules, the
 			// backend's own rule): nothing is asked for, and the screen says why.
 			if (!isSearchable(text)) return EMPTY_SEARCH;
-			const found = toSearchResult(
+			// The search looks at e-mail and name only, and on a fresh backend
+			// instance it first lists every account. An id is one direct look-up,
+			// so it goes first; only when no account has it is the text searched.
+			if (looksLikeUid(text)) {
+				try {
+					const account = await get(text);
+					const { hasProSubscription: _pro, ...summary } = account;
+					return { users: [summary], totalMatches: 1, truncated: false };
+				} catch (error) {
+					if (!isApiError(error) || error.kind !== "notFound") throw error;
+				}
+			}
+			return toSearchResult(
 				await transport.request({
 					path: ["manageUsers"],
 					// The query and the limit, and nothing else: the backend
 					// refuses a limit above this one and a `refresh` from the panel.
 					query: { query: text, limit: USER_SEARCH_LIMIT },
+					timeoutMs: USER_SEARCH_TIMEOUT_MS,
 				}),
 			);
-			if (found.users.length > 0 || !looksLikeUid(text)) return found;
-			// The search looks at e-mail and name only; an id is looked up directly.
-			try {
-				const account = await get(text);
-				const { hasProSubscription: _pro, ...summary } = account;
-				return { users: [summary], totalMatches: 1, truncated: false };
-			} catch (error) {
-				if (isApiError(error) && error.kind === "notFound") return found;
-				throw error;
-			}
 		},
 		async progress(uid) {
 			return toUserProgress(

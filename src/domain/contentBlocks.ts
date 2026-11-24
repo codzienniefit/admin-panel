@@ -72,7 +72,7 @@ export interface ContentIssue {
 const APP_SPLIT_PATTERN =
 	"(?:[\\u2700-\\u27bf]|(?:\\ud83c[\\udde6-\\uddff]){2}|[\\ud800-\\udbff][\\udc00-\\udfff]|[\\u0023-\\u0039]\\ufe0f?\\u20e3|\\u3299|\\u3297|\\u303d|\\u3030|\\u24c2|\\ud83c[\\udd70-\\udd71]|\\ud83c[\\udd7e-\\udd7f]|\\ud83c\\udd8e|\\ud83c[\\udd91-\\udd9a]|\\ud83c[\\udde6-\\uddff]|[\\ud83c[\\ude01-\\ude02]|\\ud83c\\ude1a|\\ud83c\\ude2f|[\\ud83c[\\ude32-\\ude3a]|[\\ud83c[\\ude50-\\ude51]|\\u203c|\\u2049|[\\u25aa-\\u25ab]|\\u25b6|\\u25c0|[\\u25fb-\\u25fe]|\\u00a9|\\u00ae|\\u2122|\\u2139|\\ud83c\\udc04|[\\u2600-\\u26FF]|\\u2b05|\\u2b06|\\u2b07|\\u2b1b|\\u2b1c|\\u2b50|\\u2b55|\\u231a|\\u231b|\\u2328|\\u23cf|[\\u23e9-\\u23f3]|[\\u23f8-\\u23fa]|\\ud83c\\udccf|\\u2934|\\u2935|[\\u2190-\\u21ff])";
 
-function splittingCharacters(text: string): string[] {
+export function splittingCharacters(text: string): string[] {
 	const found = text.match(new RegExp(APP_SPLIT_PATTERN, "g")) ?? [];
 	return [...new Set(found)];
 }
@@ -84,6 +84,61 @@ function splittingCharacters(text: string): string[] {
 const TAG = /<\/?[a-zA-Z][^<>]*>/g;
 const isSupportedTag = (tag: string) =>
 	tag === "<b>" || tag === "</b>" || tag === "</a>" || /^<a\s[^>]*>$/.test(tag);
+
+/** What a reader sees of a piece of marked-up text, shortened for a message. */
+function visibleText(markup: string): string {
+	const text = markup.replace(/^<a[^>]*>|<\/?[a-zA-Z][^<>]*>/g, "").trim();
+	return text.length > 40 ? `${text.slice(0, 40)}…` : text;
+}
+
+/** The selection in a Text block's editor, as far as the formatting rules care. */
+export interface FormattingSelection {
+	/** The selected text; empty for a cursor. */
+	text: string;
+	/** A line break inside the selection. */
+	spansLines: boolean;
+	/** Any of the selection (or, for a cursor, where it stands) is a link. */
+	inLink: boolean;
+	/** Any of the selection is bold. */
+	inBold: boolean;
+	/** All of the selection is bold already: the button would take bold off. */
+	allBold: boolean;
+}
+
+/**
+ * Why Bold or Link cannot be used on this selection, in Polish; null where it
+ * can. The same rules the saved text is checked against (below), applied
+ * before the change is made, so the editor never builds what the app cannot
+ * show. Taking bold off is always allowed.
+ */
+export function formattingBlockers(selection: FormattingSelection): {
+	bold: string | null;
+	link: string | null;
+} {
+	const splitting = splittingCharacters(selection.text);
+	const splitText = splitting.length > 0 ? ` (${splitting.join(" ")})` : "";
+	const bold = selection.allBold
+		? null
+		: selection.inLink
+			? "Nie można pogrubić tekstu linku: w aplikacji pogrubienie i link nie mogą się nakładać. Zaznacz tekst poza linkiem."
+			: splitting.length > 0
+				? `W zaznaczeniu jest emoji, symbol albo „[”${splitText}: pogrubienie przerywa się na takim znaku i w aplikacji nie zadziała. Zaznacz tekst bez nich.`
+				: selection.spansLines
+					? "Pogrubienie nie może przechodzić przez nową linię. Pogrub każdą linię osobno."
+					: null;
+	// A cursor in a link opens that link to edit it: always allowed.
+	const editingLink = selection.inLink && selection.text === "";
+	const link = editingLink
+		? null
+		: selection.inBold
+			? "Nie można dodać linku do pogrubionego tekstu: w aplikacji pogrubienie i link nie mogą się nakładać. Najpierw zdejmij pogrubienie (B) z tego fragmentu."
+			: splitting.length > 0
+				? `W zaznaczeniu jest emoji, symbol albo „[”${splitText}: link przerywa się na takim znaku i w aplikacji nie zadziała. Zaznacz tekst bez nich.`
+				: selection.spansLines
+					? "Link nie może przechodzić przez nową linię. Zaznacz tekst w jednej linii."
+					: null;
+	return { bold, link };
+}
 
 function count(text: string, pattern: RegExp): number {
 	return (text.match(pattern) ?? []).length;
@@ -149,7 +204,11 @@ function textProblems(text: string): Array<[ContentIssue["severity"], string]> {
 				"Pogrubienie nie zadziała, bo w środku jest emoji, symbol albo „[”. Przenieś ten znak poza <b>…</b>",
 			);
 		}
-		if (/<a[\s>]/.test(whole)) error("Link w środku pogrubienia nie działa");
+		if (/<a[\s>]/.test(whole)) {
+			error(
+				`Link w pogrubionym tekście „${visibleText(whole)}” nie zadziała w aplikacji: pogrubienie i link nie mogą się nakładać. Zdejmij pogrubienie z tego fragmentu albo przenieś link poza nie`,
+			);
+		}
 	}
 	if (/<b>\s*<\/b>/.test(text)) error("Puste pogrubienie <b></b>; usuń je");
 
@@ -159,7 +218,11 @@ function textProblems(text: string): Array<[ContentIssue["severity"], string]> {
 				"Link nie zadziała, bo w środku jest emoji, symbol albo „[”. Przenieś ten znak poza link",
 			);
 		}
-		if (whole.includes("<b>")) error("Pogrubienie w środku linku nie działa");
+		if (whole.includes("<b>")) {
+			error(
+				`Pogrubienie w linku „${visibleText(whole)}” nie zadziała w aplikacji: pogrubienie i link nie mogą się nakładać. Zdejmij pogrubienie z tekstu linku`,
+			);
+		}
 
 		const quoted = /"(.+?)"/.exec(whole);
 		if (!quoted) {

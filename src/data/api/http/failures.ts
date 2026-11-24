@@ -288,5 +288,6 @@ export function unexpectedAnswer(
 	return new ApiError("server", `${TEXT.unexpected} ${what}${where}`, {
 		status,
 		issues: problems,
+		unexpected: true,
 	});
 }

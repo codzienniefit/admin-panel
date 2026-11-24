@@ -5,11 +5,13 @@ import {
 	fromLocalInput,
 	toLocalInput,
 } from "./dates";
+import { polishMoment } from "./testSupport";
 
-// Instants are built from LOCAL date parts, so every expectation holds in
-// whatever time zone the tests run (TZ=America/Los_Angeles, Pacific/Auckland).
+// Instants are built from POLISH date parts: the panel shows and reads Polish
+// time whatever time zone the computer is in, so every expectation holds in
+// any zone the tests run in (TZ=America/Los_Angeles, Asia/Tokyo).
 
-/** The UTC instant of a local wall-clock time. */
+/** The UTC instant of a Polish wall-clock time; the month counts from 1. */
 const instant = (
 	year: number,
 	month: number,
@@ -17,7 +19,7 @@ const instant = (
 	hour = 0,
 	minute = 0,
 	second = 0,
-) => new Date(year, month - 1, dayOfMonth, hour, minute, second).toISOString();
+) => polishMoment(year, month - 1, dayOfMonth, hour, minute, second);
 
 describe("toLocalInput", () => {
 	it("shows an instant as local date and time", () => {

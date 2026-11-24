@@ -854,10 +854,8 @@ describe("usersArea: search", () => {
 	});
 
 	describe("a query that looks like an account id", () => {
-		it("is looked up directly when the search finds nothing", async () => {
-			const backend = fakeBackend()
-				.on("GET", "manageUsers", searchAnswer())
-				.on("GET", ACCOUNT, todayAccount());
+		it("is looked up directly, without the slow search", async () => {
+			const backend = fakeBackend().on("GET", ACCOUNT, todayAccount());
 			const api = usersArea(backend.transport, SWITCHED_OFF);
 
 			const found = await api.search(UID);
@@ -879,20 +877,18 @@ describe("usersArea: search", () => {
 				truncated: false,
 			});
 			expectNoSecrets(found);
-			expect(backend.calls()).toEqual(["GET manageUsers", `GET ${ACCOUNT}`]);
+			expect(backend.calls()).toEqual([`GET ${ACCOUNT}`]);
 		});
 
-		it("is not looked up when the search found someone", async () => {
-			const backend = fakeBackend().on(
-				"GET",
-				"manageUsers",
-				searchAnswer(wireUserSummary()),
-			);
+		it("is searched as text when no account has that id", async () => {
+			const backend = fakeBackend()
+				.on("GET", ACCOUNT, errorReply(404, `User not found: ${UID}`))
+				.on("GET", "manageUsers", searchAnswer(wireUserSummary()));
 			const found = await usersArea(backend.transport, SWITCHED_OFF).search(
 				UID,
 			);
 			expect(found.users).toHaveLength(1);
-			expect(backend.calls()).toEqual(["GET manageUsers"]);
+			expect(backend.calls()).toEqual([`GET ${ACCOUNT}`, "GET manageUsers"]);
 		});
 
 		it("gives the empty result when there is no such account either", async () => {
@@ -1550,7 +1546,7 @@ describe("usersArea: search on the panel's route", () => {
 		expect(error.issues[0]?.path).toBe("query");
 	});
 
-	it("looks an id up directly when the search finds nobody, and takes 404 for nobody", async () => {
+	it("looks an id up first, and searches the text when the id finds nobody (404)", async () => {
 		const backend = fakeBackend()
 			.on(
 				"GET",
@@ -1560,7 +1556,7 @@ describe("usersArea: search on the panel's route", () => {
 			.on("GET", ACCOUNT, notFoundReply(`User with id ${UID} not found`));
 		const found = await usersArea(backend.transport, production()).search(UID);
 		expect(found.users).toEqual([]);
-		expect(backend.calls()).toEqual(["GET manageUsers", `GET ${ACCOUNT}`]);
+		expect(backend.calls()).toEqual([`GET ${ACCOUNT}`, "GET manageUsers"]);
 	});
 });
 

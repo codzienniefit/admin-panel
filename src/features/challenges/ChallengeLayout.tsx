@@ -309,7 +309,7 @@ function Loaded({ challenge }: { challenge: Challenge }) {
 						activeProps={tabActive}
 						activeOptions={{ exact: true }}
 					>
-						Przegląd
+						Podgląd
 					</Link>
 					{planPathId && (
 						<Link

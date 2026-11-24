@@ -10,6 +10,7 @@ import {
 } from "@/data/schemas/challenge";
 import {
 	contentBlockSchema,
+	contentBlocksSchema,
 	contentStatusSchema,
 	idList,
 	optionalText,
@@ -141,6 +142,37 @@ describe("shared pieces", () => {
 		expect(contentBlockSchema.parse(textBlock).metadata).toBeNull();
 	});
 
+	it("leaves out the empty blocks old tools stored, and keeps the rest in order", () => {
+		// workout 5fauJdypS9Y in production ends its description with a bare {}
+		expect(
+			contentBlocksSchema.parse([
+				{ type: "Title", content: "MUSIC WORKOUT" },
+				{},
+				null,
+				{ type: "", content: "  ", metadata: null },
+				{ type: "Text", content: "Dla każdego." },
+			]),
+		).toEqual([
+			{ type: "Title", content: "MUSIC WORKOUT" },
+			{ type: "Text", content: "Dla każdego." },
+		]);
+		expect(contentBlocksSchema.parse(undefined)).toEqual([]);
+		expect(contentBlocksSchema.parse(null)).toEqual([]);
+	});
+
+	it("still refuses a block that has something in it but the wrong shape", () => {
+		expect(accepts(contentBlocksSchema, [{ type: "Text" }])).toBe(false);
+		expect(accepts(contentBlocksSchema, [{ content: "Bez rodzaju" }])).toBe(
+			false,
+		);
+		expect(
+			accepts(contentBlocksSchema, [
+				{ metadata: { imageRelativePath: "a.webp", heightToWidthRatio: 1 } },
+			]),
+		).toBe(false);
+		expect(accepts(contentBlocksSchema, ["Tekst"])).toBe(false);
+	});
+
 	it("refuses a content block of the wrong shape", () => {
 		expect(accepts(contentBlockSchema, { type: "paragraph" })).toBe(false);
 		expect(accepts(contentBlockSchema, { type: 1, content: "x" })).toBe(false);
@@ -227,6 +259,7 @@ describe("challenge", () => {
 		badgeId: "B7",
 		perfectCompletionBadgeId: "B8",
 		recommendedNext: [{ id: "C2", [UNKNOWN]: "recommendation" }],
+		defaultRecommendedNext: [{ id: "C3" }, { id: "C4" }],
 		paths: [path],
 		[UNKNOWN]: "challenge",
 	};
@@ -281,6 +314,7 @@ describe("challenge", () => {
 			badgeId: null,
 			perfectCompletionBadgeId: null,
 			recommendedNext: [],
+			defaultRecommendedNext: [],
 		});
 	});
 
@@ -458,6 +492,15 @@ describe("workout", () => {
 			"$.descriptionFancyContent[1]",
 			"$.descriptionFancyContent[1].metadata",
 		]);
+	});
+
+	it("reads a workout whose description holds an empty block", () => {
+		expect(
+			workoutSchema.parse({
+				...minimal,
+				descriptionFancyContent: [{ type: "Text", content: "Rozgrzewka" }, {}],
+			}).descriptionFancyContent,
+		).toEqual([{ type: "Text", content: "Rozgrzewka" }]);
 	});
 
 	it("fills in everything the backend may leave out", () => {

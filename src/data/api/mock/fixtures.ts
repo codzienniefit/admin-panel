@@ -348,6 +348,8 @@ function buildChallenges(count: number, workouts: Workout[]): Challenge[] {
 		}),
 		make("C3", "Plan spokojny: joga i rozciąganie", {
 			status: "hidden",
+			// as the backend's hard-coded list would have it for this plan
+			defaultRecommendedNext: [{ id: "C2" }, { id: "C1" }],
 			categoryId: "supplementary",
 			goalsIds: ["calm", "mobility"],
 			difficultyLevelsIds: ["easy"],

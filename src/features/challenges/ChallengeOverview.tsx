@@ -74,9 +74,14 @@ export function ChallengeOverview({ challenge }: { challenge: Challenge }) {
 		}
 	};
 
-	const next = challenge.recommendedNext
+	// the challenge's own list, or the backend's defaults while it has none
+	const ownNext = challenge.recommendedNext.length > 0;
+	const nextTitles = (
+		ownNext ? challenge.recommendedNext : challenge.defaultRecommendedNext
+	)
 		.map((item) => challenges.find((c) => c.id === item.id)?.title ?? item.id)
 		.join(", ");
+	const next = nextTitles && !ownNext ? `${nextTitles} (domyślne)` : nextTitles;
 
 	return (
 		<div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">

@@ -4,6 +4,11 @@ import type { ApiIssue } from "@/data/api/errors";
 import { blankChallenge, type Challenge } from "@/data/schemas/challenge";
 import { resizeDays, workoutsLostByResize } from "@/domain/challengeRules";
 import { prunePlanning } from "@/domain/plannerOps";
+import {
+	isDefaultRecommendations,
+	startingRecommendations,
+	storedRecommendations,
+} from "@/domain/recommendations";
 import { plural } from "@/domain/text";
 import { trainingTypeIdsOf } from "@/features/config/useConfig";
 import { ContentField } from "@/features/content/ContentField";
@@ -18,6 +23,7 @@ import { DateTimeField } from "@/ui/DateField";
 import { Field, TextField } from "@/ui/Field";
 import { IssuesNotice, placeIssues } from "@/ui/formIssues";
 import { MultiSelect } from "@/ui/MultiSelect";
+import { OrderedSelect } from "@/ui/OrderedSelect";
 import { Select } from "@/ui/Select";
 import { Switch } from "@/ui/Switch";
 import { attempt, whileBusy } from "@/ui/tasks";
@@ -27,6 +33,9 @@ import {
 	offerCandidate,
 } from "./challengeActions";
 import { useChallengeRules } from "./useChallengeRules";
+
+/** The app shows the first two (the next plan, then the alternative). */
+const RECOMMENDED_NEXT_MAX = 3;
 
 /** What the form holds. Lists of ids typed by hand are kept as text. */
 interface FormValues {
@@ -79,7 +88,10 @@ const fromChallenge = (challenge: Challenge): FormValues => ({
 	perfectCompletionBadgeId: challenge.perfectCompletionBadgeId,
 	imageRelativePath: challenge.imageRelativePath,
 	descriptionFancyContent: challenge.descriptionFancyContent,
-	recommendedNext: challenge.recommendedNext.map((item) => item.id),
+	recommendedNext: startingRecommendations(
+		challenge.recommendedNext.map((item) => item.id),
+		challenge.defaultRecommendedNext.map((item) => item.id),
+	),
 });
 
 const ids = (text: string) =>
@@ -119,10 +131,12 @@ function applyValues(draft: Challenge, values: FormValues) {
 	draft.perfectCompletionBadgeId = values.perfectCompletionBadgeId;
 	draft.imageRelativePath = values.imageRelativePath;
 	draft.descriptionFancyContent = values.descriptionFancyContent;
-	// Keep whatever else the backend stores on an entry that stays.
-	draft.recommendedNext = values.recommendedNext.map(
-		(id) => draft.recommendedNext.find((item) => item.id === id) ?? { id },
-	);
+	// The backend's defaults left as they are: nothing is stored, the app goes
+	// on using them. Keep whatever else the backend stores on an entry that stays.
+	draft.recommendedNext = storedRecommendations(
+		values.recommendedNext,
+		draft.defaultRecommendedNext.map((item) => item.id),
+	).map((id) => draft.recommendedNext.find((item) => item.id === id) ?? { id });
 
 	const lengthDays = Math.max(1, Math.round(Number(values.lengthDays)) || 1);
 	if (lengthDays !== draft.lengthDays) {
@@ -237,6 +251,7 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 	};
 
 	const error = (field: keyof FormValues) => formState.errors[field]?.message;
+	const defaultNext = challenge.defaultRecommendedNext.map((item) => item.id);
 	const others = challenges.filter(
 		(c) => c.id !== challenge.id && c.status !== "deleted",
 	);
@@ -523,11 +538,17 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 						render={({ field }) => (
 							<Field
 								label="Polecane dalej"
-								hint="Co zaproponować po ukończeniu tego wyzwania."
+								hint={
+									defaultNext.length === 0
+										? "Co zaproponować po ukończeniu tego wyzwania, w tej kolejności: pierwsze to następny plan, drugie to alternatywa."
+										: isDefaultRecommendations(field.value, defaultNext)
+											? "To domyślne polecenia z listy treści, zapisane w backendzie. Bez zmian nic się nie zapisuje; zmień je, żeby zapisać własne dla tego wyzwania."
+											: "Własne polecenia tego wyzwania: po zapisaniu zastępują domyślne z listy treści. Pierwsze to następny plan, drugie to alternatywa."
+								}
 								error={error("recommendedNext")}
 							>
-								{() => (
-									<MultiSelect
+								{({ invalid }) => (
+									<OrderedSelect
 										label="Polecane dalej"
 										options={others.map((c) => ({
 											value: c.id,
@@ -536,8 +557,14 @@ export function ChallengeContentForm({ challenge }: { challenge: Challenge }) {
 										}))}
 										value={field.value}
 										onChange={field.onChange}
-										placeholder="Brak"
+										max={RECOMMENDED_NEXT_MAX}
+										emptyText={
+											defaultNext.length > 0
+												? "Pusto: aplikacja pokaże wtedy domyślne polecenia z listy treści."
+												: "Brak: aplikacja zaproponuje coś sama."
+										}
 										disabled={readOnly}
+										invalid={invalid}
 									/>
 								)}
 							</Field>

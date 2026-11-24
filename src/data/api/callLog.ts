@@ -22,8 +22,11 @@ export interface CallEntry {
 	 * the call is running and when there was no answer at all.
 	 */
 	status: number | null;
-	/** For a failed call. */
-	kind?: ApiErrorKind | "unknown";
+	/**
+	 * For a failed call. "unexpected": a success the panel could not read; its
+	 * real status is in the exchanges (exchangeLog.ts).
+	 */
+	kind?: ApiErrorKind | "unexpected" | "unknown";
 	durationMs: number | null;
 	/** The answer; for a failed call, what is known about the failure. */
 	result?: unknown;
@@ -56,11 +59,13 @@ const STATUS: Record<ApiErrorKind, number | null> = {
  */
 export function statusOf(error: unknown): {
 	status: number | null;
-	kind: ApiErrorKind | "unknown";
+	kind: ApiErrorKind | "unexpected" | "unknown";
 } {
-	return isApiError(error)
-		? { status: error.status ?? STATUS[error.kind], kind: error.kind }
-		: { status: null, kind: "unknown" };
+	if (!isApiError(error)) return { status: null, kind: "unknown" };
+	// not a 500: the answer was a success the panel could not read
+	if (error.unexpected)
+		return { status: error.status ?? null, kind: "unexpected" };
+	return { status: error.status ?? STATUS[error.kind], kind: error.kind };
 }
 
 /** How serious an entry is: decides its colour. */
@@ -106,7 +111,10 @@ function failureDetails(error: unknown): unknown {
 	if (isApiError(error)) {
 		return {
 			kind: error.kind,
+			...(error.unexpected ? { unexpected: true } : {}),
+			...(error.status !== undefined ? { status: error.status } : {}),
 			message: error.message,
+			...(error.details ? { details: error.details } : {}),
 			...(error.issues.length > 0 ? { issues: error.issues } : {}),
 			...(error.current !== undefined ? { current: error.current } : {}),
 		};

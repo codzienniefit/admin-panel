@@ -266,7 +266,7 @@ the backend to store and return unchanged; the shapes are in `src/data/schemas/s
 | Ustawienia → Rodzaje planów | `settings` / `planner` | `planTypes[]`: `id`, `name`, `description`, `conditions[]` (the week rules) |
 | Ustawienia → Typy treningów | `settings` / `planner` | `trainingTypeStyles{typeId}`: `tone`, `emoji` |
 | Ustawienia → Foldery | `settings` / `planner` | `folders[]`: `id`, `name` |
-| Challenge → Przegląd → Planowanie | `challengePlanning` / `{challengeId}` | `folderId`, `calendarColor`, `note` |
+| Challenge → Podgląd → Planowanie | `challengePlanning` / `{challengeId}` | `folderId`, `calendarColor`, `note` |
 | Challenge → Wymagania | `challengePlanning` / `{challengeId}` | `customPlanTypes[]`, `conditionOverrides{planTypeId}` |
 | Variant settings | `challengePlanning` / `{challengeId}` | `variants{pathId}`: `planTypeId`, `prepStatus`, `prepNote` |
 | Planner | `challengePlanning` / `{challengeId}` | `scratchpad[]`; `variants{pathId}`: `notes`, `days{dayIndex}` (`note`, `tint`), `cards{dayIndex:workoutId}` (`note`, `color`) |

@@ -1,8 +1,19 @@
-// Calendar days for the planner. A day is a "YYYY-MM-DD" string in the
-// browser's LOCAL time (the team works in Europe/Warsaw), so it never shifts
-// when it crosses a time zone the way an instant does. Instants (ISO UTC
-// strings, as the backend stores them) are handled in dates.ts; the two meet
-// only in `dayOfInstant` and `instantOnDay` below.
+// Calendar days for the planner. A day is a "YYYY-MM-DD" string, a day of the
+// Polish calendar, so it never shifts when it crosses a time zone the way an
+// instant does. Instants (ISO UTC strings, as the backend stores them) are
+// read and written in Polish time (polishTime.ts), whatever time zone the
+// browser is set to; the two meet in `dayOfInstant`, `timeOfInstant`,
+// `instantAt` and `instantOnDay` below.
+//
+// `parseDay` and `formatDay` use a JavaScript Date only to do arithmetic on
+// calendar days (which day follows 28.02); no moment in time is read from it.
+
+import {
+	polishDayOf,
+	polishInstant,
+	polishTimeOf,
+	polishToday,
+} from "./polishTime";
 
 export type Day = string; // "YYYY-MM-DD"
 
@@ -36,8 +47,9 @@ export function formatDay(date: Date): Day {
 	return `${String(date.getFullYear()).padStart(4, "0")}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Today in Poland. */
 export function today(now: Date = new Date()): Day {
-	return formatDay(now);
+	return polishToday(now);
 }
 
 /**
@@ -198,38 +210,38 @@ export function formatDayFull(day: Day): string {
 	return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
 }
 
-/** The local calendar day of an ISO instant, or null for empty/invalid input. */
+/** The Polish calendar day of an ISO instant, or null for empty/invalid input. */
 export function dayOfInstant(iso: string | null | undefined): Day | null {
-	if (!iso) return null;
-	const date = new Date(iso);
-	return Number.isNaN(date.getTime()) ? null : formatDay(date);
+	return polishDayOf(iso);
 }
 
 const DEFAULT_HOUR = 13;
 
 /**
- * An ISO instant on `day` at the same local time of day as `previousIso`;
- * 13:00 local when there is none. Used when a challenge is dragged to another
- * day: its premiere hour must not move. Throws a RangeError for a malformed
- * day, like `toISOString` on any invalid date.
+ * An ISO instant on `day` at the same Polish time of day as `previousIso`;
+ * 13:00 Polish time when there is none. Used when a challenge is dragged to
+ * another day: its premiere hour must not move. A time that does not exist on
+ * the new day (the March clock change) moves an hour later. Throws a
+ * RangeError for a malformed day, like `toISOString` on any invalid date.
  */
 export function instantOnDay(
 	day: Day,
 	previousIso: string | null | undefined,
 ): string {
-	const date = parseDay(day);
-	const previous = previousIso ? new Date(previousIso) : null;
-	if (previous && !Number.isNaN(previous.getTime())) {
-		date.setHours(
-			previous.getHours(),
-			previous.getMinutes(),
-			previous.getSeconds(),
-			previous.getMilliseconds(),
-		);
-	} else {
-		date.setHours(DEFAULT_HOUR, 0, 0, 0);
+	if (Number.isNaN(parseDay(day).getTime())) {
+		throw new RangeError(`Invalid day: ${day}`);
 	}
-	return date.toISOString();
+	const time = polishTimeOf(previousIso) ?? `${pad(DEFAULT_HOUR)}:00`;
+	const iso =
+		polishInstant(day, time) ?? polishInstant(day, shiftTime(time, 60));
+	if (iso === null) throw new RangeError(`Invalid time on ${day}: ${time}`);
+	// seconds and milliseconds come along: no time zone moves them
+	const previous = previousIso ? new Date(previousIso) : null;
+	const within =
+		previous && !Number.isNaN(previous.getTime())
+			? previous.getUTCSeconds() * 1000 + previous.getUTCMilliseconds()
+			: 0;
+	return new Date(new Date(iso).getTime() + within).toISOString();
 }
 
 // --- dates as people type them ------------------------------------------
@@ -237,7 +249,7 @@ export function instantOnDay(
 // The date fields show and accept "DD.MM.RRRR" and "GG:MM", the way dates are
 // written in Polish, whatever the browser's own language is.
 
-/** A time of day, "HH:MM", 24-hour, local. */
+/** A time of day, "HH:MM", 24-hour, Polish time. */
 export type Time = string;
 
 const TIME_PATTERN = /^(\d{2}):(\d{2})$/;
@@ -293,28 +305,21 @@ export function parseDateTimeText(
 	return time ? { day, time } : null;
 }
 
-/** The local time of day of an ISO instant, or null for empty/invalid input. */
+/** The Polish time of day of an ISO instant, or null for empty/invalid input. */
 export function timeOfInstant(iso: string | null | undefined): Time | null {
-	if (!iso) return null;
-	const date = new Date(iso);
-	return Number.isNaN(date.getTime())
-		? null
-		: `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+	return polishTimeOf(iso);
 }
 
-/** The ISO instant of a local day and time; null when either is malformed. */
+/**
+ * The ISO instant of a Polish day and time; null when either is malformed or
+ * the time does not exist that day (the March clock change). On the October
+ * night the hour that happens twice is taken the first time.
+ */
 export function instantAt(day: Day, time: Time): string | null {
-	const date = parseDay(day);
-	const match = TIME_PATTERN.exec(time);
-	if (Number.isNaN(date.getTime()) || !match) return null;
-	const hours = Number(match[1]);
-	const minutes = Number(match[2]);
-	if (hours > 23 || minutes > 59) return null;
-	date.setHours(hours, minutes, 0, 0);
-	return date.toISOString();
+	return polishInstant(day, time);
 }
 
-/** "DD.MM.RRRR GG:MM" in local time; empty for empty/invalid input. */
+/** "DD.MM.RRRR GG:MM" in Polish time; empty for empty/invalid input. */
 export function formatDateTimeText(iso: string | null | undefined): string {
 	const day = dayOfInstant(iso);
 	const time = timeOfInstant(iso);

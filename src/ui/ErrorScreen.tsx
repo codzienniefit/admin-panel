@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { copyIssueReport, recentFailures } from "@/data/api/copyReport";
 import { ApiError } from "@/data/api/errors";
-import { copyText } from "@/lib/clipboard";
 import { Button } from "./Button";
 
 interface ErrorScreenProps {
@@ -34,11 +34,12 @@ function technicalDetails(error: unknown): string {
  * error is one click away, in small print, for whoever has to debug it.
  */
 export function ErrorScreen({ error, onRetry }: ErrorScreenProps) {
-	const [copied, setCopied] = useState(false);
+	const [copied, setCopied] = useState<boolean | null>(null);
 	const details = technicalDetails(error);
 
+	// one JSON: this error, and the latest failed calls with their requests
 	const copy = async () => {
-		setCopied(await copyText(details));
+		setCopied(await copyIssueReport({ calls: recentFailures(), error }));
 	};
 
 	return (
@@ -76,7 +77,11 @@ export function ErrorScreen({ error, onRetry }: ErrorScreenProps) {
 					{details}
 				</pre>
 				<Button variant="ghost" className="mt-2" onClick={copy}>
-					{copied ? "Skopiowano" : "Skopiuj szczegóły"}
+					{copied === true
+						? "Skopiowano"
+						: copied === false
+							? "Przeglądarka nie pozwoliła skopiować"
+							: "Skopiuj szczegóły (JSON)"}
 				</Button>
 			</details>
 		</div>

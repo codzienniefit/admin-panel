@@ -12,6 +12,7 @@
 		"format": "biome check --write .",
 		"test": "vitest run",
 		"test:ui": "playwright test",
+		"test:timezones": "for tz in UTC America/Los_Angeles Asia/Tokyo Pacific/Auckland; do echo TZ=$tz && TZ=$tz vitest run src/domain src/ui src/data || exit 1; done",
 		"test:ui:show": "playwright test --ui",
 		"test:all": "npm run check && npm run test:ui",
 		"secrets": "node scripts/check-secrets.mjs",

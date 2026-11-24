@@ -1,6 +1,6 @@
 import { z } from "zod";
 import {
-	contentBlockSchema,
+	contentBlocksSchema,
 	contentStatusSchema,
 	idList,
 	optionalText,
@@ -23,7 +23,7 @@ export const workoutSchema = z.looseObject({
 	imageRelativePath: optionalText,
 	audioRelativePath: optionalText,
 	videoUrl: optionalText,
-	descriptionFancyContent: z.array(contentBlockSchema).default([]),
+	descriptionFancyContent: contentBlocksSchema,
 	/** Badge earned by completing the workout. */
 	badgeId: optionalText,
 	addedAtUtc: z.string(),

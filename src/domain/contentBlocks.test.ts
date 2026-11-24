@@ -5,6 +5,7 @@ import {
 	contentErrors,
 	contentExcerpt,
 	contentIssues,
+	formattingBlockers,
 	linkAddressIn,
 	linkAddressProblem,
 	looksLikeJson,
@@ -153,10 +154,10 @@ describe("content validation", () => {
 		it("refuses nesting either way", () => {
 			expect(
 				errorsOf(text('<a href="https://x.pl">zobacz <b>tu</b></a>')).join(" "),
-			).toContain("w środku linku");
+			).toContain("Pogrubienie w linku „zobacz tu” nie zadziała");
 			expect(
 				errorsOf(text('<b>zobacz <a href="https://x.pl">tu</a></b>')).join(" "),
-			).toContain("w środku pogrubienia");
+			).toContain("Link w pogrubionym tekście „zobacz tu” nie zadziała");
 		});
 
 		it("refuses empty bold", () => {
@@ -449,5 +450,67 @@ describe("excerpt", () => {
 	});
 	it("shortens long content", () => {
 		expect(contentExcerpt([text("a".repeat(300))], 50)).toHaveLength(50);
+	});
+});
+
+describe("formattingBlockers: what the editor's Bold and Link buttons refuse", () => {
+	const plain = {
+		text: "trzy serie",
+		spansLines: false,
+		inLink: false,
+		inBold: false,
+		allBold: false,
+	};
+
+	it("allows both on plain text in one line", () => {
+		expect(formattingBlockers(plain)).toEqual({ bold: null, link: null });
+	});
+
+	it("refuses bold on a link, and a link on bold text, saying why", () => {
+		const onLink = formattingBlockers({ ...plain, inLink: true });
+		expect(onLink.bold).toMatch(/Nie można pogrubić tekstu linku/);
+		const onBold = formattingBlockers({ ...plain, inBold: true });
+		expect(onBold.link).toMatch(/Nie można dodać linku do pogrubionego tekstu/);
+		expect(onBold.link).toMatch(/zdejmij pogrubienie/i);
+	});
+
+	it("always allows taking bold off", () => {
+		expect(
+			formattingBlockers({
+				...plain,
+				inBold: true,
+				allBold: true,
+				inLink: true,
+			}).bold,
+		).toBeNull();
+	});
+
+	it("lets a cursor in a link open that link", () => {
+		expect(
+			formattingBlockers({ ...plain, text: "", inLink: true }).link,
+		).toBeNull();
+		// but typing bold inside it is refused
+		expect(
+			formattingBlockers({ ...plain, text: "", inLink: true }).bold,
+		).not.toBeNull();
+	});
+
+	it("names the emoji or symbol that would break the formatting", () => {
+		const blockers = formattingBlockers({
+			...plain,
+			text: "brzuch 🔥 i plecy",
+		});
+		expect(blockers.bold).toMatch(/emoji, symbol albo „\[”.*🔥/);
+		expect(blockers.link).toMatch(/🔥/);
+	});
+
+	it("refuses formatting across a new line", () => {
+		const blockers = formattingBlockers({
+			...plain,
+			text: "a\nb",
+			spansLines: true,
+		});
+		expect(blockers.bold).toMatch(/nową linię/);
+		expect(blockers.link).toMatch(/nową linię/);
 	});
 });

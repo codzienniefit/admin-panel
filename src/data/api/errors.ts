@@ -37,6 +37,11 @@ export class ApiError<TCurrent = unknown> extends Error {
 	 * whenever the panel shows its own words instead of the backend's.
 	 */
 	readonly details: string | undefined;
+	/**
+	 * The backend answered with success, but the body is not what the panel
+	 * expects (not JSON, or a field of the wrong shape). Kind "server".
+	 */
+	readonly unexpected: boolean;
 
 	constructor(
 		kind: ApiErrorKind,
@@ -46,6 +51,7 @@ export class ApiError<TCurrent = unknown> extends Error {
 			current?: TCurrent;
 			status?: number;
 			details?: string;
+			unexpected?: boolean;
 		} = {},
 	) {
 		super(message);
@@ -55,6 +61,7 @@ export class ApiError<TCurrent = unknown> extends Error {
 		this.current = extra.current;
 		this.status = extra.status;
 		this.details = extra.details;
+		this.unexpected = extra.unexpected ?? false;
 	}
 }
 

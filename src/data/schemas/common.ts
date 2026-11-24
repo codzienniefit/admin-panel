@@ -26,6 +26,39 @@ export const contentBlockSchema = z.looseObject({
 });
 export type ContentBlock = z.infer<typeof contentBlockSchema>;
 
+/**
+ * A block with nothing in it: no type, no text, no picture. Old tools left
+ * such `{}` behind in stored descriptions (workout 5fauJdypS9Y has one); the
+ * app shows nothing for it.
+ */
+function isEmptyBlock(block: unknown): boolean {
+	if (block === null || block === undefined) return true;
+	if (typeof block !== "object" || Array.isArray(block)) return false;
+	const { type, content, metadata } = block as Record<string, unknown>;
+	const blank = (value: unknown) =>
+		value === undefined ||
+		value === null ||
+		(typeof value === "string" && value.trim() === "");
+	return blank(type) && blank(content) && blank(metadata);
+}
+
+/**
+ * A description or message body as stored. Empty blocks are left out on
+ * read, so one leftover `{}` does not stop a whole list from loading; the next
+ * save writes the body without it. Anything else that does not fit still
+ * fails loudly, with the entity's id and the field.
+ */
+export const contentBlocksSchema = z.preprocess(
+	(value) =>
+		Array.isArray(value)
+			? value.filter((block) => !isEmptyBlock(block))
+			: value,
+	z
+		.array(contentBlockSchema)
+		.nullish()
+		.transform((value) => value ?? []),
+);
+
 // The backend leaves unset fields out of some responses and sends null in
 // others. Both mean "empty"; on read they become null (or an empty list).
 export const optionalText = z.string().nullish().default(null);

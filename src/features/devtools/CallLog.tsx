@@ -6,6 +6,9 @@ import {
 	markCallsSeen,
 	severityOf,
 } from "@/data/api/callLog";
+import { copyIssueReport } from "@/data/api/copyReport";
+import { clearExchangeLog } from "@/data/api/exchangeLog";
+import { POLISH_TIME_ZONE } from "@/domain/polishTime";
 import { plural } from "@/domain/text";
 import { useStore } from "@/lib/store";
 import { Button } from "@/ui/Button";
@@ -29,6 +32,7 @@ const KIND_LABELS: Record<NonNullable<CallEntry["kind"]>, string> = {
 	forbidden: "brak uprawnień",
 	notFound: "nie znaleziono",
 	server: "błąd serwera",
+	unexpected: "nieczytelna odpowiedź",
 	network: "brak odpowiedzi",
 	unknown: "błąd w panelu",
 };
@@ -49,10 +53,45 @@ function statusText(entry: CallEntry): string {
 }
 
 const timeFormat = new Intl.DateTimeFormat("pl-PL", {
+	timeZone: POLISH_TIME_ZONE,
 	hour: "2-digit",
 	minute: "2-digit",
 	second: "2-digit",
 });
+
+/**
+ * Copies the issue report (issueReport.ts) for these calls: one JSON with
+ * every request and answer, to paste wherever the failure is investigated.
+ */
+function CopyReportButton({
+	calls,
+	label,
+	size,
+}: {
+	calls: () => readonly CallEntry[];
+	label: string;
+	size?: "md";
+}) {
+	const [state, setState] = useState<"idle" | "copied" | "refused">("idle");
+	return (
+		<Button
+			size={size}
+			disabled={calls().length === 0}
+			onClick={async () => {
+				setState(
+					(await copyIssueReport({ calls: calls() })) ? "copied" : "refused",
+				);
+				window.setTimeout(() => setState("idle"), 2500);
+			}}
+		>
+			{state === "copied"
+				? "Skopiowano"
+				: state === "refused"
+					? "Przeglądarka nie pozwoliła skopiować"
+					: label}
+		</Button>
+	);
+}
 
 /** The button in the top bar; nothing when developer mode is off. */
 export function CallLogButton() {
@@ -117,9 +156,22 @@ function CallLogDialog({ onClose }: { onClose: () => void }) {
 			size="lg"
 			footer={
 				<>
-					<Button size="md" onClick={() => clearCallLog()}>
+					<Button
+						size="md"
+						onClick={() => {
+							clearCallLog();
+							clearExchangeLog();
+						}}
+					>
 						Wyczyść
 					</Button>
+					<CopyReportButton
+						size="md"
+						label="Kopiuj nieudane (JSON)"
+						calls={() =>
+							entries.filter((entry) => entry.state === "failed").reverse()
+						}
+					/>
 					<Button size="md" variant="primary" onClick={onClose}>
 						Zamknij
 					</Button>
@@ -188,6 +240,15 @@ function CallRow({ entry }: { entry: CallEntry }) {
 			</button>
 			{open && (
 				<div className="grid gap-3 border-line border-t p-3 md:grid-cols-2">
+					<div className="flex flex-wrap items-center justify-between gap-2 md:col-span-2">
+						<p className="text-xs text-muted">
+							Pełny raport: zapytania HTTP, odpowiedzi, kody i czasy.
+						</p>
+						<CopyReportButton
+							label="Kopiuj szczegóły (JSON)"
+							calls={() => [entry]}
+						/>
+					</div>
 					<section className="flex min-w-0 flex-col gap-1.5">
 						<h3 className="text-xs font-semibold">Parametry</h3>
 						<JsonView

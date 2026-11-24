@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { currentEnvironment } from "@/data/environment";
 import { withCallLog } from "./callLog";
 import { capabilitiesFor } from "./capabilities";
+import { recordExchange } from "./exchangeLog";
 import { createHttpApi } from "./http";
 import { createTransport } from "./http/transport";
 import { createMockApi } from "./mock";
@@ -33,6 +34,7 @@ function createApi(): ApiClient {
 			baseUrl: API_BASE,
 			getToken: (options) => auth.getToken(options),
 			onUnauthorized: sessionEnded,
+			record: (request) => recordExchange(request),
 		}),
 	});
 }

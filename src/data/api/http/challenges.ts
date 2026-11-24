@@ -401,6 +401,9 @@ export function fromChallenge(
 	for (const field of READ_ONLY_FIELDS) {
 		delete (rest as Record<string, unknown>)[field];
 	}
+	// the backend's defaults are its own; a backend that does not send them
+	// would refuse the field
+	delete (rest as Record<string, unknown>).defaultRecommendedNext;
 	const isNew = typeof challenge.id !== "string";
 	const exact = capabilities.etag;
 	const body: Record<string, unknown> = {

@@ -1784,12 +1784,24 @@ describe("fromChallenge: what a save sends to the panel's route", () => {
 				warnings: [
 					{ path: "title", code: "REQUIRED", message: "Nazwa jest wymagana" },
 				],
+				defaultRecommendedNext: [{ id: "C62" }, { id: "C34" }],
 			}),
 			OPEN,
 		);
 		expect(deleted).toHaveProperty("warnings");
+		expect(deleted.defaultRecommendedNext).toEqual([
+			{ id: "C62" },
+			{ id: "C34" },
+		]);
 		const body = fromChallenge({ ...deleted, status: "draft" }, OPEN, now);
-		for (const field of ["warnings", "deletedAtUtc", "deletedBy", "etag"]) {
+		for (const field of [
+			"warnings",
+			"deletedAtUtc",
+			"deletedBy",
+			"etag",
+			// a backend that does not send it would refuse it
+			"defaultRecommendedNext",
+		]) {
 			expect(body, field).not.toHaveProperty(field);
 		}
 	});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayOfInstant, instantOnDay } from "./calendarDates";
+import { dayOfInstant, instantOnDay, timeOfInstant } from "./calendarDates";
 import {
 	calendarField,
 	calendarStart,
@@ -40,9 +40,7 @@ describe("a challenge's place on the calendar", () => {
 		);
 		expect(dayOfInstant(moved.liveAtUtc)).toBe("2027-03-17");
 		expect(moved.availableAtUtc).toBe(available);
-		expect(new Date(moved.liveAtUtc ?? "").getHours()).toBe(
-			new Date(live).getHours(),
-		);
+		expect(timeOfInstant(moved.liveAtUtc)).toBe(timeOfInstant(live));
 	});
 
 	it("builds a calendar item with a chosen or a derived colour", () => {

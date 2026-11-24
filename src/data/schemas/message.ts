@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { contentBlockSchema, optionalText } from "./common";
+import { contentBlocksSchema, optionalText } from "./common";
 
 // A message to app users. It starts as a draft, is sent once to a target
 // group and can then only be archived: what was delivered cannot be edited.
@@ -19,7 +19,7 @@ export const messageSchema = z.looseObject({
 	targetGroup: optionalText,
 	/** Extra value some groups need (for example a challenge id). */
 	targetGroupValue: optionalText,
-	fancyContent: z.array(contentBlockSchema).default([]),
+	fancyContent: contentBlocksSchema,
 	createdAtUtc: z.string(),
 	sentAtUtc: optionalText,
 	archivedAtUtc: optionalText,

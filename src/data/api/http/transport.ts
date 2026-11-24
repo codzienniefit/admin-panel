@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { ApiIssue } from "@/data/api/errors";
 import { ApiError, isApiError } from "@/data/api/errors";
+import type { ExchangeRequest, ExchangeResponse } from "@/data/api/exchangeLog";
 import { failureFrom, networkFailure, unexpectedAnswer } from "./failures";
 
 // The one place the panel makes HTTP requests to the backend.
@@ -39,6 +40,8 @@ export interface WireAnswer {
 	text: string;
 	/** The `ETag` response header. */
 	etag: string | null;
+	/** Every response header the browser lets the page read, names in lower case. */
+	headers?: Record<string, string>;
 }
 
 /** Performs one request. Rejects only when there was no answer at all. */
@@ -94,6 +97,13 @@ export interface TransportOptions {
 	send?: Sender;
 	/** Used when a request reports progress; fetch cannot. */
 	upload?: Sender;
+	/**
+	 * Told about every request as it leaves; the function it returns is told
+	 * how it ended. For the developer's register (exchangeLog.ts).
+	 */
+	record?: (
+		request: ExchangeRequest,
+	) => (outcome: { response: ExchangeResponse } | { error: string }) => void;
 }
 
 /** Marks a request as made by the panel's own code. */
@@ -162,8 +172,23 @@ export const fetchSender: Sender = async (request) => {
 		status: response.status,
 		text: await response.text(),
 		etag: response.headers.get("etag"),
+		headers: Object.fromEntries(response.headers.entries()),
 	};
 };
+
+/** `getAllResponseHeaders()` as an object, names in lower case. */
+function xhrHeaders(raw: string): Record<string, string> {
+	const headers: Record<string, string> = {};
+	for (const line of raw.trim().split(/[\r\n]+/)) {
+		const at = line.indexOf(":");
+		if (at > 0) {
+			headers[line.slice(0, at).trim().toLowerCase()] = line
+				.slice(at + 1)
+				.trim();
+		}
+	}
+	return headers;
+}
 
 /** fetch cannot report how much of a body has been sent; XMLHttpRequest can. */
 export const xhrSender: Sender = (request) =>
@@ -185,6 +210,7 @@ export const xhrSender: Sender = (request) =>
 				status: xhr.status,
 				text: xhr.responseText,
 				etag: xhr.getResponseHeader("etag"),
+				headers: xhrHeaders(xhr.getAllResponseHeaders()),
 			});
 		xhr.onerror = () => reject(new TypeError("Network request failed"));
 		xhr.ontimeout = () =>
@@ -228,9 +254,41 @@ export function createTransport(options: TransportOptions): Transport {
 				(request.file ? UPLOAD_TIMEOUT_MS : DEFAULT_TIMEOUT_MS),
 			onProgress: request.onProgress,
 		};
+		const finish = options.record?.({
+			method: wire.method,
+			url: wire.url,
+			headers,
+			body:
+				body === undefined
+					? null
+					: typeof body === "string"
+						? body
+						: {
+								file:
+									"name" in body && typeof body.name === "string"
+										? body.name
+										: null,
+								type: body.type,
+								size: body.size,
+							},
+		});
 		try {
-			return await (request.onProgress ? upload : send)(wire);
+			const answer = await (request.onProgress ? upload : send)(wire);
+			finish?.({
+				response: {
+					status: answer.status,
+					headers: answer.headers ?? (answer.etag ? { etag: answer.etag } : {}),
+					body: answer.text,
+				},
+			});
+			return answer;
 		} catch (cause) {
+			finish?.({
+				error:
+					cause instanceof Error
+						? `${cause.name}: ${cause.message}`
+						: String(cause),
+			});
 			throw isApiError(cause) ? cause : networkFailure(cause);
 		}
 	}

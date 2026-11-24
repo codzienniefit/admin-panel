@@ -18,6 +18,7 @@ import {
 	timeOfInstant,
 	today,
 } from "@/domain/calendarDates";
+import { polishTimeNote, polishTimeProblem } from "@/domain/polishTime";
 import { Button } from "./Button";
 import { borderFor, controlClass, Field } from "./Field";
 import { Popover } from "./Popover";
@@ -25,7 +26,12 @@ import { Popover } from "./Popover";
 // The panel's one way to enter a date. Two fields share it:
 //
 //   DateField       a calendar day ("YYYY-MM-DD")
-//   DateTimeField   a moment, edited in local time and stored as UTC
+//   DateTimeField   a moment, edited in Polish time and stored as UTC
+//
+// Polish time always (Europe/Warsaw, domain/polishTime.ts), whatever time
+// zone the computer is set to. A time the clock skips in March is refused
+// with a message; the October hour that happens twice is taken the first
+// time, with a note.
 //
 // A date can be typed ("20.11.2026 10:06") or picked from the calendar; both
 // read and write the Polish format, whatever language the browser is in. The
@@ -74,30 +80,52 @@ export function DateField({ value, onChange, ...common }: DateFieldProps) {
 	);
 }
 
-/** A date and time, edited in local time and stored as UTC. */
+const DATE_TIME_MISTAKE =
+	"Wpisz datę i godzinę jako DD.MM.RRRR GG:MM (czas polski).";
+
+/** A date and time, edited in Polish time and stored as UTC. */
 export function DateTimeField({
 	value,
 	onChange,
 	stepMinutes = 15,
 	defaultTime = "13:00",
+	hint,
 	...common
 }: DateTimeFieldProps) {
 	const day = dayOfInstant(value);
 	const time = timeOfInstant(value) ?? defaultTime;
+	const note = day ? polishTimeNote(day, time) : null;
 	return (
 		<DateControl
 			{...common}
+			hint={[hint, note].filter(Boolean).join(" ") || "Czas polski."}
 			day={day}
 			text={formatDateTimeText(value)}
 			placeholder="DD.MM.RRRR GG:MM"
-			mistake="Wpisz datę jako DD.MM.RRRR GG:MM"
+			mistake={(text) => {
+				const typed = parseDateTimeText(text);
+				if (!typed) {
+					const first = text.trim().split(/[\s,]+/)[0] ?? "";
+					// written like a date, but no such day (31.02)
+					return /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(first) &&
+						!parseDayText(first)
+						? `Nie ma takiego dnia: ${first}.`
+						: DATE_TIME_MISTAKE;
+				}
+				return (
+					polishTimeProblem(typed.day, typed.time ?? time) ?? DATE_TIME_MISTAKE
+				);
+			}}
 			parse={(text) => {
 				const typed = parseDateTimeText(text);
 				return typed ? instantAt(typed.day, typed.time ?? time) : null;
 			}}
 			onCommit={onChange}
 			onPickDay={(picked) => {
-				onChange(instantAt(picked, time));
+				// a time the clock skips on the picked day moves an hour on
+				const instant =
+					instantAt(picked, time) ?? instantAt(picked, shiftTime(time, 60));
+				if (instant) onChange(instant);
 				// Stays open: the time is set in the same panel.
 				return "stay";
 			}}
@@ -105,11 +133,13 @@ export function DateTimeField({
 				<TimeInput
 					// A new day or a new time from outside starts the input afresh.
 					key={`${day}-${time}`}
+					day={day}
 					time={time}
 					disabled={!day}
 					stepMinutes={stepMinutes}
 					onChange={(next) => {
-						if (day) onChange(instantAt(day, next));
+						const instant = day ? instantAt(day, next) : null;
+						if (instant) onChange(instant);
 					}}
 				/>
 			}
@@ -123,8 +153,8 @@ interface DateControlProps<T> extends CommonProps {
 	/** The value as text, in the format people type. */
 	text: string;
 	placeholder: string;
-	/** Shown when what was typed is not a date. */
-	mistake: string;
+	/** Shown when what was typed is not a date: the same text, or one made for what was typed. */
+	mistake: string | ((text: string) => string);
 	parse: (text: string) => T | null;
 	onCommit: (value: T | null) => void;
 	onPickDay: (day: Day) => "close" | "stay";
@@ -176,7 +206,17 @@ function DateControl<T>({
 	const shownMonth = month ?? selected ?? parseDay(today());
 
 	return (
-		<Field label={label} hint={hint} error={mistaken ? mistake : error}>
+		<Field
+			label={label}
+			hint={hint}
+			error={
+				mistaken
+					? typeof mistake === "function"
+						? mistake(draft ?? "")
+						: mistake
+					: error
+			}
+		>
 			{({ id, describedBy, invalid }) => (
 				<div className="flex gap-2">
 					<div className="relative min-w-0 flex-1">
@@ -326,57 +366,111 @@ function Calendar({ selected, month, onMonthChange, onPick }: CalendarProps) {
 }
 
 interface TimeInputProps {
+	/** The day the time is on: decides whether the time exists in Poland. */
+	day: Day | null;
 	time: Time;
 	disabled: boolean;
 	stepMinutes: number;
 	onChange: (time: Time) => void;
 }
 
-/** The time of day under the calendar: typed, or stepped with the arrow keys. */
-function TimeInput({ time, disabled, stepMinutes, onChange }: TimeInputProps) {
+/** What is wrong with a typed time on this day; null when it can be used. */
+function timeProblem(day: Day | null, draft: string): string | null {
+	const typed = parseTimeText(draft);
+	if (!typed) return "Wpisz godzinę jako GG:MM, od 00:00 do 23:59.";
+	return day ? polishTimeProblem(day, typed) : null;
+}
+
+/**
+ * The time of day under the calendar, in Polish time: typed, or stepped with
+ * the arrow keys. A time that cannot be used stays as typed, with the reason
+ * under it, and is not saved.
+ */
+function TimeInput({
+	day,
+	time,
+	disabled,
+	stepMinutes,
+	onChange,
+}: TimeInputProps) {
 	const [draft, setDraft] = useState<string | null>(null);
-	const typed = draft === null ? time : parseTimeText(draft);
+	const [shown, setShown] = useState(false);
+	const problem = draft === null ? null : timeProblem(day, draft);
 
 	const commit = () => {
 		if (draft === null) return;
+		if (problem) {
+			setShown(true);
+			return;
+		}
+		const typed = parseTimeText(draft);
 		setDraft(null);
+		setShown(false);
 		if (typed && typed !== time) onChange(typed);
 	};
 
+	/** The next time the arrows reach, stepping over an hour the clock skips. */
+	const stepFrom = (from: Time, step: number): Time => {
+		let next = shiftTime(from, step);
+		for (
+			let tries = 0;
+			tries < 8 && day && polishTimeProblem(day, next);
+			tries++
+		) {
+			next = shiftTime(next, step);
+		}
+		return next;
+	};
+
+	const note = draft === null && day ? polishTimeNote(day, time) : null;
+	const message = shown ? problem : null;
 	return (
-		<label className="flex flex-col gap-1 text-xs font-semibold">
-			Godzina
-			<input
-				type="text"
-				inputMode="numeric"
-				autoComplete="off"
-				placeholder="GG:MM"
-				title={disabled ? "Najpierw wybierz dzień" : undefined}
-				value={draft ?? time}
-				onChange={(event) => setDraft(event.target.value)}
-				onBlur={commit}
-				onKeyDown={(event) => {
-					if (event.key === "Enter") {
-						event.preventDefault();
-						commit();
-					}
-					const step =
-						event.key === "ArrowUp"
-							? stepMinutes
-							: event.key === "ArrowDown"
-								? -stepMinutes
-								: 0;
-					if (step !== 0 && typed) {
-						event.preventDefault();
-						setDraft(null);
-						onChange(shiftTime(typed, step));
-					}
-				}}
-				disabled={disabled}
-				aria-invalid={typed === null || undefined}
-				className={`h-9 w-24 text-center font-normal tabular-nums ${controlClass} ${borderFor(typed === null)}`}
-			/>
-		</label>
+		<div className="flex max-w-64 flex-col gap-1">
+			<label className="flex flex-col gap-1 text-xs font-semibold">
+				Godzina (czas polski)
+				<input
+					type="text"
+					inputMode="numeric"
+					autoComplete="off"
+					placeholder="GG:MM"
+					title={disabled ? "Najpierw wybierz dzień" : undefined}
+					value={draft ?? time}
+					onChange={(event) => {
+						setDraft(event.target.value);
+						setShown(false);
+					}}
+					onBlur={commit}
+					onKeyDown={(event) => {
+						if (event.key === "Enter") {
+							event.preventDefault();
+							commit();
+						}
+						const step =
+							event.key === "ArrowUp"
+								? stepMinutes
+								: event.key === "ArrowDown"
+									? -stepMinutes
+									: 0;
+						const from = draft === null ? time : parseTimeText(draft);
+						if (step !== 0 && from) {
+							event.preventDefault();
+							setDraft(null);
+							setShown(false);
+							onChange(stepFrom(from, step));
+						}
+					}}
+					disabled={disabled}
+					aria-invalid={message ? true : undefined}
+					className={`h-9 w-24 text-center font-normal tabular-nums ${controlClass} ${borderFor(Boolean(message))}`}
+				/>
+			</label>
+			{message && (
+				<p role="alert" className="text-xs text-danger">
+					{message}
+				</p>
+			)}
+			{note && <p className="text-xs text-muted">{note}</p>}
+		</div>
 	);
 }
 

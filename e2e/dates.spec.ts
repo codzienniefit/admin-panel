@@ -61,7 +61,7 @@ test("a date can be typed, and a date that does not exist is refused", async ({
 	await field.press("Enter");
 	await expect(field).toHaveAttribute("aria-invalid", "true");
 	await expect(
-		page.getByText("Wpisz datę jako DD.MM.RRRR GG:MM"),
+		page.getByText("Nie ma takiego dnia: 31.02.2027."),
 	).toBeVisible();
 	// Nothing was taken: the form has no change to save.
 	await expect(

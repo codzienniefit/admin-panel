@@ -16,7 +16,11 @@ import { type EditorState, TextSelection } from "@tiptap/pm/state";
 import type { EditorView } from "@tiptap/pm/view";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { useEffect, useRef, useState } from "react";
-import { linkAddressProblem } from "@/domain/contentBlocks";
+import {
+	type FormattingSelection,
+	formattingBlockers,
+	linkAddressProblem,
+} from "@/domain/contentBlocks";
 import { contentToDoc, contentToInline, docToContent } from "@/domain/richText";
 import { Button } from "@/ui/Button";
 import { TextField } from "@/ui/Field";
@@ -82,12 +86,51 @@ const StoredLink = MarkExtension.create({
 	},
 });
 
+/** The selection as the formatting rules (domain/contentBlocks.ts) see it. */
+function selectionFacts(state: EditorState): FormattingSelection {
+	const { from, to, empty, $from } = state.selection;
+	const { link, bold } = state.schema.marks;
+	const text = state.doc.textBetween(from, to, "\n", "\n");
+	const here = state.storedMarks ?? $from.marks();
+	const has = (type: typeof bold) =>
+		type == null
+			? false
+			: empty
+				? type.isInSet(here) != null
+				: state.doc.rangeHasMark(from, to, type);
+	const inBold = has(bold);
+	let allBold = inBold;
+	if (!empty && bold) {
+		state.doc.nodesBetween(from, to, (node) => {
+			if (node.isText && !bold.isInSet(node.marks)) allBold = false;
+		});
+	}
+	return {
+		text,
+		spansLines: text.includes("\n"),
+		inLink: has(link),
+		inBold,
+		allBold,
+	};
+}
+
+/** Bold whose shortcut obeys the same rules as its button. */
+const GuardedBold = Bold.extend({
+	addKeyboardShortcuts() {
+		const toggle = () =>
+			formattingBlockers(selectionFacts(this.editor.state)).bold !== null
+				? true // taken: nothing happens
+				: this.editor.commands.toggleBold();
+		return { "Mod-b": toggle, "Mod-B": toggle };
+	},
+});
+
 const EXTENSIONS = [
 	OneParagraph,
 	Paragraph,
 	Text,
 	HardBreak,
-	Bold.configure({ HTMLAttributes: { class: "font-bold" } }),
+	GuardedBold.configure({ HTMLAttributes: { class: "font-bold" } }),
 	StoredLink,
 	UndoRedo,
 	LineBreakOnEnter,
@@ -179,7 +222,7 @@ function linkDraft(
 }
 
 const toolButton =
-	"rounded-chip border border-line-input px-2.5 py-0.5 text-xs hover:border-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line-input aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-white";
+	"rounded-chip border border-line-input px-2.5 py-0.5 text-xs hover:border-primary disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line-input aria-disabled:cursor-not-allowed aria-disabled:opacity-40 aria-disabled:hover:border-line-input aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-white";
 
 interface RichTextEditorProps {
 	/** Position of the block: part of every accessible name here. */
@@ -285,12 +328,19 @@ export function RichTextEditor({
 
 	// Read through the library's hook: the editor object stays the same while
 	// its state changes, so nothing read from it during render would update.
-	const { bold, empty } = useEditorState({
+	const { bold, empty, blockers } = useEditorState({
 		editor,
 		selector: ({ editor: current }) => ({
 			bold: current.isActive("bold"),
 			empty: current.isEmpty,
+			blockers: formattingBlockers(selectionFacts(current.state)),
 		}),
+		// a new object every time: compare what is in it
+		equalityFn: (a, b) =>
+			a?.bold === b?.bold &&
+			a?.empty === b?.empty &&
+			a?.blockers.bold === b?.blockers.bold &&
+			a?.blockers.link === b?.blockers.link,
 	});
 
 	const startLink = () => {
@@ -379,26 +429,37 @@ export function RichTextEditor({
 	return (
 		<div className="flex flex-col gap-2">
 			<div className="flex gap-1.5">
+				{/* Not `disabled` when a rule takes them: a disabled button shows no
+				    hover text, and the hover text says why. */}
 				<button
 					type="button"
-					title="Pogrubienie (Ctrl+B)"
+					title={blockers.bold ?? "Pogrubienie (Ctrl+B)"}
 					aria-label={`Pogrubienie, blok ${index + 1}`}
 					aria-pressed={bold}
+					aria-disabled={blockers.bold !== null || undefined}
+					aria-description={blockers.bold ?? undefined}
 					disabled={disabled}
 					// The selection in the text must survive the press.
 					onMouseDown={(event) => event.preventDefault()}
-					onClick={() => editor.chain().focus().toggleBold().run()}
+					onClick={() => {
+						if (blockers.bold === null)
+							editor.chain().focus().toggleBold().run();
+					}}
 					className={`${toolButton} font-bold`}
 				>
 					B
 				</button>
 				<button
 					type="button"
-					title="Zamień zaznaczenie w link albo wstaw nowy"
+					title={blockers.link ?? "Zamień zaznaczenie w link albo wstaw nowy"}
 					aria-label={`Link, blok ${index + 1}`}
+					aria-disabled={blockers.link !== null || undefined}
+					aria-description={blockers.link ?? undefined}
 					disabled={disabled}
 					onMouseDown={(event) => event.preventDefault()}
-					onClick={startLink}
+					onClick={() => {
+						if (blockers.link === null) startLink();
+					}}
 					className={toolButton}
 				>
 					Link

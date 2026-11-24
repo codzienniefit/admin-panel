@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { createStore, useStore } from "@/lib/store";
 
 // Loading, the same everywhere: one spinner in the middle of the page, in
-// the logo's colours, fading in and out. No grey blocks standing in for tabs
+// the logo's colours, fading in and out over a dimmed page. No grey blocks standing in for tabs
 // or content.
 //
 // A screen says "this part is still loading" by rendering <Loading />. It
@@ -51,7 +51,9 @@ export function LoadingOverlay() {
 	return (
 		<div
 			role="status"
-			className={`pointer-events-none fixed inset-0 z-[70] flex items-center justify-center transition-opacity duration-300 ease-out ${
+			// the page under the spinner is dimmed, so a list still on screen from
+			// before does not read as the answer
+			className={`pointer-events-none fixed inset-0 z-[70] flex items-center justify-center bg-bg/60 transition-opacity duration-300 ease-out ${
 				busy ? "opacity-100 delay-150" : "opacity-0"
 			}`}
 		>

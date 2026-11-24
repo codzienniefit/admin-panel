@@ -44,9 +44,15 @@ export function AppCacheSettings() {
 					<h2 className="text-lg font-semibold">Pamięć podręczna backendu</h2>
 					<p className="text-sm text-subtle">
 						Odpowiedzi backendu idą do aplikacji przez Cloudflare, który trzyma
-						ich kopię. Po wyczyszczeniu aplikacja od razu dostaje najnowsze
-						treści z backendu, zamiast czekać, aż ta kopia wygaśnie. Backend
-						robi to też sam po każdym zapisie w panelu i w Retoolu.
+						ich kopię. Po wyczyszczeniu aplikacja dostaje najnowsze treści z
+						backendu, zamiast czekać, aż ta kopia wygaśnie. Backend robi to też
+						sam po każdym zapisie w panelu i w Retoolu.
+					</p>
+					<p className="mt-2 text-sm text-subtle">
+						Zmiana może pojawić się w aplikacji dopiero po kilku minutach:
+						backend trzyma część danych w swojej pamięci, żeby szybciej
+						odpowiadać. Najpóźniej 5 minut po zapisie albo po wciśnięciu tego
+						przycisku aplikacja widzi wszystko, co nowe.
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-3">

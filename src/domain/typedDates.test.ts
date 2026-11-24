@@ -9,6 +9,7 @@ import {
 	shiftTime,
 	timeOfInstant,
 } from "./calendarDates";
+import { polishMoment } from "./testSupport";
 
 // Dates as people type them into the date fields (the last part of
 // calendarDates.ts). Instants are built with local Date constructors, so the
@@ -104,10 +105,10 @@ describe("a typed day and time", () => {
 describe("a day and a time as an instant", () => {
 	it("is that local moment", () => {
 		expect(instantAt("2026-11-20", "10:06")).toBe(
-			new Date(2026, 10, 20, 10, 6).toISOString(),
+			polishMoment(2026, 10, 20, 10, 6),
 		);
 		expect(instantAt("2027-01-01", "00:00")).toBe(
-			new Date(2027, 0, 1, 0, 0).toISOString(),
+			polishMoment(2027, 0, 1, 0, 0),
 		);
 	});
 
@@ -144,10 +145,10 @@ describe("a day and a time as an instant", () => {
 
 describe("an instant as text", () => {
 	it("is written the Polish way, 24-hour, local", () => {
-		expect(
-			formatDateTimeText(new Date(2026, 10, 20, 10, 6).toISOString()),
-		).toBe("20.11.2026 10:06");
-		expect(formatDateTimeText(new Date(2027, 2, 1, 0, 5).toISOString())).toBe(
+		expect(formatDateTimeText(polishMoment(2026, 10, 20, 10, 6))).toBe(
+			"20.11.2026 10:06",
+		);
+		expect(formatDateTimeText(polishMoment(2027, 2, 1, 0, 5))).toBe(
 			"01.03.2027 00:05",
 		);
 	});
@@ -159,7 +160,7 @@ describe("an instant as text", () => {
 	});
 
 	it("can be typed back in unchanged", () => {
-		const instant = new Date(2026, 5, 9, 18, 45).toISOString();
+		const instant = polishMoment(2026, 5, 9, 18, 45);
 		const typed = parseDateTimeText(formatDateTimeText(instant));
 		expect(typed).toEqual({ day: "2026-06-09", time: "18:45" });
 		expect(instantAt(typed?.day ?? "", typed?.time ?? "")).toBe(instant);

@@ -44,7 +44,7 @@ test("a challenge is created as a draft and gets its first variant", async ({
 	await expect(page.getByText("Szkic", { exact: true }).first()).toBeVisible();
 
 	// A new challenge opens on its content; variants are on the overview.
-	await page.getByRole("link", { name: "Przegląd" }).click();
+	await page.getByRole("link", { name: "Podgląd" }).click();
 	await expect(page.getByText("Brak wariantów")).toBeVisible();
 	await page.getByRole("button", { name: "Dodaj wariant" }).click();
 	const variant = dialog(page, "Nowy wariant");
@@ -100,6 +100,98 @@ test("content is edited, saved, and still there after a reload", async ({
 	await expect(page.getByRole("textbox", { name: "Nazwa" })).toHaveValue(
 		"Wiosenny start 2027",
 	);
+});
+
+test("recommended next keeps the order it is given, through a save and a reload", async ({
+	page,
+}) => {
+	await open(page, "/challenges/C1/content");
+	const list = page.getByRole("list", { name: "Polecane dalej" });
+
+	await choose(page, "Dodaj: Polecane dalej", /Mocne plecy w 7 dni/);
+	await choose(page, "Dodaj: Polecane dalej", /Plan spokojny/);
+	await expect(list.getByRole("listitem")).toHaveText([
+		/1\.\s*Mocne plecy w 7 dni/,
+		/2\.\s*Plan spokojny/,
+	]);
+
+	// the second becomes the first
+	await page
+		.getByRole("button", { name: /^Przesuń wyżej: Plan spokojny/ })
+		.click();
+	await page.getByRole("button", { name: "Zapisz zmiany" }).click();
+	await expect(toast(page, "Zapisano")).toBeVisible();
+
+	await page.reload();
+	await expect(list.getByRole("listitem")).toHaveText([
+		/1\.\s*Plan spokojny/,
+		/2\.\s*Mocne plecy w 7 dni/,
+	]);
+
+	// removed, and can be added again at the end
+	await page
+		.getByRole("button", { name: /^Usuń z listy: Plan spokojny/ })
+		.click();
+	await expect(list.getByRole("listitem")).toHaveText([/1\.\s*Mocne plecy/]);
+	await choose(page, "Dodaj: Polecane dalej", /Plan spokojny/);
+	await expect(list.getByRole("listitem")).toHaveText([
+		/1\.\s*Mocne plecy/,
+		/2\.\s*Plan spokojny/,
+	]);
+});
+
+test("recommended next starts from the backend's defaults and stores only a real change", async ({
+	page,
+}) => {
+	// C3 has nothing of its own; the backend's defaults are C2, then C1.
+	await open(page, "/challenges/C3/content");
+	const list = page.getByRole("list", { name: "Polecane dalej" });
+	await expect(list.getByRole("listitem")).toHaveText([
+		/1\.\s*Mocne plecy w 7 dni/,
+		/2\.\s*Wiosenny start/,
+	]);
+	await expect(
+		page.getByText(/To domyślne polecenia z listy treści/),
+	).toBeVisible();
+	// left as they are, they are no change to save
+	await expect(
+		page.getByRole("button", { name: "Zapisz zmiany" }),
+	).toBeDisabled();
+
+	// another order is the challenge's own list
+	await page
+		.getByRole("button", { name: /^Przesuń wyżej: Wiosenny start/ })
+		.click();
+	await expect(page.getByText(/Własne polecenia tego wyzwania/)).toBeVisible();
+	await page.getByRole("button", { name: "Zapisz zmiany" }).click();
+	await expect(toast(page, "Zapisano")).toBeVisible();
+	await page.reload();
+	await expect(list.getByRole("listitem")).toHaveText([
+		/1\.\s*Wiosenny start/,
+		/2\.\s*Mocne plecy w 7 dni/,
+	]);
+
+	// put back in the defaults' order: saved as nothing of its own
+	await page
+		.getByRole("button", { name: /^Przesuń wyżej: Mocne plecy w 7 dni/ })
+		.click();
+	await expect(
+		page.getByText(/To domyślne polecenia z listy treści/),
+	).toBeVisible();
+	await page.getByRole("button", { name: "Zapisz zmiany" }).click();
+	await expect(toast(page, "Zapisano")).toBeVisible();
+	await page.reload();
+	await expect(list.getByRole("listitem")).toHaveText([
+		/1\.\s*Mocne plecy w 7 dni/,
+		/2\.\s*Wiosenny start/,
+	]);
+	await expect(
+		page.getByText(/To domyślne polecenia z listy treści/),
+	).toBeVisible();
+	await page.getByRole("link", { name: "Podgląd" }).click();
+	await expect(
+		page.getByText("Mocne plecy w 7 dni, Wiosenny start (domyślne)"),
+	).toBeVisible();
 });
 
 test("content can be saved the moment the page opens", async ({ page }) => {

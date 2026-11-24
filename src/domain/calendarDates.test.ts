@@ -13,9 +13,11 @@ import {
 	mondayOf,
 	monthLabel,
 	parseDay,
+	timeOfInstant,
 	today,
 	WEEKDAY_SHORT_PL,
 } from "./calendarDates";
+import { polishMoment } from "./testSupport";
 
 // Expectations are written as day strings or built with local Date
 // constructors, so the tests hold in whatever time zone they run.
@@ -61,8 +63,12 @@ describe("parsing and formatting a day", () => {
 	});
 
 	it("takes today from the given clock", () => {
-		expect(today(new Date(2026, 10, 11, 8, 30))).toBe("2026-11-11");
-		expect(today(new Date(2026, 10, 11, 23, 59))).toBe("2026-11-11");
+		expect(today(new Date(polishMoment(2026, 10, 11, 8, 30)))).toBe(
+			"2026-11-11",
+		);
+		expect(today(new Date(polishMoment(2026, 10, 11, 23, 59)))).toBe(
+			"2026-11-11",
+		);
 		expect(today()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 	});
 });
@@ -285,12 +291,8 @@ describe("labels", () => {
 describe("days and instants", () => {
 	it("gives the local day of an instant", () => {
 		// Late evening and just after midnight are where UTC has another date.
-		expect(dayOfInstant(new Date(2026, 0, 1, 23, 30).toISOString())).toBe(
-			"2026-01-01",
-		);
-		expect(dayOfInstant(new Date(2026, 6, 1, 0, 15).toISOString())).toBe(
-			"2026-07-01",
-		);
+		expect(dayOfInstant(polishMoment(2026, 0, 1, 23, 30))).toBe("2026-01-01");
+		expect(dayOfInstant(polishMoment(2026, 6, 1, 0, 15))).toBe("2026-07-01");
 	});
 
 	it("gives null for a missing or broken instant", () => {
@@ -302,23 +304,23 @@ describe("days and instants", () => {
 
 	it("puts a new instant at 13:00 local", () => {
 		const instant = instantOnDay("2026-09-14", null);
-		expect(instant).toBe(new Date(2026, 8, 14, 13, 0, 0, 0).toISOString());
+		expect(instant).toBe(polishMoment(2026, 8, 14, 13, 0, 0, 0));
 		expect(instantOnDay("2026-09-14", undefined)).toBe(instant);
 		expect(instantOnDay("2026-09-14", "")).toBe(instant);
 		expect(instantOnDay("2026-09-14", "nie data")).toBe(instant);
 	});
 
 	it("keeps the local time of day when moving to another day", () => {
-		const previous = new Date(2026, 5, 1, 18, 30, 15, 250).toISOString();
+		const previous = polishMoment(2026, 5, 1, 18, 30, 15, 250);
 		// June to December crosses a clock change: the UTC hour moves, the
 		// local one must not.
 		const moved = instantOnDay("2026-12-24", previous);
-		expect(moved).toBe(new Date(2026, 11, 24, 18, 30, 15, 250).toISOString());
-		expect(new Date(moved).getHours()).toBe(18);
+		expect(moved).toBe(polishMoment(2026, 11, 24, 18, 30, 15, 250));
+		expect(timeOfInstant(moved)).toBe("18:30");
 	});
 
 	it("round-trips a day through an instant", () => {
-		const lateShow = new Date(2026, 2, 1, 23, 45).toISOString();
+		const lateShow = polishMoment(2026, 2, 1, 23, 45);
 		for (const day of [
 			"2026-01-01",
 			"2026-03-29",
@@ -331,12 +333,12 @@ describe("days and instants", () => {
 	});
 
 	it("leaves an instant alone when moved onto its own day", () => {
-		const instant = new Date(2026, 8, 14, 9, 5).toISOString();
+		const instant = polishMoment(2026, 8, 14, 9, 5);
 		expect(instantOnDay(dayOfInstant(instant) ?? "", instant)).toBe(instant);
 	});
 
 	it("moves an instant by whole days", () => {
-		const instant = new Date(2026, 8, 14, 20, 0).toISOString();
+		const instant = polishMoment(2026, 8, 14, 20, 0);
 		const start = dayOfInstant(instant) ?? "";
 		const moved = instantOnDay(addDays(start, 10), instant);
 		expect(diffInDays(start, dayOfInstant(moved) ?? "")).toBe(10);

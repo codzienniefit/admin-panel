@@ -413,6 +413,10 @@ export function createMockApi(options: MockApiOptions = {}): ApiClient {
 					renamedToAvoidOverwrite: path !== clean,
 				});
 			},
+			publicUrlFor(path) {
+				// sample files have no real address
+				return `https://media.example/${path}`;
+			},
 			urlFor(path) {
 				const uploaded = uploads.get(path);
 				if (uploaded) return uploaded;

@@ -1,16 +1,19 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { useState } from "react";
-import { mediaCollection } from "@/data/collections/media";
+import { mediaCollection, mediaPublicUrl } from "@/data/collections/media";
 import type { MediaFile } from "@/data/schemas/media";
 import { formatDate } from "@/domain/dates";
 import { folderOf, formatBytes, MEDIA_FOLDERS } from "@/domain/mediaRules";
 import { matchesQuery, plural } from "@/domain/text";
+import { copyText } from "@/lib/clipboard";
 import { useStore } from "@/lib/store";
 import { Button } from "@/ui/Button";
 import { EmptyState } from "@/ui/EmptyState";
 import { SearchInput } from "@/ui/ListPage";
 import { Loading, useDelayedLoading } from "@/ui/Loading";
+import { Menu } from "@/ui/Menu";
 import { Select } from "@/ui/Select";
+import { toast } from "@/ui/toast";
 import { nowPlaying, togglePlayback } from "./audioPlayer";
 import { MediaImage } from "./MediaImage";
 import { MediaUpload } from "./MediaUpload";
@@ -140,7 +143,7 @@ export function MediaBrowser({
 			{files.length > shown.length && (
 				<div className="flex justify-center">
 					<Button onClick={() => setLimit(limit + PAGE)}>
-						Pokaż kolejne ({files.length - shown.length} pozostało)
+						Pokaż kolejne ({files.length - shown.length})
 					</Button>
 				</div>
 			)}
@@ -155,6 +158,43 @@ interface FilesProps {
 }
 
 const fileName = (path: string) => path.split("/").pop() ?? path;
+
+/** Copies a text and says so. */
+async function copyAndSay(text: string, what: string) {
+	const copied = await copyText(text);
+	toast(
+		copied
+			? { title: `Skopiowano ${what}`, description: text, tone: "green" }
+			: { title: "Nie udało się skopiować", tone: "red" },
+	);
+}
+
+/** The "⋯" of a file: its path as stored, or its public address. */
+function FileMenu({
+	path,
+	className = "",
+}: {
+	path: string;
+	className?: string;
+}) {
+	return (
+		<Menu
+			label={`Akcje: ${fileName(path)}`}
+			trigger="⋯"
+			triggerClassName={`flex size-7 items-center justify-center rounded-chip text-base leading-none ${className}`}
+			actions={[
+				{
+					label: "Skopiuj ścieżkę względną",
+					onSelect: () => void copyAndSay(path, "ścieżkę"),
+				},
+				{
+					label: "Skopiuj cały link",
+					onSelect: () => void copyAndSay(mediaPublicUrl(path), "link"),
+				},
+			]}
+		/>
+	);
+}
 
 function ImageGrid({ files, onPick, selectedPath }: FilesProps) {
 	return (
@@ -175,7 +215,7 @@ function ImageGrid({ files, onPick, selectedPath }: FilesProps) {
 				);
 				const frame = `block w-full overflow-hidden rounded-cell border bg-surface text-left ${selected ? "border-primary shadow-focus" : "border-line"}`;
 				return (
-					<li key={file.path} title={file.path}>
+					<li key={file.path} title={file.path} className="relative">
 						{onPick ? (
 							<button
 								type="button"
@@ -187,6 +227,14 @@ function ImageGrid({ files, onPick, selectedPath }: FilesProps) {
 							</button>
 						) : (
 							<div className={frame}>{body}</div>
+						)}
+						{/* On the Media page only (a picker is for picking), and
+						    beside the tile's own button, never inside it. */}
+						{!onPick && (
+							<FileMenu
+								path={file.path}
+								className="absolute top-1.5 right-1.5 bg-surface/85 shadow-sm hover:bg-surface"
+							/>
 						)}
 					</li>
 				);
@@ -222,6 +270,7 @@ function AudioList({ files, onPick, selectedPath }: FilesProps) {
 							Wybierz
 						</Button>
 					)}
+					{!onPick && <FileMenu path={file.path} className="hover:bg-hover" />}
 				</li>
 			))}
 		</ul>

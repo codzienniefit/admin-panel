@@ -263,6 +263,13 @@ describe("Produkcja today: everything can be read", () => {
 		expect(
 			api(backend, PRODUCTION_CAPABILITIES).media.urlFor("workouts/a.webp"),
 		).toBe("/api/files?path=workouts%2Fa.webp");
+		expect(
+			api(backend, PRODUCTION_CAPABILITIES).media.publicUrlFor(
+				"workouts/a b.webp",
+			),
+		).toBe(
+			"https://api.codzienniefitapp.com/api/files?path=workouts%2Fa%20b.webp",
+		);
 		expect(backend.requests).toEqual([]);
 	});
 });
@@ -433,6 +440,7 @@ describe("Produkcja today: nothing can be written", () => {
 			"workouts.list",
 			"media.list",
 			"media.urlFor",
+			"media.publicUrlFor",
 			"badges.list",
 			"messages.list",
 			"users.search",

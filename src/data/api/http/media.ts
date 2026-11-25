@@ -12,6 +12,9 @@ import { cleanUploadPath } from "@/domain/mediaRules";
 import { conform } from "./shared";
 import type { Transport } from "./transport";
 
+/** Where the backend answers the public, the mobile app included. */
+export const PUBLIC_API_ORIGIN = "https://api.codzienniefitapp.com";
+
 // Files in the public container: `manageMedia/files` of the backend
 // (src/handlers/admin/mediaManagementHandler.ts), and the public
 // `files?path=` for showing one.
@@ -114,5 +117,9 @@ export function mediaArea(
 		// follows the backend's redirect to the file, so the browser only
 		// ever loads from the panel's own address.
 		urlFor: (path) => transport.url(["files"], { path }),
+		// The backend's own file route: public, and it redirects to wherever
+		// the storage is, so the link keeps working if the storage moves.
+		publicUrlFor: (path) =>
+			`${PUBLIC_API_ORIGIN}/api/files?path=${encodeURIComponent(path)}`,
 	};
 }

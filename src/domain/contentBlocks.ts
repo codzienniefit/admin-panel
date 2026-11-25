@@ -501,11 +501,143 @@ function blockReason(raw: unknown): string | null {
 	return reasons.length > 0 ? reasons.join(", ") : null;
 }
 
+/** A comma right before "}" or "]": the usual leftover of a deleted field. */
+export interface TrailingComma {
+	/** Which block it is in (or after, for one after the last block). */
+	index: number;
+	/** 1-based line of the comma. */
+	line: number;
+	/** Offset of the comma in the text. */
+	at: number;
+	/** What it stands before: "}" ends a block, "]" the list. */
+	before: "}" | "]";
+}
+
+/**
+ * Every comma that only a "}" or "]" follows, outside quoted text, with the
+ * block it belongs to. JSON does not allow them; people leave them behind
+ * when they delete the last field of a block.
+ */
+export function trailingCommas(text: string): TrailingComma[] {
+	const found: TrailingComma[] = [];
+	let inString = false;
+	let escaped = false;
+	let depth = 0;
+	let block = 0;
+	let line = 1;
+	let pending: { at: number; line: number; depth: number } | null = null;
+	for (let i = 0; i < text.length; i += 1) {
+		const char = text[i];
+		if (char === "\n") line += 1;
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (char === "\\") escaped = true;
+			else if (char === '"') inString = false;
+			continue;
+		}
+		if (char === " " || char === "\n" || char === "\r" || char === "\t") {
+			continue;
+		}
+		if ((char === "}" || char === "]") && pending) {
+			found.push({
+				// a comma after the last block of the list belongs to that block
+				index: pending.depth === 1 ? Math.max(0, block - 1) : block,
+				line: pending.line,
+				at: pending.at,
+				before: char,
+			});
+		}
+		pending = null;
+		if (char === '"') inString = true;
+		else if (char === "{" || char === "[") depth += 1;
+		else if (char === "}" || char === "]") depth -= 1;
+		else if (char === ",") {
+			pending = { at: i, line, depth };
+			if (depth === 1) block += 1;
+		}
+	}
+	return found;
+}
+
+/** The blocks of a parsed list, each checked; null where a block is wrong. */
+function inspectList(list: readonly unknown[]): {
+	blocks: (ContentBlock | null)[];
+	problems: BlockJsonProblem[];
+} {
+	const blocks: (ContentBlock | null)[] = [];
+	const problems: BlockJsonProblem[] = [];
+	list.forEach((item, index) => {
+		const reason = blockReason(item);
+		if (reason === null) {
+			blocks.push(contentBlockSchema.parse(item));
+		} else {
+			blocks.push(null);
+			problems.push({ index, reason, message: `Blok ${index + 1}: ${reason}` });
+		}
+	});
+	return { blocks, problems };
+}
+
+const commaReason = (comma: TrailingComma) =>
+	comma.before === "}"
+		? `zbędny przecinek przed „}” (linia ${comma.line}): usuń go`
+		: `zbędny przecinek po ostatnim bloku (linia ${comma.line}): usuń go`;
+
+/**
+ * JSON with commas left before "}" or "]": said block by block, and when
+ * that is its only mistake, the rest of the blocks still checked and shown.
+ */
+function withTrailingCommas(
+	text: string,
+	commas: readonly TrailingComma[],
+	error: unknown,
+): InspectedJson {
+	let repaired: unknown;
+	try {
+		let fixed = text;
+		for (const comma of [...commas].reverse()) {
+			fixed = fixed.slice(0, comma.at) + fixed.slice(comma.at + 1);
+		}
+		repaired = JSON.parse(fixed);
+	} catch {
+		repaired = undefined;
+	}
+	if (!Array.isArray(repaired)) {
+		const [first] = commas;
+		return {
+			kind: "syntax",
+			problem: first
+				? `${syntaxProblem(error, text)}. Blok ${first.index + 1}: ${commaReason(first)}`
+				: syntaxProblem(error, text),
+		};
+	}
+	const { blocks, problems } = inspectList(repaired);
+	for (const comma of commas) {
+		blocks[comma.index] = null;
+		const known = problems.find((problem) => problem.index === comma.index);
+		const reason = commaReason(comma);
+		if (known) {
+			known.reason = `${reason}, ${known.reason}`;
+			known.message = `Blok ${comma.index + 1}: ${known.reason}`;
+		} else {
+			problems.push({
+				index: comma.index,
+				reason,
+				message: `Blok ${comma.index + 1}: ${reason}`,
+			});
+		}
+	}
+	problems.sort((a, b) => a.index - b.index);
+	return { kind: "blocks", blocks, problems };
+}
+
 export function inspectContentJson(text: string): InspectedJson {
 	let raw: unknown;
 	try {
 		raw = JSON.parse(text);
 	} catch (error) {
+		const commas = trailingCommas(text);
+		if (commas.length > 0) return withTrailingCommas(text, commas, error);
 		return { kind: "syntax", problem: syntaxProblem(error, text) };
 	}
 	if (!Array.isArray(raw)) {
@@ -514,21 +646,7 @@ export function inspectContentJson(text: string): InspectedJson {
 			problem: "JSON musi być listą bloków: [ { … }, { … } ]",
 		};
 	}
-	const blocks: (ContentBlock | null)[] = [];
-	const problems: BlockJsonProblem[] = [];
-	raw.forEach((item: unknown, index) => {
-		const reason = blockReason(item);
-		if (reason === null) {
-			blocks.push(contentBlockSchema.parse(item));
-		} else {
-			blocks.push(null);
-			problems.push({
-				index,
-				reason,
-				message: `Blok ${index + 1}: ${reason}`,
-			});
-		}
-	});
+	const { blocks, problems } = inspectList(raw);
 	if (problems.length > 0) return { kind: "blocks", blocks, problems };
 	return { kind: "ok", blocks: blocks as ContentBlock[] };
 }

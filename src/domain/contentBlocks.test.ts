@@ -13,6 +13,7 @@ import {
 	parseContentJson,
 	textSegments,
 	textToBlocks,
+	trailingCommas,
 } from "./contentBlocks";
 
 const title = (content: string): ContentBlock => ({
@@ -605,7 +606,7 @@ describe("inspectContentJson", () => {
 
 	it("points near the line of a syntax mistake", () => {
 		const inspected = inspectContentJson(
-			'[\n  {\n    "type": "Title",\n  }\n]',
+			'[\n  {\n    "type": "Title"\n    "content": "x"\n  }\n]',
 		);
 		expect(inspected.kind).toBe("syntax");
 		if (inspected.kind !== "syntax") return;
@@ -619,5 +620,60 @@ describe("inspectContentJson", () => {
 				.kind,
 		).toBe("ok");
 		expect(inspectContentJson('{"type":"Text"}').kind).toBe("notList");
+	});
+});
+
+describe("trailing commas", () => {
+	it("names the block and the line of a comma left before }", () => {
+		const text = [
+			"[",
+			"  {",
+			'    "type": "Title",',
+			"  },",
+			"  {",
+			'    "type": "Text",',
+			'    "content": "Dobry, z przecinkiem, w tekście }",',
+			'    "metadata": null',
+			"  }",
+			"]",
+		].join("\n");
+		expect(trailingCommas(text)).toEqual([
+			{ index: 0, line: 3, at: text.indexOf('"Title",') + 7, before: "}" },
+		]);
+		const inspected = inspectContentJson(text);
+		if (inspected.kind !== "blocks") throw new Error("test: expected blocks");
+		// the second block is still read and drawn
+		expect(inspected.blocks[0]).toBeNull();
+		expect(inspected.blocks[1]?.content).toBe(
+			"Dobry, z przecinkiem, w tekście }",
+		);
+		expect(inspected.problems).toEqual([
+			{
+				index: 0,
+				reason:
+					"zbędny przecinek przed „}” (linia 3): usuń go, brakuje pola „content”",
+				message:
+					"Blok 1: zbędny przecinek przed „}” (linia 3): usuń go, brakuje pola „content”",
+			},
+		]);
+	});
+
+	it("names a comma after the last block, and never counts one in quotes", () => {
+		const text = '[{"type":"Text","content":"a, }"},\n]';
+		const inspected = inspectContentJson(text);
+		if (inspected.kind !== "blocks") throw new Error("test: expected blocks");
+		expect(inspected.problems.map((problem) => problem.message)).toEqual([
+			"Blok 1: zbędny przecinek po ostatnim bloku (linia 1): usuń go",
+		]);
+		expect(trailingCommas('[{"type":"Text","content":",}"}]')).toEqual([]);
+	});
+
+	it("still says where, when the commas are not the only mistake", () => {
+		const inspected = inspectContentJson(
+			'[{"type": "Title",}, {"type" "Text"}]',
+		);
+		expect(inspected.kind).toBe("syntax");
+		if (inspected.kind !== "syntax") return;
+		expect(inspected.problem).toContain("Blok 1: zbędny przecinek przed „}”");
 	});
 });

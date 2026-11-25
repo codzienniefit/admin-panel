@@ -184,6 +184,7 @@ export function AddWorkoutDialog({
 											path={workout.imageRelativePath}
 											placeholder="brak"
 											className="aspect-video w-20 shrink-0 rounded-chip"
+											zoomOnHover
 											imageClassName="bg-hover object-cover"
 											placeholderClassName="bg-bg text-[10px] text-muted"
 										/>

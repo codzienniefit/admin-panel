@@ -18,6 +18,9 @@ export const mediaCollection = createCollection(
 
 /** The address a browser can load a media file from. */
 export const mediaUrl = (path: string): string => api.media.urlFor(path);
+/** The file's public address, for pasting anywhere. */
+export const mediaPublicUrl = (path: string): string =>
+	api.media.publicUrlFor(path);
 
 /**
  * Sends a file to a folder and adds it to the library. The stored path can

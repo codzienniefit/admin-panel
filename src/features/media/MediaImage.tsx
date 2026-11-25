@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { mediaUrl } from "@/data/collections/media";
 import { Spinner } from "@/ui/Loading";
+import { useHoverZoom } from "./HoverZoom";
 
 // The one place a picture from the media library is drawn. Every thumbnail
 // in the panel goes through here, so it behaves the same everywhere:
@@ -34,6 +35,8 @@ interface MediaImageProps {
 	imageClassName?: string;
 	/** The placeholder's look, where a dashed outline does not fit. */
 	placeholderClassName?: string;
+	/** In a list: the picture about three times larger while hovered. */
+	zoomOnHover?: boolean;
 }
 
 /** What happened so far, for one path: another path starts from nothing. */
@@ -62,9 +65,15 @@ export function MediaImage({
 	placeholder,
 	imageClassName = "object-cover",
 	placeholderClassName = DASHED,
+	zoomOnHover = false,
 }: MediaImageProps) {
 	const [attempt, setAttempt] = useState<Attempt>(() => fresh(path));
 	const current = attempt.path === path ? attempt : fresh(path);
+	// only a picture that has loaded is enlarged (the browser has it already)
+	const { handlers, zoom } = useHoverZoom(
+		path ? mediaUrl(path) : null,
+		zoomOnHover && current.loaded,
+	);
 
 	const delay = current.waiting
 		? MEDIA_RETRY_DELAYS_MS[current.failures - 1]
@@ -98,7 +107,9 @@ export function MediaImage({
 		<span
 			className={`relative flex items-center justify-center overflow-hidden ${className} ${current.loaded ? "" : "bg-hover"}`}
 			aria-busy={busy || undefined}
+			{...handlers}
 		>
+			{zoom}
 			{!current.waiting && !givenUp && (
 				<img
 					// a new element for each try, so the browser asks again

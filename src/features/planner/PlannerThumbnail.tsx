@@ -12,6 +12,7 @@ export function plannerThumbnail(workout: Workout | undefined) {
 		<MediaImage
 			path={workout.imageRelativePath}
 			className="h-8 w-12 rounded-sm"
+			zoomOnHover
 			imageClassName="object-cover"
 		/>
 	);

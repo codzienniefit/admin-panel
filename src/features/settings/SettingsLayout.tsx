@@ -6,7 +6,7 @@ import { Page } from "@/ui/Page";
 import { tabItem, tabItemActive } from "@/ui/Tabs";
 
 const TABS = [
-	{ to: "/settings/plan-types", label: "Rodzaje planów" },
+	{ to: "/settings/plan-types", label: "Rodzaje planów (wymagania)" },
 	{ to: "/settings/training-types", label: "Typy treningów" },
 	{ to: "/settings/folders", label: "Foldery" },
 	{ to: "/settings/app", label: "Aplikacja" },

@@ -10,6 +10,7 @@ import { Card } from "@/ui/Card";
 import { confirm } from "@/ui/confirm";
 import { EmptyState } from "@/ui/EmptyState";
 import { Loading } from "@/ui/Loading";
+import { Notice } from "@/ui/Notice";
 import { ConditionList } from "./ConditionsEditor";
 import { PlanTypeDialog } from "./PlanTypeDialog";
 import { usePlannerSettings } from "./usePlannerSettings";
@@ -77,11 +78,22 @@ export function PlanTypesSettings() {
 
 	return (
 		<div className="flex flex-col gap-3">
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<p className="text-sm text-muted">
-					Rodzaj planu wybiera się w ustawieniach wariantu. Wyzwanie może mieć
-					własne wymagania: zakładka „Wymagania” wyzwania.
-				</p>
+			<div className="flex flex-wrap items-start justify-between gap-3">
+				<Notice tone="blue" title="Rodzaj planu to zestaw wymagań dla tygodni">
+					<p>
+						Każdy rodzaj planu to lista wymagań, które planer sprawdza w każdym
+						tygodniu wariantu, np. „od 2 do 3 treningów”, „po cardio dzień
+						przerwy”, „najwyżej 2 treningi siłowe”. Tydzień, który je spełnia,
+						ma zieloną ramkę; który nie, czerwoną, z listą tego, czego brakuje.
+					</p>
+					<p className="mt-1.5">
+						Rodzaj planu wybierasz w „Ustawieniach wariantu” w planerze. Wariant
+						bez rodzaju planu sprawdza tylko domyślne wymaganie: 2–3 treningi w
+						tygodniu. Wyzwanie może też dostosować wymagania dla siebie, w
+						zakładce „Wymagania”. To tylko pomoc w planowaniu: aplikacja tego
+						nie widzi i niczego nie blokuje.
+					</p>
+				</Notice>
 				<Button variant="primary" onClick={() => setEditing("new")}>
 					Nowy rodzaj planu
 				</Button>

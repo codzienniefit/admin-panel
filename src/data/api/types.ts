@@ -72,6 +72,11 @@ export interface ApiClient {
 		upload(file: Blob, options: UploadOptions): Promise<MediaUploadResult>;
 		/** The address a browser can load the file from. */
 		urlFor(path: string): string;
+		/**
+		 * The file's public address, which works anywhere, signed in or not:
+		 * to paste into a message, a document or a chat.
+		 */
+		publicUrlFor(path: string): string;
 	};
 	badges: {
 		list(): Promise<Badge[]>;

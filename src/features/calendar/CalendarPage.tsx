@@ -3,7 +3,6 @@ import { challengesCollection } from "@/data/collections/challenges";
 import { planningCollection } from "@/data/collections/planning";
 import type { Challenge } from "@/data/schemas/challenge";
 import {
-	addDays,
 	type Day,
 	formatDay,
 	formatDayFull,
@@ -132,12 +131,6 @@ export function CalendarPage({
 		);
 	};
 
-	const onMove = (id: string, deltaDays: number) => {
-		const challenge = byId.get(id);
-		const from = challenge ? calendarStart(challenge)?.day : undefined;
-		if (challenge && from) void moveTo(challenge, addDays(from, deltaDays));
-	};
-
 	const monthStart = formatDay(new Date(year, month0, 1));
 	const monthEnd = formatDay(new Date(year, month0 + 1, 0));
 	const inMonth = dated.filter(
@@ -197,11 +190,10 @@ export function CalendarPage({
 											month0={month0}
 											dated={dated}
 											onOpen={onOpen}
-											onMove={onMove}
 										/>
 										<p className="mt-2 text-xs text-muted">
-											Przeciągnij pasek, żeby przenieść wyzwanie. Przed
-											zapisaniem panel zapyta o potwierdzenie.
+											Kliknij pasek, żeby otworzyć wyzwanie. Datę zmienisz na
+											jego stronie, w „Treść”.
 										</p>
 									</div>
 									{/* On a phone: the month as a list. Dates change in the form. */}

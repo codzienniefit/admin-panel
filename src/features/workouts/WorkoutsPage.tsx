@@ -79,6 +79,7 @@ export function WorkoutsPage({
 					<MediaImage
 						path={workout.imageRelativePath}
 						className="h-10 w-15 shrink-0 rounded-chip"
+						zoomOnHover
 						imageClassName="bg-hover object-cover"
 					/>
 					<span className="min-w-0">

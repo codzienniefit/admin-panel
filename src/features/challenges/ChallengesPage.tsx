@@ -16,6 +16,7 @@ import {
 import { formatDate } from "@/domain/dates";
 import { plural } from "@/domain/text";
 import { useConfig } from "@/features/config/useConfig";
+import { MediaImage } from "@/features/media/MediaImage";
 import { usePlanningById } from "@/features/planner/usePlanning";
 import { usePlannerSettings } from "@/features/settings/usePlannerSettings";
 import { Button } from "@/ui/Button";
@@ -105,16 +106,25 @@ export function ChallengesPage({
 			header: "Nazwa",
 			primary: true,
 			cell: (challenge) => (
-				<span className="block min-w-0">
-					<span className="block truncate" title={challenge.title}>
-						{challenge.title || "Bez nazwy"}
-					</span>
-					<span
-						className="block truncate text-xs font-normal text-muted"
-						title={challenge.subtitle ?? undefined}
-					>
-						{challenge.id}
-						{challenge.subtitle ? ` · ${challenge.subtitle}` : ""}
+				<span className="flex items-center gap-3">
+					{/* the app's thumbnail is wide (5:2) */}
+					<MediaImage
+						path={challenge.imageRelativePath}
+						className="h-10 w-25 shrink-0 rounded-chip"
+						zoomOnHover
+						imageClassName="bg-hover object-cover"
+					/>
+					<span className="block min-w-0">
+						<span className="block truncate" title={challenge.title}>
+							{challenge.title || "Bez nazwy"}
+						</span>
+						<span
+							className="block truncate text-xs font-normal text-muted"
+							title={challenge.subtitle ?? undefined}
+						>
+							{challenge.id}
+							{challenge.subtitle ? ` · ${challenge.subtitle}` : ""}
+						</span>
 					</span>
 				</span>
 			),

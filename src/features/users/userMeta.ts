@@ -1,5 +1,4 @@
 import type { UserSummary } from "@/data/schemas/user";
-import type { AttemptState } from "@/domain/userRules";
 import type { EnumMeta } from "@/ui/enums";
 
 // How things about a person are worded and coloured, in the style of
@@ -15,12 +14,6 @@ const PROVIDERS: Record<string, string> = {
 /** "google.com" → "Google". An unknown method shows as it came. */
 export const providerLabel = (provider: string): string =>
 	PROVIDERS[provider] ?? provider;
-
-export const ATTEMPT_STATE_META: Record<AttemptState, EnumMeta> = {
-	active: { label: "W trakcie", tone: "blue" },
-	completed: { label: "Ukończone", tone: "green" },
-	aborted: { label: "Przerwane", tone: "grey" },
-};
 
 /** What to call a person on screen when they gave no name. */
 export const personName = (

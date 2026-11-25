@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type Badge, blankBadge } from "@/data/schemas/badge";
-import type { UserBadge, UserProgress } from "@/data/schemas/user";
+import type { UserBadge } from "@/data/schemas/user";
 import {
-	attemptState,
 	emailIssues,
 	grantableBadges,
 	grantIssues,
@@ -11,7 +10,6 @@ import {
 	isSearchable,
 	normalizeEmail,
 	parseUserQuery,
-	progressSummary,
 	revokeIssues,
 	searchQueryProblem,
 	USER_SEARCH_LIMIT,
@@ -281,68 +279,5 @@ describe("a person's badges by section", () => {
 		]);
 		// The definition of a deleted badge is gone; the person still holds it.
 		expect(other[0]?.badge).toBeNull();
-	});
-});
-
-describe("progress", () => {
-	const progress: UserProgress = {
-		workouts: [
-			{ workoutId: "W2", completedAtUtc: "2026-11-09T07:00:00.000Z" },
-			{ workoutId: "W1", completedAtUtc: "2026-11-01T07:00:00.000Z" },
-		],
-		challenges: [
-			{
-				challengeId: "C1",
-				levelId: "beginner",
-				startedAtUtc: "2026-10-01T00:00:00.000Z",
-				completedAtUtc: null,
-				abortedAtUtc: null,
-				completedDays: 4,
-			},
-			{
-				challengeId: "C2",
-				levelId: null,
-				startedAtUtc: "2026-08-01T00:00:00.000Z",
-				completedAtUtc: "2026-08-08T00:00:00.000Z",
-				abortedAtUtc: null,
-				completedDays: 7,
-			},
-			{
-				challengeId: "C3",
-				levelId: null,
-				startedAtUtc: "2026-06-01T00:00:00.000Z",
-				completedAtUtc: null,
-				abortedAtUtc: "2026-06-04T00:00:00.000Z",
-				completedDays: 2,
-			},
-		],
-	};
-
-	it("tells an attempt that is running from a finished or abandoned one", () => {
-		expect(progress.challenges.map(attemptState)).toEqual([
-			"active",
-			"completed",
-			"aborted",
-		]);
-	});
-
-	it("adds up what a person has done", () => {
-		expect(progressSummary(progress)).toEqual({
-			workoutsDone: 2,
-			challengesStarted: 3,
-			challengesCompleted: 1,
-			challengesActive: 1,
-			lastWorkoutAtUtc: "2026-11-09T07:00:00.000Z",
-		});
-	});
-
-	it("copes with someone who has done nothing yet", () => {
-		expect(progressSummary({ workouts: [], challenges: [] })).toEqual({
-			workoutsDone: 0,
-			challengesStarted: 0,
-			challengesCompleted: 0,
-			challengesActive: 0,
-			lastWorkoutAtUtc: null,
-		});
 	});
 });

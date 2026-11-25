@@ -1,12 +1,7 @@
 import type { ApiIssue } from "@/data/api/errors";
 import type { Badge } from "@/data/schemas/badge";
 import type { InternalConfig } from "@/data/schemas/config";
-import type {
-	UserBadge,
-	UserChallengeAttempt,
-	UserProgress,
-	UserSummary,
-} from "@/data/schemas/user";
+import type { UserBadge, UserSummary } from "@/data/schemas/user";
 
 // Rules for looking people up and for the few things the panel may change
 // about them. One set, used by the screens and by the mock server.
@@ -204,35 +199,4 @@ export function groupUserBadges(
 			subsections: group.subsections.filter((s) => s.badges.length > 0),
 		}))
 		.filter((group) => group.subsections.length > 0);
-}
-
-export type AttemptState = "completed" | "aborted" | "active";
-
-export const attemptState = (
-	attempt: Pick<UserChallengeAttempt, "completedAtUtc" | "abortedAtUtc">,
-): AttemptState =>
-	attempt.completedAtUtc
-		? "completed"
-		: attempt.abortedAtUtc
-			? "aborted"
-			: "active";
-
-export interface ProgressSummary {
-	workoutsDone: number;
-	challengesStarted: number;
-	challengesCompleted: number;
-	challengesActive: number;
-	lastWorkoutAtUtc: string | null;
-}
-
-export function progressSummary(progress: UserProgress): ProgressSummary {
-	const states = progress.challenges.map(attemptState);
-	const dates = progress.workouts.map((item) => item.completedAtUtc).sort();
-	return {
-		workoutsDone: progress.workouts.length,
-		challengesStarted: progress.challenges.length,
-		challengesCompleted: states.filter((s) => s === "completed").length,
-		challengesActive: states.filter((s) => s === "active").length,
-		lastWorkoutAtUtc: dates.at(-1) ?? null,
-	};
 }

@@ -1,5 +1,6 @@
 import type { Condition } from "@/data/schemas/planning";
 import { ALL_SCOPE } from "./conditions";
+import { plural } from "./text";
 
 // The one place a week of a plan is checked against its rules. What a rule
 // consists of (its fields and their limits) is in conditions.ts.
@@ -14,6 +15,12 @@ export type WeekInput = readonly WeekDayInput[];
 export interface ConditionResult {
 	label: string;
 	pass: boolean;
+	/**
+	 * What the check counted, in words, for a rule that counts: "jest 5
+	 * treningów w 4 dniach, o 2 za dużo". So a red rule says why, and a
+	 * reader can see what "2–3 treningi" counts.
+	 */
+	found?: string;
 }
 
 export interface WeekResult {
@@ -21,6 +28,8 @@ export interface WeekResult {
 	total: number;
 	state: "valid" | "invalid" | "neutral";
 	results: ConditionResult[];
+	/** The variant has no rules (no plan type): the built-in default is used. */
+	byDefault?: true;
 }
 
 const DEFAULT_LABEL = "Domyślnie: 2–3 treningi w tygodniu";
@@ -148,6 +157,83 @@ function passesMaxInWindow(
 	return true;
 }
 
+const workoutsText = (count: number) =>
+	plural(count, "trening", "treningi", "treningów");
+const trainingDaysText = (count: number) =>
+	plural(count, "dzień treningowy", "dni treningowe", "dni treningowych");
+
+/** "jest 5 treningów, o 2 za dużo" against a range of allowed counts. */
+function againstRange(
+	found: string,
+	counted: number,
+	from: number | null,
+	to: number | null,
+): string {
+	if (to !== null && counted > to) return `${found}, o ${counted - to} za dużo`;
+	if (from !== null && counted < from) {
+		return `${found}, brakuje ${from - counted}`;
+	}
+	return found;
+}
+
+/** What a counting rule counted in this week; undefined for the others. */
+function foundFor(condition: Condition, week: WeekInput): string | undefined {
+	const scope = scopeOf(condition);
+	const countsDays = condition.countMode === "days";
+	const counted = countsDays
+		? daysWithScope(week, scope).length
+		: countInWeek(week, scope);
+	const found = `jest ${countsDays ? trainingDaysText(counted) : workoutsText(counted)}`;
+
+	switch (condition.type) {
+		case "limit":
+			return againstRange(found, counted, null, whole(condition.value, 0));
+		case "minimum": {
+			const workouts = countInWeek(week, scope);
+			return againstRange(
+				`jest ${workoutsText(workouts)}`,
+				workouts,
+				whole(condition.value, 0),
+				null,
+			);
+		}
+		case "zakres": {
+			const from = whole(condition.valueMin, 0);
+			const to = Math.max(from, whole(condition.valueMax, 0));
+			return againstRange(found, counted, from, to);
+		}
+		case "min_dni_odpoczynku": {
+			const rest = week.filter((day) => day.workouts.length === 0).length;
+			return againstRange(
+				`jest ${plural(rest, "dzień odpoczynku", "dni odpoczynku", "dni odpoczynku")}`,
+				rest,
+				whole(condition.value, 0),
+				null,
+			);
+		}
+		case "max_w_dniu": {
+			const most = Math.max(0, ...week.map((day) => day.workouts.length));
+			return againstRange(
+				`najwięcej w jednym dniu: ${most}`,
+				most,
+				null,
+				whole(condition.value, 1),
+			);
+		}
+		case "max_dni_treningowych": {
+			const days = daysWithScope(week, scope).length;
+			return againstRange(
+				`jest ${trainingDaysText(days)}`,
+				days,
+				null,
+				whole(condition.value, 0),
+			);
+		}
+		default:
+			return undefined;
+	}
+}
+
 function checkCondition(
 	week: WeekInput,
 	condition: Condition,
@@ -262,19 +348,37 @@ export function validateWeek(
 
 	if (conditions.length === 0) {
 		const pass = total >= 2 && total < 4;
+		const days = daysWithScope(week, ALL_SCOPE).length;
 		return {
 			total,
 			state: pass ? "valid" : total >= 4 ? "invalid" : "neutral",
-			results: [{ label: DEFAULT_LABEL, pass }],
+			byDefault: true,
+			results: [
+				{
+					label: DEFAULT_LABEL,
+					pass,
+					// Treningi, not days: two on one day are two.
+					found: againstRange(
+						`jest ${workoutsText(total)} w ${plural(days, "dniu", "dniach", "dniach")}`,
+						total,
+						2,
+						3,
+					),
+				},
+			],
 		};
 	}
 
 	const prev = neighbours.prev ?? [];
 	const next = neighbours.next ?? [];
-	const results = conditions.map((condition) => ({
-		label: formatConditionLabel(condition, scopeLabel),
-		pass: checkCondition(week, condition, prev, next),
-	}));
+	const results = conditions.map((condition) => {
+		const found = foundFor(condition, week);
+		return {
+			label: formatConditionLabel(condition, scopeLabel),
+			pass: checkCondition(week, condition, prev, next),
+			...(found ? { found } : {}),
+		};
+	});
 	return {
 		total,
 		state: results.every((result) => result.pass) ? "valid" : "invalid",

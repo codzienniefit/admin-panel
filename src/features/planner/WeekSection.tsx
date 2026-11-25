@@ -45,7 +45,11 @@ export function WeekSection({
 				{result.state !== "neutral" && (
 					<Popover
 						label={`Wymagania tygodnia ${number}`}
-						title="Wymagania rodzaju planu"
+						title={
+							result.byDefault
+								? "Domyślne wymaganie"
+								: "Wymagania rodzaju planu"
+						}
 						align="end"
 						trigger={
 							<span
@@ -74,10 +78,21 @@ export function WeekSection({
 										<span className="sr-only">
 											{item.pass ? " (spełnione)" : " (niespełnione)"}
 										</span>
+										{item.found && (
+											<span className="block text-xs text-muted">
+												{item.found}
+											</span>
+										)}
 									</span>
 								</li>
 							))}
 						</ul>
+						{result.byDefault && (
+							<p className="mt-2 max-w-64 text-xs text-muted">
+								Ten wariant nie ma rodzaju planu, więc obowiązuje domyślne
+								wymaganie. Rodzaj planu wybierzesz w „Ustawieniach wariantu”.
+							</p>
+						)}
 					</Popover>
 				)}
 			</header>

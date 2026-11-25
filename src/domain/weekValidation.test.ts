@@ -68,8 +68,42 @@ describe("the default rule, when a plan type has no rules", () => {
 		).toEqual({
 			total: 2,
 			state: "valid",
-			results: [{ label: "Domyślnie: 2–3 treningi w tygodniu", pass: true }],
+			byDefault: true,
+			results: [
+				{
+					label: "Domyślnie: 2–3 treningi w tygodniu",
+					pass: true,
+					found: "jest 2 treningi w 2 dniach",
+				},
+			],
 		});
+	});
+
+	it("says it counts workouts, not days, and by how much it is off", () => {
+		// the week from the panel: two on day 2, five in four days
+		const busy = week(
+			"stretching",
+			"strength stretching",
+			"",
+			"cardio",
+			"",
+			"strength",
+			"",
+		);
+		const result = validateWeek(busy, [], {}, scopeLabel);
+		expect(result.state).toBe("invalid");
+		expect(result.results[0]).toEqual({
+			label: "Domyślnie: 2–3 treningi w tygodniu",
+			pass: false,
+			found: "jest 5 treningów w 4 dniach, o 2 za dużo",
+		});
+		const quiet = validateWeek(
+			week("cardio", "", "", "", "", "", ""),
+			[],
+			{},
+			scopeLabel,
+		);
+		expect(quiet.results[0]?.found).toBe("jest 1 trening w 1 dniu, brakuje 1");
 	});
 });
 
@@ -450,10 +484,45 @@ describe("a week with rules", () => {
 			total: 2,
 			state: "valid",
 			results: [
-				{ label: "Min. 2 (Wszystkie treningi)", pass: true },
-				{ label: "Max 1 (Cardio)", pass: true },
+				{
+					label: "Min. 2 (Wszystkie treningi)",
+					pass: true,
+					found: "jest 2 treningi",
+				},
+				{ label: "Max 1 (Cardio)", pass: true, found: "jest 1 trening" },
 			],
 		});
+	});
+
+	it("says what each counting rule found", () => {
+		const days = week("cardio", "cardio strength", "cardio", "", "", "", "");
+		const found = (condition: Condition) =>
+			validateWeek(days, [condition], {}, scopeLabel).results[0]?.found;
+		expect(found({ type: "limit", scope: "cardio", value: 2 })).toBe(
+			"jest 3 treningi, o 1 za dużo",
+		);
+		expect(
+			found({ type: "limit", scope: "all", value: 2, countMode: "days" }),
+		).toBe("jest 3 dni treningowe, o 1 za dużo");
+		expect(found({ type: "minimum", scope: "strength", value: 3 })).toBe(
+			"jest 1 trening, brakuje 2",
+		);
+		expect(
+			found({ type: "zakres", scope: "all", valueMin: 2, valueMax: 3 }),
+		).toBe("jest 4 treningi, o 1 za dużo");
+		expect(found({ type: "min_dni_odpoczynku", scope: "all", value: 5 })).toBe(
+			"jest 4 dni odpoczynku, brakuje 1",
+		);
+		expect(found({ type: "max_w_dniu", scope: "all", value: 1 })).toBe(
+			"najwięcej w jednym dniu: 2, o 1 za dużo",
+		);
+		expect(
+			found({ type: "max_dni_treningowych", scope: "cardio", value: 3 }),
+		).toBe("jest 3 dni treningowe");
+		// rules about gaps and runs of days have no single count to show
+		expect(
+			found({ type: "odstep", scope: "cardio", value: 1 }),
+		).toBeUndefined();
 	});
 
 	it("is invalid when one fails, and says which", () => {

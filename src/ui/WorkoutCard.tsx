@@ -83,67 +83,62 @@ export function WorkoutCard({
 				<p className="line-clamp-2 font-medium leading-snug">
 					{workout ? workout.title || "Bez nazwy" : fallbackTitle}
 				</p>
-				{/* Under the title, so a narrow day column keeps the title whole. */}
-				<div className="flex items-start gap-1.5">
-					{thumbnail && <span className="mt-1 shrink-0">{thumbnail}</span>}
-					<div className="min-w-0 flex-1">
-						{types.length > 0 && (
-							<p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] opacity-80">
-								{types.map((type) => (
-									<span
-										key={type.id}
-										className="inline-flex items-center gap-1"
-									>
-										{type.emoji ? (
-											<span aria-hidden="true">{type.emoji}</span>
-										) : (
-											<span
-												data-tone={type.tone}
-												className="size-1.5 rounded-full bg-(--tone)"
-											/>
-										)}
-										{type.label}
-									</span>
-								))}
-							</p>
+				{/* The picture beside the minutes; the types below take the
+				    card's whole width, so a narrow day column does not squeeze
+				    them into one word a line. */}
+				<div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+					{thumbnail && <span className="shrink-0">{thumbnail}</span>}
+					<p className="flex max-w-full flex-wrap items-center gap-x-1.5 text-[11px] whitespace-nowrap opacity-70">
+						{workout ? (
+							<>
+								<span>{workout.durationMinutes} min</span>
+								<span aria-hidden="true">·</span>
+								<span>
+									{workout.format
+										? formatMeta(workout.format).label
+										: workoutFormat(workout)}
+								</span>
+							</>
+						) : (
+							<span>Nie ma takiego treningu</span>
 						)}
-						<p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] opacity-70">
-							{workout ? (
-								<>
-									<span>{workout.durationMinutes} min</span>
-									<span aria-hidden="true">·</span>
-									<span>
-										{workout.format
-											? formatMeta(workout.format).label
-											: workoutFormat(workout)}
-									</span>
-								</>
-							) : (
-								<span>Nie ma takiego treningu</span>
-							)}
-							{workout?.recordingStatus &&
-								workout.recordingStatus !== "published" && (
-									<span
-										data-tone={
-											recordingStatusMeta(workout.recordingStatus).tone
-										}
-										title="Status nagrania"
-										className="rounded-full bg-(--tone-soft) px-1.5 font-semibold text-(--tone-ink) opacity-100"
-									>
-										{recordingStatusMeta(workout.recordingStatus).label}
-									</span>
-								)}
-							{status && status !== "published" && (
+						{workout?.recordingStatus &&
+							workout.recordingStatus !== "published" && (
 								<span
-									data-tone={STATUS_META[status].tone}
+									data-tone={recordingStatusMeta(workout.recordingStatus).tone}
+									title="Status nagrania"
 									className="rounded-full bg-(--tone-soft) px-1.5 font-semibold text-(--tone-ink) opacity-100"
 								>
-									{STATUS_META[status].label}
+									{recordingStatusMeta(workout.recordingStatus).label}
 								</span>
 							)}
-						</p>
-					</div>
+						{status && status !== "published" && (
+							<span
+								data-tone={STATUS_META[status].tone}
+								className="rounded-full bg-(--tone-soft) px-1.5 font-semibold text-(--tone-ink) opacity-100"
+							>
+								{STATUS_META[status].label}
+							</span>
+						)}
+					</p>
 				</div>
+				{types.length > 0 && (
+					<p className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] opacity-80">
+						{types.map((type) => (
+							<span key={type.id} className="inline-flex items-center gap-1">
+								{type.emoji ? (
+									<span aria-hidden="true">{type.emoji}</span>
+								) : (
+									<span
+										data-tone={type.tone}
+										className="size-1.5 rounded-full bg-(--tone)"
+									/>
+								)}
+								{type.label}
+							</span>
+						))}
+					</p>
+				)}
 				{note && (
 					<p className="mt-1 line-clamp-2 border-current/20 border-t pt-1 text-[11px] italic opacity-80">
 						{note}

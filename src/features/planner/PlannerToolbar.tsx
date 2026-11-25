@@ -9,7 +9,6 @@ import { useStore } from "@/lib/store";
 import { Button } from "@/ui/Button";
 import { levelMeta, PREP_TONES } from "@/ui/enums";
 import { SaveStatusText } from "@/ui/SaveStatusText";
-import { Tag } from "@/ui/Tag";
 import { plannerHistory, stagedSchedules } from "./plannerSession";
 
 const RANK: Record<SaveStatus["phase"], number> = {
@@ -94,12 +93,31 @@ export function PlannerToolbar({
 						</Link>
 					);
 				})}
-				<Tag tone="indigo" title="Rodzaj planu">
-					{planTypeName ?? "Bez rodzaju planu"}
-				</Tag>
-				<Tag tone={PREP_TONES[prepStatus]} title="Stan przygotowania">
-					{PREP_LABELS[prepStatus]}
-				</Tag>
+				{/* Both are set in the variant's settings; a click goes there. */}
+				<button
+					type="button"
+					data-tone="indigo"
+					onClick={onSettings}
+					disabled={readOnly}
+					title={
+						planTypeName
+							? "Rodzaj planu decyduje, jakie wymagania sprawdza każdy tydzień. Kliknij, żeby zmienić."
+							: "Bez rodzaju planu każdy tydzień sprawdza tylko domyślne wymaganie: 2–3 treningi. Kliknij, żeby wybrać rodzaj planu."
+					}
+					className="rounded-full bg-(--tone-soft) px-2.5 py-0.5 text-xs font-semibold text-(--tone-ink) enabled:cursor-pointer enabled:hover:underline"
+				>
+					Rodzaj planu: {planTypeName ?? "brak (domyślnie 2–3 treningi)"}
+				</button>
+				<button
+					type="button"
+					data-tone={PREP_TONES[prepStatus]}
+					onClick={onSettings}
+					disabled={readOnly}
+					title="Jak daleko jest przygotowanie tego wariantu: notatka dla zespołu, aplikacja tego nie widzi. Kliknij, żeby zmienić."
+					className="rounded-full bg-(--tone-soft) px-2.5 py-0.5 text-xs font-semibold text-(--tone-ink) enabled:cursor-pointer enabled:hover:underline"
+				>
+					Przygotowanie: {PREP_LABELS[prepStatus]}
+				</button>
 			</div>
 
 			<div className="flex flex-wrap items-center gap-2">

@@ -355,7 +355,7 @@ function OfferForm({
 					}
 				: {
 						title: "Wyłączyć ofertę?",
-						description: `Kod ${offer.code} przestanie działać od razu: aplikacja odpowie „nieznany kod”. Zakupy, które już policzono, zostają. Ofertę można włączyć z powrotem.`,
+						description: `Kod ${offer.code} przestanie działać od razu: aplikacja odpowie „nieznany kod”. Ofertę można później włączyć z powrotem.`,
 						confirmLabel: "Wyłącz",
 						destructive: true,
 					},
@@ -741,7 +741,6 @@ function OfferForm({
 					<Facts
 						items={[
 							{ label: "Identyfikator", value: offer.id },
-							{ label: "Zakupy z tej oferty", value: offer.purchases },
 							{
 								label: "Utworzono",
 								value: formatDateTime(offer.createdAtUtc || null),

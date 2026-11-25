@@ -82,7 +82,7 @@ export function OffersPage({
 		},
 		{
 			key: "period",
-			header: "Kiedy działa",
+			header: "Dostępny od",
 			cell: (offer) => (
 				<span className="text-subtle">{offerPeriod(offer)}</span>
 			),
@@ -95,11 +95,6 @@ export function OffersPage({
 					{offer.offeringId}
 				</span>
 			),
-		},
-		{
-			key: "purchases",
-			header: "Zakupy",
-			cell: (offer) => <span className="tabular-nums">{offer.purchases}</span>,
 		},
 	];
 
